@@ -11,3 +11,6 @@ datassert-docs.md
 # glob, not a literal name: the original literal "reactjs-principles.md" failed to
 # match the real on-disk "reactjs-principles .md" (stray space) and it got tracked.
 *principles*.md
+# Vite dep pre-bundle cache — generated on every dev run, 12MB, never shipped
+# (dist/ is the deployed build and stays tracked on purpose).
+.vite/
