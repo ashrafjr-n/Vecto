@@ -50,7 +50,17 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
                excludedColumns: [] };
     }
 
-    const targetUnique  = [...new Set(targetVals.map(v => String(v).toLowerCase().trim()))];
+    /* Deterministic level ordering. [...new Set()] is INSERTION-ordered, so which
+       level was encoded 0 and which 1 depended on which row happened to appear
+       first in the file: moving a single row to the top flipped the sign of r
+       (Titanic: Sex +0.54 -> -0.54, inverting the conclusion drawn from identical
+       data). Sorting fixes the convention — numerically when both levels are
+       numbers, so "higher value = 1" is meaningful, lexicographically otherwise. */
+    const byLevel = (a, b) => (isNumeric(a) && isNumeric(b))
+      ? parseFloat(a) - parseFloat(b)
+      : (a < b ? -1 : a > b ? 1 : 0);
+
+    const targetUnique  = [...new Set(targetVals.map(v => String(v).toLowerCase().trim()))].sort(byLevel);
     const targetNumeric = targetVals.filter(v => isNumeric(v));
     const isNumericTarget     = targetVals.length > 0 && targetNumeric.length / targetVals.length > 0.8;
     const isBinaryTarget      = targetUnique.length === 2;
@@ -67,7 +77,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       if (skipCols.has(col)) return;
 
       const colVals = getValues(data, col);
-      const colUnique = [...new Set(colVals.map(v => String(v).toLowerCase().trim()))];
+      const colUnique = [...new Set(colVals.map(v => String(v).toLowerCase().trim()))].sort(byLevel);
       const colNumericVals = colVals.filter(v => isNumeric(v));
       const colIsNumeric = colNumericVals.length / colVals.length > 0.8;
       const colIsBinary  = colUnique.length === 2;
@@ -135,10 +145,24 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
 
         const rCats = Object.keys(rowMarg).length;
         const cCats = Object.keys(colMarg).length;
-        const minDim = Math.min(rCats - 1, cCats - 1);
-        if (minDim <= 0) return;
+        if (Math.min(rCats - 1, cCats - 1) <= 0) return;
 
-        const cramersV = Math.sqrt(chi2 / (totalN * minDim));
+        /* Bergsma (2013) bias correction. Uncorrected V = sqrt(chi2/(N*min(r-1,c-1)))
+           rises toward 1.0 from cardinality alone: on Titanic "Name" (891 distinct
+           values over 891 rows) scored 0.73 and was reported as the TOP predictor of
+           Survived, ahead of "Sex" (0.54) — a column that generalizes to nothing beat
+           the real signal. The correction subtracts the chi-square expected under
+           independence and shrinks both dimensions the same way, sending per-row-unique
+           columns to 0 while leaving Sex/Pclass/Embarked untouched (delta < 0.01 at N=891). */
+        const phi2     = chi2 / totalN;
+        const phi2Corr = Math.max(0, phi2 - ((rCats - 1) * (cCats - 1)) / (totalN - 1));
+        const rTilde   = rCats - ((rCats - 1) ** 2) / (totalN - 1);
+        const cTilde   = cCats - ((cCats - 1) ** 2) / (totalN - 1);
+        const minDim   = Math.min(rTilde - 1, cTilde - 1);
+        // A dimension shrinks to <= 0 exactly when it carried no usable signal (one
+        // distinct value per row) — that is a zero association, not a NaN. totalN >= 5
+        // is guaranteed above, so the (totalN - 1) divisors are always safe.
+        const cramersV = minDim <= 0 ? 0 : Math.sqrt(phi2Corr / minDim);
         // FIX #4: store metric type — Cramér's V is not comparable to Pearson
         targetCorrelations[col] = {
           metric:   "cramers_v",
