@@ -300,8 +300,10 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
     );
   }
 
-  // Balanced classes
-  if (classBalance && !classBalance.isImbalanced) {
+  // Balanced classes. An identifier target passes the plain imbalance test —
+  // 891 classes of one row each have a majority/minority ratio of exactly 1.0 —
+  // so this used to print a green "Classes are Balanced" for PassengerId.
+  if (classBalance && !classBalance.isImbalanced && !meta.targetIsIdentifier) {
     const majority = classBalance.classes.filter(c => !c.missing)[0];
     push("success",
       "Classes are Balanced",

@@ -338,5 +338,70 @@ check("normalizeValue keys numbers by value, so \"1\", \"1.0\" and \" 1 \" agree
 check("normalizeValue is case- and whitespace-insensitive for text",
   normalizeValue(" Male ") === normalizeValue("MALE"));
 
+/* ══════════════════════════════════════════
+   8. EVIDENCE CAPS — stage 5
+   The score measured how good the data LOOKED and never asked whether there was
+   enough of it to justify saying so. Measured before the cap layer:
+     2 rows / 2 cols             -> 84 "Good"
+     1 row                       -> 77 "Good"
+     titanic, PassengerId target -> 88 "Good", targetReadiness 100
+     titanic, Survived target    -> 93 "Excellent", with Cabin 77% missing
+   An overconfident score is more dangerous than a crash: it does not look like
+   a defect, so nobody goes looking for one.
+══════════════════════════════════════════ */
+console.log("\nThe score cannot claim more than the evidence supports\n");
+
+const tiny  = analyzeDataset([{ a: "1", b: "x" }, { a: "2", b: "y" }], ["a", "b"], "b");
+const idTgt = analyzeDataset(idRows, ["pid", "v"], "pid");
+
+check("a 2-row dataset is not graded Good or Excellent",
+  tiny.healthScore.score < 60);
+
+check("an identifier chosen as target is not graded as usable",
+  idTgt.healthScore.score <= 40);
+
+check("an identifier target is never described as balanced",
+  !idTgt.insights.some(i => /balanc/i.test(i.title ?? "")));
+
+/* Every cap must explain itself. A score that is quietly lower teaches the user
+   nothing; the reason is the part that has value. */
+const allCaps = [...tiny.healthScore.limits, ...idTgt.healthScore.limits];
+check("every cap carries a non-empty human reason",
+  allCaps.length > 0 && allCaps.every(c => typeof c.reason === "string" && c.reason.length > 10));
+
+check("every cap names a ceiling the final score actually respects",
+  allCaps.every(c => Number.isFinite(c.max))
+    && tiny.healthScore.score <= Math.min(...tiny.healthScore.limits.map(c => c.max)));
+
+/* THE false positive this design has to avoid. A continuous regression target
+   (price, fare, temperature) is ALSO one distinct value per row, so a rule based
+   on class count alone would condemn every legitimate regression dataset.
+   Identifier-ness, not cardinality, is the discriminator. */
+const priceRows = Array.from({ length: 600 }, (_, i) => ({
+  size:  String(100 + (i % 173)),
+  grade: ["a", "b", "c"][i % 3],
+  price: String(1000 + i * 7.31),          // continuous, one distinct value per row
+}));
+const priceRun = analyzeDataset(priceRows, ["size", "grade", "price"], "price");
+check("a continuous regression target is NOT mistaken for an identifier",
+  priceRun.meta.targetIsIdentifier === false
+    && !priceRun.healthScore.limits.some(c => /identifier/i.test(c.reason)));
+
+/* Caps must not make a good grade unreachable — they bound overreach, they are
+   not a blanket penalty. */
+const cleanRows = Array.from({ length: 2000 }, (_, i) => ({
+  measure: String((i * 7919) % 100000),
+  price:   String((i % 997) / 7),
+  grp:     ["a", "b", "c"][i % 3],
+  code:    String(i % 4),
+  y:       i % 2 ? "yes" : "no",
+}));
+const clean = analyzeDataset(cleanRows, ["measure", "price", "grp", "code", "y"], "y");
+check("a large clean dataset still reaches Excellent (caps bound overreach, not everything)",
+  clean.healthScore.score >= 90 && clean.healthScore.limits.length === 0);
+
+check("an uncapped run reports no limits",
+  clean.healthScore.limits.length === 0);
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);

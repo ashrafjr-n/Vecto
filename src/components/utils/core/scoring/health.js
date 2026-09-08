@@ -9,12 +9,14 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
   // FIX #1b: Additional per-column severity penalty.
   // A single column with 77% missing is a serious structural problem
   // even if the overall dataset missing% looks small.
-  const worstColMissingPct = quality.columnsWithIssues
+  let worstColMissingPct = 0;
+  let worstMissingCol    = null;
+  quality.columnsWithIssues
     .filter(c => c.issue === "missing")
-    .reduce((worst, c) => {
+    .forEach(c => {
       const pct = ((c.count ?? parseInt(c.detail)) / meta.rows) * 100;
-      return Math.max(worst, pct);
-    }, 0);
+      if (pct > worstColMissingPct) { worstColMissingPct = pct; worstMissingCol = c.col; }
+    });
 
   // Penalty: 0 if worst col < 20%, scales to -30 at 100%
   const worstColPenalty = worstColMissingPct > 20
@@ -134,6 +136,47 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
     targetDim = Math.min(100, tScore);
   }
 
+  /* ── Evidence caps ──
+     Everything above measures how good the data LOOKS. Nothing above asks
+     whether there is enough of it to justify saying so, and the weighting lets
+     one strong dimension carry a dataset that has no business being graded.
+     Measured before this layer existed:
+
+       2 rows / 2 columns           -> 84 "Good"      (quality 100: nothing is
+                                       missing when there is nothing there)
+       1 row                        -> 77 "Good"
+       titanic, PassengerId target  -> 88 "Good", targetReadiness 100
+       titanic, Survived target     -> 93 "Excellent", with Cabin 77% missing
+
+     A cap does not compute a better number — it refuses to claim one, and
+     carries the reason so the report can say why instead of just showing a
+     smaller figure. Caps only ever lower a score, never raise it. */
+  const caps  = [];
+  const nRows = `${meta.rows} row${meta.rows === 1 ? "" : "s"}`;
+
+  if (meta.rows < 10) {
+    caps.push({ max: 25, reason: `Only ${nRows} — there is not enough data here to assess anything.` });
+  } else if (meta.rows < 50) {
+    caps.push({ max: 50, reason: `Only ${nRows} — estimates from this few rows are not stable enough to act on.` });
+  } else if (meta.rows < 200) {
+    caps.push({ max: 75, reason: `${nRows} is a small dataset — treat every figure here as provisional.` });
+  }
+
+  // A target that is unique per row has nothing in it to learn. This has to come
+  // from meta.targetIsIdentifier: the class-balance test cannot see it, because a
+  // legitimate continuous target (price, temperature) is also one row per class.
+  if (meta.targetIsIdentifier) {
+    caps.push({ max: 40, reason: `The target "${meta.target}" is unique per row — an identifier, not a label. There is nothing in it for a model to predict.` });
+  }
+
+  if (worstColMissingPct >= 90) {
+    caps.push({ max: 55, reason: `"${worstMissingCol}" is ${Math.round(worstColMissingPct)}% empty — it carries almost no information.` });
+  } else if (worstColMissingPct >= 50) {
+    caps.push({ max: 89, reason: `"${worstMissingCol}" is ${Math.round(worstColMissingPct)}% missing — that has to be dealt with before this dataset is "Excellent".` });
+  }
+
+  const ceiling = caps.reduce((lowest, c) => Math.min(lowest, c.max), 100);
+
   /* ── Final weighted score ── */
   let score;
   if (hasTarget) {
@@ -143,7 +186,7 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
     score = qualityDim * 0.40 + structureDim * 0.30 + relDim * 0.30;
   }
 
-  const finalScore = Math.round(Math.max(0, Math.min(100, score)));
+  const finalScore = Math.round(Math.max(0, Math.min(100, score, ceiling)));
 
   const grade =
     finalScore >= 90 ? "Excellent" :
@@ -166,6 +209,10 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
       duplicatesComputed: quality.duplicatesComputed,
       components:         qualityComponents,
     },
+    // Every cap that applied, with its reason. Empty when the score is the
+    // weighted figure in full — so a capped score can always explain itself
+    // rather than just being mysteriously lower.
+    limits: caps,
     hasTarget,
   };
 }

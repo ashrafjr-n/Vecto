@@ -11,7 +11,7 @@ import { getRelationshipsV3 }      from "./analyzers/relations.js";
 import { getHealthScore }          from "./scoring/health.js";
 import { getRecommendations }      from "./intelligence/recommendations.js";
 import { getPriorityInsights }     from "./intelligence/insights.js";
-import { getValues, isMissing, valueFrequencies } from "./helpers.js";
+import { getValues, isMissing, valueFrequencies, isIdentifierCol } from "./helpers.js";
 import { ROLE } from "./roles.constants.js";
 
 export { detectColumnRoles }       from "./detectors/roles.js";
@@ -33,7 +33,14 @@ export function analyzeDataset(data, columns, target) {
   // explicitly there or they leak back in as spurious predictors).
   const skipFromCorrelation = new Set([...identifierCols, ...temporalCols]);
 
-  const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, columnRoles);
+  /* detectColumnRoles deliberately skips the identifier check for the target, so
+     the target's identifier-ness is not recoverable from columnRoles or from
+     identifierCols. It has to be asked separately — without it, PassengerId as a
+     target looks exactly like a legitimate continuous regression target (a price
+     column is ALSO one distinct value per row) and scored 88 "Good". */
+  const targetIsIdentifier = !!target && isIdentifierCol(data, target);
+
+  const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, columnRoles, targetIsIdentifier);
   const quality        = getQuality(data, columns, identifierCols, temporalCols);
   const statistics     = getStatistics(data, numericCols);
   const visualizations = getVisualizations(data, columns, numericCols, categoricalCols);
@@ -54,7 +61,7 @@ export function analyzeDataset(data, columns, target) {
 }
 
 
-function getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, columnRoles) {
+function getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, columnRoles, targetIsIdentifier) {
   let datasetType = "Unknown";
 
   if (target) {
@@ -92,6 +99,7 @@ function getMeta(data, columns, target, numericCols, categoricalCols, identifier
     temporalCols,
     columnRoles,
     target,
+    targetIsIdentifier,
     datasetType,
   };
 }

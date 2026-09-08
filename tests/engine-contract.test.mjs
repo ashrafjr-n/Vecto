@@ -65,7 +65,7 @@ assertKeysExact(withTarget, [
 
 assertKeysExact(withTarget.meta, [
   "rows", "columns", "numericCols", "categoricalCols", "identifierCols",
-  "temporalCols", "columnRoles", "target", "datasetType",
+  "temporalCols", "columnRoles", "target", "targetIsIdentifier", "datasetType",
 ], "meta");
 
 assertKeysExact(withTarget.quality, [
@@ -132,8 +132,9 @@ if (withTarget.insights.length > 0) {
 }
 
 assertKeysExact(withTarget.healthScore, [
-  "score", "grade", "breakdown", "qualityBreakdown", "hasTarget",
+  "score", "grade", "breakdown", "qualityBreakdown", "limits", "hasTarget",
 ], "healthScore");
+assertType(withTarget.healthScore.limits, "array", "healthScore.limits (always an array, [] when uncapped)");
 assertKeysExact(withTarget.healthScore.breakdown, [
   "quality", "structure", "relationships", "targetReadiness",
 ], "healthScore.breakdown");
