@@ -13,9 +13,7 @@ import {
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import { setPendingDataset } from "../lib/datasetHandoff.js";
-
-const MAX_SIZE_MB = 40;
-const MAX_SIZE_B  = MAX_SIZE_MB * 1024 * 1024;
+import { validateFile, inspectParseResult, MAX_SIZE_MB } from "../lib/csvIntake.js";
 
 const ERRORS = {
   format: {
@@ -258,12 +256,6 @@ function DatasetJourneySection() {
   );
 }
 
-function validate(file) {
-  if (!file.name.toLowerCase().endsWith(".csv") && file.type !== "text/csv") return "format";
-  if (file.size > MAX_SIZE_B) return "size";
-  return null;
-}
-
 const TalkingPointsColumn = forwardRef(function TalkingPointsColumn(_props, ref) {
   return (
     <aside ref={ref} className="order-2 space-y-6 lg:order-1">
@@ -334,6 +326,9 @@ function Home() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
   const [error,      setError]      = useState(null);
+  /* Set when the CSV parsed but some rows were ragged — a warning, not a
+     rejection: the readable rows are already handed off and analysable. */
+  const [malformed,  setMalformed]  = useState(null);
 
   /* Keeps "How the analysis works" the same height as "Why it's built this
      way" — both are dynamic-height content, so a fixed Tailwind height would
@@ -353,24 +348,36 @@ function Home() {
 
   const handleFile = useCallback((file) => {
     if (!file) return;
-    const err = validate(file);
+    const err = validateFile(file);
     if (err) { setError(err); return; }
 
     setError(null);
+    setMalformed(null);
     setIsParsing(true);
 
     Papa.parse(file, {
       header:         true,
       skipEmptyLines: true,
       complete: (results) => {
-        const data = results.data;
-        const cols = results.meta.fields;
-        if (!cols || cols.length === 0 || data.length === 0) {
+        const { error: verdict, malformed } = inspectParseResult(results);
+        if (verdict) {
           setIsParsing(false);
-          setError("parse");
+          setError(verdict);
           return;
         }
-        setPendingDataset(data, cols);
+
+        setPendingDataset(results.data, results.meta.fields);
+
+        /* Rows PapaParse could not read cleanly. They were previously ignored
+           outright — the file analyzed silently and every statistic downstream
+           was computed over partly-garbage rows the user never saw. Hold the
+           navigation so the warning is actually read; the data is already
+           handed off, so continuing is one click. */
+        if (malformed) {
+          setIsParsing(false);
+          setMalformed(malformed);
+          return;
+        }
         navigate("/analyze");
       },
       error: () => {
@@ -461,6 +468,33 @@ function Home() {
               <p className="mt-4 text-center text-[12px] text-ink-faint">
                 CSV only · Up to {MAX_SIZE_MB}MB · Processed locally, never uploaded
               </p>
+
+              {malformed && (
+                <div className="mt-4 rounded-lg border border-warning/25 bg-warning-tint px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <FileWarning size={16} className="mt-0.5 shrink-0 text-warning" />
+                    <div>
+                      <div className="text-[13px] font-semibold text-warning">
+                        {malformed.count.toLocaleString()} row{malformed.count > 1 ? "s" : ""} could not be read cleanly.
+                      </div>
+                      <div className="mt-0.5 text-[13px] leading-relaxed text-ink-soft">
+                        {malformed.totalRows.toLocaleString()} rows parsed. The affected lines
+                        {" "}({malformed.sampleRows.join(", ")}
+                        {malformed.count > malformed.sampleRows.length ? ", …" : ""}) have a
+                        different column count than the header, usually from an unescaped comma
+                        or quote. They are still analysed, so the report may be skewed.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/analyze")}
+                    className="mt-3 w-full rounded-lg bg-ink px-4 py-2 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
+                  >
+                    Analyze anyway
+                  </button>
+                </div>
+              )}
 
               {error && (
                 <div className="mt-4 flex items-start gap-3 rounded-lg border border-critical/20 bg-critical-tint px-4 py-3">
