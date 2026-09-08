@@ -1,4 +1,4 @@
-import { getValues } from "../helpers.js";
+import { getValues, normalizeValue } from "../helpers.js";
 
 export function detectTarget(columns, data) {
   const targetNames = [
@@ -17,7 +17,7 @@ export function detectTarget(columns, data) {
   //    Prefer the LAST binary column found (more likely to be target)
   const binaryCols = columns.filter(col => {
     const vals   = getValues(data, col);
-    const unique = [...new Set(vals.map(v => String(v).toLowerCase().trim()))];
+    const unique = [...new Set(vals.map(v => normalizeValue(v)))];
     return unique.length === 2 && (
       (unique.includes("0") && unique.includes("1")) ||
       (unique.includes("yes") && unique.includes("no")) ||

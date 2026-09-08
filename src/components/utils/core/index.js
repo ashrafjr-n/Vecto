@@ -11,7 +11,7 @@ import { getRelationshipsV3 }      from "./analyzers/relations.js";
 import { getHealthScore }          from "./scoring/health.js";
 import { getRecommendations }      from "./intelligence/recommendations.js";
 import { getPriorityInsights }     from "./intelligence/insights.js";
-import { getValues, isMissing } from "./helpers.js";
+import { getValues, isMissing, valueFrequencies } from "./helpers.js";
 import { ROLE } from "./roles.constants.js";
 
 export { detectColumnRoles }       from "./detectors/roles.js";
@@ -104,19 +104,14 @@ function getClassBalance(data, target) {
   const totalRows   = allVals.length;
   const missingCount = allVals.filter(v => isMissing(v)).length;
 
-  const freq = {};
-  allVals.forEach(v => {
-    if (!isMissing(v)) freq[String(v)] = (freq[String(v)] || 0) + 1;
-  });
-
+  // Levels are grouped by the canonical key and labelled with an original
+  // spelling, so " Male "/"MALE"/"male" is ONE class still displayed as "Male".
   // FIX: pct over totalRows (not just non-missing), so numbers add up to ≤100%
-  const classes = Object.entries(freq)
-    .sort((a, b) => b[1] - a[1])
-    .map(([value, count]) => ({
-      value,
-      count,
-      pct: Math.round((count / totalRows) * 1000) / 10,
-    }));
+  const classes = valueFrequencies(data, target).map(({ value, count }) => ({
+    value,
+    count,
+    pct: Math.round((count / totalRows) * 1000) / 10,
+  }));
 
   if (missingCount > 0) {
     classes.push({

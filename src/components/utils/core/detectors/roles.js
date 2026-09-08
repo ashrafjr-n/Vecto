@@ -1,4 +1,4 @@
-import { isIdentifierCol, isNumeric, isMissing } from "../helpers.js";
+import { isIdentifierCol, isNumeric, isMissing, normalizeValue } from "../helpers.js";
 import { isTemporalColumn } from "./temporal.js";
 import { ROLE } from "../roles.constants.js";
 
@@ -56,7 +56,7 @@ function profileColumn(data, col) {
     }
 
     if (!overflowed) {
-      distinct.add(numeric ? String(parseFloat(raw)) : String(raw).toLowerCase().trim());
+      distinct.add(normalizeValue(raw));
       if (distinct.size > CARD_CAP) overflowed = true;
     }
   }

@@ -2,7 +2,7 @@ import {
   getNumericValues,
   mean, median, stdDev, quantile,
   skewness as computeSkewness, kurtosis as computeKurtosis,
-  buildHistogram, isMissing, minMax,
+  buildHistogram, minMax, valueFrequencies,
 } from "../helpers.js";
 
 export function getStatistics(data, numericCols) {
@@ -125,23 +125,16 @@ export function getVisualizations(data, columns, numericCols, categoricalCols) {
   });
 
   categoricalCols.forEach(col => {
-    const freq = {};
-    data.forEach(r => {
-      const v = r[col];
-      // FIX (Group B): exclude missing tokens so NA/?/"" don't render as categories
-      if (!isMissing(v)) freq[String(v)] = (freq[String(v)] || 0) + 1;
-    });
-
-    const total       = Object.values(freq).reduce((a, b) => a + b, 0);
-    const uniqueCount = Object.keys(freq).length;
-    const sorted      = Object.entries(freq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([value, count]) => ({
-        value,
-        count,
-        pct: Math.round((count / total) * 1000) / 10,
-      }));
+    // Grouped by the canonical key, labelled with an original spelling, missing
+    // tokens excluded (FIX Group B) — one shared rule, in valueFrequencies().
+    const levels      = valueFrequencies(data, col);
+    const total       = levels.reduce((sum, l) => sum + l.count, 0);
+    const uniqueCount = levels.length;
+    const sorted      = levels.slice(0, 10).map(({ value, count }) => ({
+      value,
+      count,
+      pct: Math.round((count / total) * 1000) / 10,
+    }));
 
     const topValue = sorted[0];
     const insight  = topValue
