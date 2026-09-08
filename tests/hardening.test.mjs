@@ -16,6 +16,8 @@ import { getStatistics, getVisualizations } from "../src/components/utils/core/a
 import { getRelationshipsV3 } from "../src/components/utils/core/analyzers/relations.js";
 import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
+import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
+import { ROLE } from "../src/components/utils/core/roles.constants.js";
 import { validateFile, inspectParseResult, MAX_SIZE_B } from "../src/lib/csvIntake.js";
 
 let failures = 0;
@@ -231,6 +233,57 @@ check("binary-feature correlation keeps its sign when rows are reordered",
 
 check("binary-feature correlation is identical, not merely same-signed, after reordering",
   signA === signB);
+
+/* ══════════════════════════════════════════
+   6. ROLE STABILITY — stage 3
+   Roles decide which analysis every column receives, so a role that moves is a
+   report that moves. Cardinality used to be judged against a 100-row head
+   sample, making the verdict a function of dataset size rather than of the
+   column: Pclass came back NUMERIC at n<=60 and CATEGORICAL at n>=80.
+══════════════════════════════════════════ */
+console.log("\nRole detection is stable and complete\n");
+
+const SIZES = [20, 40, 60, 80, 100, 500, 5000];
+const roleAt = (n, build, col) =>
+  detectColumnRoles(Array.from({ length: n }, (_, i) => build(i)), [col], null)[col];
+
+const shapes = {
+  "a 3-level code":        { build: i => ({ c: String((i % 3) + 1) }), want: ROLE.CATEGORICAL },
+  "a 0/1 flag":            { build: i => ({ c: String(i % 2) }),       want: ROLE.BINARY },
+  "a 0-8 count":           { build: i => ({ c: String(i % 9) }),       want: ROLE.NUMERIC },
+  "a continuous measure":  { build: i => ({ c: String(i * 1.7) }),     want: ROLE.NUMERIC },
+  "a text category":       { build: i => ({ c: ["red","green","blue"][i % 3] }), want: ROLE.CATEGORICAL },
+};
+
+for (const [label, { build, want }] of Object.entries(shapes)) {
+  const seen = SIZES.map(n => roleAt(n, build, "c"));
+  check(`${label} keeps one role at every size (${SIZES.length} sizes, 20-5000 rows)`,
+    seen.every(r => r === seen[0]));
+  check(`${label} is ${want}`, seen[0] === want);
+}
+
+/* ROLE.BINARY was unreachable for the most common binary encoding there is: a
+   numeric 0/1 column was claimed by the encoded-categorical branch first, so only
+   text pairs (yes/no, male/female) ever reached it. */
+const binaryEncodings = {
+  "numeric 0/1":  i => ({ c: String(i % 2) }),
+  "numeric 1/2":  i => ({ c: String((i % 2) + 1) }),
+  "text yes/no":  i => ({ c: i % 2 ? "yes" : "no" }),
+  "text m/f":     i => ({ c: i % 2 ? "male" : "female" }),
+  "bool strings": i => ({ c: i % 2 ? "true" : "false" }),
+};
+for (const [label, build] of Object.entries(binaryEncodings)) {
+  check(`ROLE.BINARY is reached by ${label}`, roleAt(500, build, "c") === ROLE.BINARY);
+}
+
+/* Normalization: one level written three ways is one level, not three. */
+check("numeric levels are counted by value, so \"1\", \"1.0\" and \" 1 \" are one level",
+  roleAt(300, i => ({ c: [" 1 ", "1.0", "1"][i % 3] }), "c") !== ROLE.BINARY);
+
+/* A column of one distinct value carries no information and must not be mistaken
+   for a binary flag. */
+check("a constant column is not reported as binary",
+  roleAt(300, () => ({ c: "7" }), "c") !== ROLE.BINARY);
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
