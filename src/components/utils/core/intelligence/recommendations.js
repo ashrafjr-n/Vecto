@@ -1,3 +1,5 @@
+import { ROLE } from "../roles.constants.js";
+
 export function getRecommendations({ meta, quality, statistics, relationships, classBalance, visualizations = [] }) {
   const recs = [];
 
@@ -6,7 +8,36 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
   /* Advice was type-blind: every rule keyed off a quality flag or a statistic
      and never asked what KIND of column it was talking about. meta.columnRoles
      has existed all along and was never consulted here. */
+  const roleOf   = col => meta.columnRoles?.[col];
   const catViz   = new Map(visualizations.filter(v => v.type === "categorical").map(v => [v.col, v]));
+
+  /* Imputation depends on what the column IS, not on whether a statistics entry
+     happened to exist for it. The old rule read `stat ? (skewed ? median : mean)
+     : "mode"` — so the fallback to mode was reached by ACCIDENT, whenever
+     statistics had no entry, which is also true for temporal columns (where
+     both mean and mode are wrong) and for a numeric column that was excluded
+     for any other reason. */
+  const imputationFor = (col) => {
+    const role = roleOf(col);
+    const stat = statistics.find(s => s.col === col);
+    if (role === ROLE.TEMPORAL) {
+      return { method: "forward-fill or interpolation",
+               why: "this is a date column — a mean or a mode date is meaningless; carry the previous value forward or interpolate between neighbours" };
+    }
+    if (role === ROLE.CATEGORICAL || role === ROLE.BINARY) {
+      return { method: 'the most frequent level, or an explicit "Unknown" category',
+               why: 'this is a categorical column — averaging levels is undefined, and an explicit "Unknown" keeps missingness visible to the model' };
+    }
+    if (stat && Math.abs(stat.skewness) > 1) {
+      return { method: "median",
+               why: `the distribution is skewed (${stat.skewness}), so the mean is pulled toward the tail while the median is not` };
+    }
+    if (stat) {
+      return { method: "mean", why: "the distribution is roughly symmetric, so the mean is a fair centre" };
+    }
+    return { method: "the most frequent value",
+             why: "no numeric summary is available for this column" };
+  };
 
   /* ── Missing values ── */
   quality.columnsWithIssues
@@ -17,47 +48,47 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       const pct    = rawPct < 1 && rawPct > 0
         ? Math.max(0.1, Math.round(rawPct * 10) / 10)
         : Math.round(rawPct);
-      const stat   = statistics.find(s => s.col === c.col);
-      const skewed = stat && Math.abs(stat.skewness) > 1;
+      const { method, why } = imputationFor(c.col);
 
       if (pct > 50) {
+        /* "Just drop it" throws away the one thing a mostly-empty column still
+           reliably carries: WHETHER the value was present. On titanic, Cabin is
+           77% missing and its missingness tracks passenger class closely — the
+           presence flag survives even though the value does not. */
         push({
           category:  "Data Cleaning",
           priority:  "high",
           column:    c.col,
           issue:     `Missing values (${pct}%)`,
-          action:    `Consider dropping "${c.col}" — over 50% of values are missing, making imputation unreliable.`,
-          rationale: `${pct}% missing exceeds the safe imputation threshold. The column may not provide useful signal.`,
+          action:    `Replace "${c.col}" with a binary "${c.col}_present" indicator rather than dropping it outright, then drop the original.`,
+          rationale: `${pct}% missing is past the point where imputing the VALUE is defensible — ${method} would be invented for ${pct}% of rows. Whether the value exists at all is still real, measured information and often correlates with something meaningful, so keep that and discard the rest.`,
         });
       } else if (pct > 20) {
-        const method = stat ? (skewed ? "median" : "mean") : "mode";
         push({
           category:  "Data Cleaning",
           priority:  "high",
           column:    c.col,
           issue:     `Missing values (${pct}%)`,
-          action:    `Impute "${c.col}" using ${method}${pct > 30 ? " and consider adding a binary indicator column (col_was_missing)" : ""}.`,
-          rationale: `${pct}% missing is significant.${skewed ? " Distribution is skewed — median is more robust than mean." : ""}`,
+          action:    `Impute "${c.col}" with ${method}, and add a binary "${c.col}_was_missing" indicator alongside it.`,
+          rationale: `${pct}% missing is high enough that the imputed value becomes a real part of the column — ${why}. The indicator lets the model separate imputed rows from measured ones instead of treating them as equally trustworthy.`,
         });
       } else if (pct > 5) {
-        const method = stat ? (skewed ? "median" : "mean") : "mode";
         push({
           category:  "Data Cleaning",
           priority:  "medium",
           column:    c.col,
           issue:     `Missing values (${pct}%)`,
-          action:    `Impute "${c.col}" using ${method}.`,
-          rationale: `${pct}% missing is manageable with standard imputation.`,
+          action:    `Impute "${c.col}" with ${method}.`,
+          rationale: `${pct}% missing is manageable with standard imputation — ${why}.`,
         });
       } else if (count > 0) {
-        // Only generate recommendation if there are actual missing values
         push({
           category:  "Data Cleaning",
           priority:  "low",
           column:    c.col,
           issue:     `Missing values (${pct}%)`,
-          action:    `Consider row deletion or ${stat ? "median" : "mode"} imputation for "${c.col}" — only ${pct}% affected.`,
-          rationale: `Low missing rate. Row deletion is safe if dataset is large enough.`,
+          action:    `Drop the ${count} affected row${count === 1 ? "" : "s"}, or impute "${c.col}" with ${method}.`,
+          rationale: `Only ${pct}% of rows are affected, so deleting them costs little${meta.rows > 100 ? "" : " — though with only " + meta.rows + " rows, imputing is safer than losing any"}.`,
         });
       }
     });
