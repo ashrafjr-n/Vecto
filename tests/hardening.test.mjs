@@ -175,27 +175,28 @@ const weakSignal = getHealthScore({
 check("health score is finite when targetCorrelations is populated",
   Number.isFinite(strongSignal.score) && Number.isFinite(strongSignal.breakdown.relationships));
 
-/* THE bug: health.js does Math.abs(entry) on a {metric,value,absValue} object.
-   Math.abs(object) is NaN, every NaN comparison is false, so signalScore falls
-   through to its worst bucket (15) for EVERY dataset that has a target — the
-   relationships dimension is a constant, carrying zero information.
-   relations.js already fixed this exact read (FIX P1); health.js was missed.
-   Scheduled for stage 2 — and deliberately NOT fixed before the Cramer's V
-   bias correction, because until then the strongest "signal" on a real file is
-   an inflated high-cardinality column, and trusting it makes the score worse. */
+/* Was: health.js did Math.abs(entry) on a {metric,value,absValue} object.
+   Math.abs(object) is NaN, every NaN comparison is false, so signalScore fell
+   through to its worst bucket (15) for EVERY dataset with a target and the
+   relationships dimension was a constant carrying zero information. Fixed in
+   stage 2, deliberately AFTER the Cramer's V bias correction below — until that
+   landed, the strongest "signal" on a real file was an inflated high-cardinality
+   column, so making the score listen to it would have made the score worse. */
 check("relationships dimension distinguishes strong signal from none",
-  strongSignal.breakdown.relationships !== weakSignal.breakdown.relationships,
-  true);
+  strongSignal.breakdown.relationships !== weakSignal.breakdown.relationships);
+
+check("a strong feature-target signal scores the relationships dimension higher than a weak one",
+  strongSignal.breakdown.relationships > weakSignal.breakdown.relationships);
 
 /* ══════════════════════════════════════════
-   5. CORRELATION CORRECTNESS — stage 2 targets, pinned now
+   5. CORRELATION CORRECTNESS — stage 2 fixes, now guarded
 ══════════════════════════════════════════ */
 console.log("\nCorrelation correctness\n");
 
 /* A column with one distinct value per row carries no generalizable signal, but
    uncorrected Cramer's V rises toward 1.0 purely from cardinality. On Titanic
    this made "Name" (891/891 unique) outrank "Sex" as the reported top predictor
-   of survival. Bergsma (2013) bias correction sends it to ~0. */
+   of survival. The Bergsma (2013) correction added in stage 2 sends it to 0. */
 const cardRows = Array.from({ length: 400 }, (_, i) => ({
   unique_note: `note_${i}`,
   real_signal: i % 2 === 0 ? "left" : "right",
@@ -207,8 +208,11 @@ check("a genuinely predictive low-cardinality column is detected",
   (cardRel.targetCorrelations.real_signal?.absValue ?? 0) > 0.9);
 
 check("a per-row-unique text column is not reported as a strong predictor",
-  (cardRel.targetCorrelations.unique_note?.absValue ?? 1) < 0.3,
-  true);
+  (cardRel.targetCorrelations.unique_note?.absValue ?? 1) < 0.3);
+
+check("the real predictor outranks the per-row-unique column",
+  (cardRel.targetCorrelations.real_signal?.absValue ?? 0)
+    > (cardRel.targetCorrelations.unique_note?.absValue ?? 1));
 
 /* Binary text features are encoded 0/1 by order of first appearance
    ([...new Set()] is insertion-ordered), so moving one row to the top of the
@@ -223,8 +227,10 @@ const signA = getRelationshipsV3(signRows, [], "y", new Set()).targetCorrelation
 const signB = getRelationshipsV3(movedRows, [], "y", new Set()).targetCorrelations.sex?.value;
 
 check("binary-feature correlation keeps its sign when rows are reordered",
-  Math.sign(signA) === Math.sign(signB),
-  true);
+  Math.sign(signA) === Math.sign(signB));
+
+check("binary-feature correlation is identical, not merely same-signed, after reordering",
+  signA === signB);
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);

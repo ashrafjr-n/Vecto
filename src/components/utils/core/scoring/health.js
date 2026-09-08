@@ -86,8 +86,14 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
   // Feature-target signal — works with both Pearson and Cramér's V
   let signalScore = 65; // neutral default (slightly lower — no info = uncertain)
   if (hasTarget && Object.keys(relationships.targetCorrelations).length > 0) {
+    // FIX P1 (relations.js) applied here too: targetCorrelations values are
+    // {metric, value, absValue} objects since FIX #4, not bare numbers.
+    // Math.abs(object) is NaN and every NaN comparison is false, so maxR stayed 0,
+    // signalScore fell through to its worst bucket (15) for EVERY dataset with a
+    // target, and the relationships dimension was a constant 62 carrying no
+    // information at all. Read absValue directly.
     const maxR = Object.values(relationships.targetCorrelations)
-      .reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+      .reduce((m, entry) => Math.max(m, entry?.absValue ?? 0), 0);
     signalScore =
       maxR >= 0.5  ? 100 :
       maxR >= 0.3  ? 80  :
