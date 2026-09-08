@@ -236,10 +236,28 @@ export function isIdentifierCol(data, col) {
    The target column gets its true role (numeric/binary/categorical),
    NOT the special "target" sentinel. isTarget is tracked separately
    so getMeta can read the real role without ambiguity. */
+/* ── Single-pass min/max ──
+   NEVER use Math.min(...vals) / Math.max(...vals) on column data. The spread
+   passes every element as a separate call argument and throws
+   RangeError: Maximum call stack size exceeded somewhere above ~125k values.
+   The upload limit is 40MB, which holds several hundred thousand rows, so that
+   was reachable with a perfectly valid file — and the failure landed in a
+   setTimeout callback, which no ErrorBoundary can catch, leaving the spinner
+   running forever. Caller guards the empty case (min/max are ±Infinity here). */
+export function minMax(vals) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i < vals.length; i++) {
+    const v = vals[i];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  return { min, max };
+}
+
 export function buildHistogram(vals, bins = 10) {
   if (!vals.length) return [];
-  const min = Math.min(...vals);
-  const max = Math.max(...vals);
+  const { min, max } = minMax(vals);
 
   if (min === max) {
     return [{ bin: `${min}`, count: vals.length }];

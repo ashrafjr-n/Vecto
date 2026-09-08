@@ -2,7 +2,7 @@ import {
   getNumericValues,
   mean, median, stdDev, quantile,
   skewness as computeSkewness, kurtosis as computeKurtosis,
-  buildHistogram, isMissing,
+  buildHistogram, isMissing, minMax,
 } from "../helpers.js";
 
 export function getStatistics(data, numericCols) {
@@ -78,8 +78,8 @@ export function getVisualizations(data, columns, numericCols, categoricalCols) {
     const vals = getNumericValues(data, col);
     if (!vals.length) return;
 
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
+    // minMax(), never Math.min(...vals) — see helpers.js for why the spread breaks
+    const { min, max } = minMax(vals);
 
     // FIX P7: use shared buildHistogram helper
     const bins = buildHistogram(vals);
