@@ -4,12 +4,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { stdDev, mean, skewness, kurtosis } from "../src/components/utils/core/helpers.js";
+import { stdDev, skewness, kurtosis, isMissing } from "../src/components/utils/core/helpers.js";
 import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { getVisualizations } from "../src/components/utils/core/analyzers/stats.js";
-import { isMissing } from "../src/components/utils/core/helpers.js";
 import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
 import { etaCorrelation } from "../src/components/utils/core/helpers.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
