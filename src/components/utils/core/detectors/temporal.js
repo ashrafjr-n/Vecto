@@ -42,7 +42,7 @@ const inTime  = (h, mi, s) => h >= 0 && h <= 23 && mi >= 0 && mi <= 59 && (s ===
 /* dateFamily — returns { family, p1, p2 } if the string is a valid date, else null.
    p1/p2 are the raw leading two components; only meaningful for the ambiguous
    "slash_dm" family (used by the column-level day>12 disambiguation). */
-export function dateFamily(str) {
+function dateFamily(str) {
   if (typeof str !== "string") return null;
   const s = str.trim();
   if (s === "") return null;
@@ -82,11 +82,6 @@ export function dateFamily(str) {
   }
 
   return null;
-}
-
-/* isValidDate — boolean convenience wrapper. Bare integers/years/epoch → false. */
-export function isValidDate(str) {
-  return dateFamily(str) !== null;
 }
 
 /* isTemporalColumn — a column is TEMPORAL iff ≥90% of the non-missing sample are valid

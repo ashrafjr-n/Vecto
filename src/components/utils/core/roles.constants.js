@@ -12,5 +12,3 @@ export const ROLE = Object.freeze({
   CATEGORICAL: "categorical",
   TEMPORAL:    "temporal",
 });
-
-export const ALL_ROLES = Object.freeze(Object.values(ROLE));
