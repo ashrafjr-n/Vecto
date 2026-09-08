@@ -258,8 +258,41 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       });
     });
 
+  /* ── The target itself ──
+     Every rule here advised on FEATURES. Nothing ever questioned the target,
+     so a user who picked an unusable one got a full page of careful feature
+     advice and no hint that the whole analysis was built on a column nothing
+     can be learned from. Stage 5 detects this for the score; it was never
+     turned into advice. */
+  if (meta.target && meta.targetIsIdentifier) {
+    push({
+      category:  "Data Integrity",
+      priority:  "high",
+      column:    meta.target,
+      issue:     "Target is an identifier",
+      action:    `Pick a different target column — "${meta.target}" is unique per row, so there is nothing in it to predict.`,
+      rationale: `Every row has its own value of "${meta.target}", which means a model would have to memorise the dataset rather than learn a pattern. Every other recommendation on this page is scoped to this target, so change it first and re-run.`,
+    });
+  }
+
+  if (meta.target && !meta.targetIsIdentifier) {
+    const entries  = Object.values(relationships.targetCorrelations ?? {});
+    const strongest = entries.reduce((best, e) => (e.absValue ?? 0) > (best?.absValue ?? 0) ? e : best, null);
+    const anySignificant = entries.some(e => e.pValue != null && e.pValue < 0.05);
+    if (entries.length > 0 && (strongest?.absValue ?? 0) < 0.1 && !anySignificant) {
+      push({
+        category:  "Modeling",
+        priority:  "high",
+        column:    meta.target,
+        issue:     "No feature shows a detectable relationship with the target",
+        action:    `Before modelling "${meta.target}", engineer new features or bring in additional data — the columns present do not explain it.`,
+        rationale: `The strongest association with "${meta.target}" is ${(strongest?.absValue ?? 0).toFixed(2)}, and no feature reaches statistical significance. A model trained on these columns as they stand will not do much better than predicting the base rate.`,
+      });
+    }
+  }
+
   /* ── Class imbalance ── */
-  if (classBalance && classBalance.isImbalanced) {
+  if (classBalance && classBalance.isImbalanced && !meta.targetIsIdentifier) {
     const majority = classBalance.classes.filter(c => !c.missing)[0];
     const majPct   = majority?.pct ?? 0;
     const severity = majPct > 90 ? "high" : "medium";
@@ -375,9 +408,16 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
     });
   });
 
-  // Sort: high → medium → low
-  const ORDER = { high: 0, medium: 1, low: 2 };
-  recs.sort((a, b) => (ORDER[a.priority] ?? 3) - (ORDER[b.priority] ?? 3));
+  /* Sort: high → medium → low, and within one priority put Data Integrity
+     first. An integrity problem — an identifier target, a leaking feature —
+     invalidates every other recommendation on the page, so it must not appear
+     underneath the advice it makes irrelevant. Sort is otherwise stable, so
+     rules keep the order they were written in. */
+  const ORDER    = { high: 0, medium: 1, low: 2 };
+  const CATEGORY = { "Data Integrity": 0 };
+  recs.sort((a, b) =>
+    ((ORDER[a.priority] ?? 3) - (ORDER[b.priority] ?? 3))
+    || ((CATEGORY[a.category] ?? 1) - (CATEGORY[b.category] ?? 1)));
 
   return recs;
 }
