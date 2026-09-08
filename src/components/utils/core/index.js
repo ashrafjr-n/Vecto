@@ -50,7 +50,7 @@ export function analyzeDataset(data, columns, target) {
 
   // V3 systems
   const healthScore       = getHealthScore({ meta, quality, statistics, relationships, classBalance });
-  const recommendations   = getRecommendations({ meta, quality, statistics, relationships, classBalance });
+  const recommendations   = getRecommendations({ meta, quality, statistics, relationships, classBalance, visualizations });
   const insights          = getPriorityInsights({ meta, quality, statistics, relationships, classBalance, recommendations });
 
   return {
