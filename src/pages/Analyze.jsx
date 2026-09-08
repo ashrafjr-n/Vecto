@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { getPendingDataset } from "../lib/datasetHandoff.js";
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,8 +10,8 @@ import TargetStep     from "../components/analyze/TargetStep/TargetStep.jsx";
 const ResultsDashboard = lazy(() =>
   import("../components/analyze/ResultsDashboard/ResultsDashboard.jsx"));
 
-import { analyzeDataset, detectTarget, generateSampleData }
-  from "../components/utils/core/index.js";
+import { detectTarget, generateSampleData } from "../components/utils/core/index.js";
+import { runAnalysis, runAnalysisSync } from "../lib/runAnalysis.js";
 
 const stepVariants = {
   initial:  { opacity: 0, y: 16 },
@@ -20,31 +20,16 @@ const stepVariants = {
 };
 
 /* Minimal spinner-only loading step. No copy, no fake progress — see frontend.md
-   "Processing step" spec. Held for a minimum visible duration so a near-instant
-   analyzeDataset() call never flashes for a single frame. */
-/* analyzeDataset() is pure and synchronous, but it runs over the entire parsed
-   file on the main thread — a hostile or very large CSV can still make it throw.
-   Wrapped here because the results-step call site is a setTimeout callback, and
-   an ErrorBoundary only catches errors thrown during render: a throw there used
-   to escape unhandled and leave the spinner turning forever with no message. */
-function runAnalysis(data, columns, target) {
-  try {
-    return { result: analyzeDataset(data, columns, target), error: null };
-  } catch (err) {
-    console.error("analyzeDataset() failed:", err);
-    return { result: null, error: err?.message ?? "Unknown error" };
-  }
-}
+   "Processing step" spec. It is now a pure spinner: it no longer owns a timer or
+   triggers the analysis. The work is started by the event handler that caused it
+   (reactjs-principles.md §6 — don't use an effect to handle an event), and the
+   minimum-visible delay lives there too, next to the thing it is pacing.
 
+   The spinner also finally spins during the analysis. It could not before: the
+   work ran on the main thread, so the animation was frozen for exactly as long
+   as the user was waiting. */
 const MIN_VISIBLE_MS = 550;
-function ProcessingStep({ onComplete }) {
-  // Subscribing to a real external timer — the one legitimate useEffect case here
-  // (react-principles.md §6), not a derived-data computation.
-  useEffect(() => {
-    const timer = setTimeout(onComplete, MIN_VISIBLE_MS);
-    return () => clearTimeout(timer);
-  }, [onComplete]);
-
+function ProcessingStep() {
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
       <LoaderCircle size={28} className="animate-spin text-gold-ink" />
@@ -66,7 +51,10 @@ function Analyze() {
     if (new URLSearchParams(location.search).get("sample")) {
       const { data, columns: cols } = generateSampleData();
       const detectedTarget          = detectTarget(cols, data);
-      const { result, error }       = runAnalysis(data, cols, detectedTarget);
+      /* Synchronous on purpose: the sample is 500 generated rows, analysed in
+         single-digit milliseconds, and going async here would mean rendering a
+         spinner for a frame on a page that has nothing to wait for. */
+      const { result, error }       = runAnalysisSync(data, cols, detectedTarget);
       return {
         step: error ? "failed" : "results",
         data, columns: cols, target: detectedTarget, result, error,
@@ -89,20 +77,29 @@ function Analyze() {
 
   if (!entry) return <Navigate to="/" replace />;
 
+  /* The analysis starts here, in the handler for the click that asked for it,
+     rather than in an effect watching the step change (reactjs-principles.md §6).
+     The minimum-visible delay is applied to the RESULT, not to the start: the
+     work and the spinner's floor run concurrently, so a slow analysis costs its
+     own time and a fast one still shows a spinner rather than a single flashed
+     frame. */
   const handleTargetConfirmed = (selectedTarget) => {
     setTarget(selectedTarget);
     setStep("processing");
-  };
 
-  const handleAnalysisComplete = () => {
-    const { result, error } = runAnalysis(csvData, columns, target);
-    if (error) {
-      setFailure(error);
-      setStep("failed");
-      return;
-    }
-    setAnalysisResult(result);
-    setStep("results");
+    const startedAt = Date.now();
+    runAnalysis(csvData, columns, selectedTarget).then(({ result, error }) => {
+      const remaining = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt));
+      setTimeout(() => {
+        if (error) {
+          setFailure(error);
+          setStep("failed");
+          return;
+        }
+        setAnalysisResult(result);
+        setStep("results");
+      }, remaining);
+    });
   };
 
   const handleReset = () => navigate("/");
@@ -128,7 +125,7 @@ function Analyze() {
 
           {step === "processing" && (
             <motion.div key="processing" {...stepVariants}>
-              <ProcessingStep onComplete={handleAnalysisComplete} />
+              <ProcessingStep />
             </motion.div>
           )}
 
