@@ -170,7 +170,197 @@ export function pearson(data, colA, colB) {
   }
 
   const denom = Math.sqrt(dx2 * dy2);
-  return denom === 0 ? 0 : Math.round((num / denom) * 100) / 100;
+  // Full precision. The 2-decimal rounding that used to live here was a DISPLAY
+  // decision baked into a numeric helper, and a p-value computed from a rounded r
+  // is wrong by enough to flip a borderline call (measured: p 0.0809 vs scipy's
+  // 0.0877 on the same data). Callers round when they render.
+  return denom === 0 ? 0 : num / denom;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STAGE 7 — statistical depth.
+
+   The engine reported Pearson and called a weak result "no meaningful
+   association". Pearson measures LINEAR association only, so on a skewed column
+   (titanic Fare, skew 4.79) that sentence could mean "no linear association"
+   while a strong monotonic one sat right there. And a correlation carried a
+   confidence LABEL derived from the pair count alone — r=0.5 on 8 rows and
+   r=0.5 on 891 rows both read "moderate"/"reliable" with no arithmetic behind
+   the word.
+
+   Everything below is validated against scipy in tests/phase0.test.mjs.
+═══════════════════════════════════════════════════════════════════════ */
+
+/* Lanczos log-gamma — the base for both incomplete functions below. */
+const LOG_GAMMA_COF = [
+  76.18009172947146, -86.50532032941678, 24.01409824083091,
+  -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5,
+];
+function logGamma(x) {
+  let y   = x;
+  let tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) ser += LOG_GAMMA_COF[j] / ++y;
+  return -tmp + Math.log(2.5066282746310007 * ser / x);
+}
+
+const TINY = 1e-300;   // guards a zero denominator in both continued fractions
+
+/* Regularized lower incomplete gamma P(a,x), by series — converges for x < a+1. */
+function gammaSeries(a, x) {
+  let ap  = a;
+  let sum = 1 / a;
+  let del = sum;
+  for (let n = 0; n < 300; n++) {
+    ap++;
+    del *= x / ap;
+    sum += del;
+    if (Math.abs(del) < Math.abs(sum) * 1e-15) break;
+  }
+  return sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
+}
+
+/* Regularized upper incomplete gamma Q(a,x), by continued fraction (x >= a+1). */
+function gammaCF(a, x) {
+  let b = x + 1 - a;
+  let c = 1 / TINY;
+  let d = 1 / b;
+  let h = d;
+  for (let i = 1; i <= 300; i++) {
+    const an = -i * (i - a);
+    b += 2;
+    d = an * d + b; if (Math.abs(d) < TINY) d = TINY;
+    c = b + an / c; if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-15) break;
+  }
+  return Math.exp(-x + a * Math.log(x) - logGamma(a)) * h;
+}
+
+/* Continued fraction for the incomplete beta (Lentz). */
+function betaCF(a, b, x) {
+  const qab = a + b, qap = a + 1, qam = a - 1;
+  let c = 1;
+  let d = 1 - qab * x / qap;
+  if (Math.abs(d) < TINY) d = TINY;
+  d = 1 / d;
+  let h = d;
+  for (let m = 1; m <= 400; m++) {
+    const m2 = 2 * m;
+    let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < TINY) d = TINY;
+    c = 1 + aa / c; if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < TINY) d = TINY;
+    c = 1 + aa / c; if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-15) break;
+  }
+  return h;
+}
+
+/* Regularized incomplete beta I_x(a,b). */
+function betaI(a, b, x) {
+  if (!(x > 0)) return 0;
+  if (x >= 1)   return 1;
+  const bt = Math.exp(
+    logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x),
+  );
+  return x < (a + 1) / (a + b + 2)
+    ? bt * betaCF(a, b, x) / a
+    : 1 - bt * betaCF(b, a, 1 - x) / b;
+}
+
+/* Two-sided p-value for a correlation coefficient r over n paired observations,
+   under H0: rho = 0. Matches scipy.stats.pearsonr(...).pvalue (and, on ranks,
+   spearmanr's asymptotic p). Returns null when n is too small for the test to
+   mean anything — a null p is honest, a fabricated 0.05 is not. */
+export function correlationPValue(r, n) {
+  if (!Number.isFinite(r) || n < 3) return null;
+  const absR = Math.min(1, Math.abs(r));
+  if (absR >= 1) return 0;
+  const df = n - 2;
+  const t2 = (absR * absR) * df / (1 - absR * absR);
+  return betaI(df / 2, 0.5, df / (df + t2));
+}
+
+/* Upper-tail p-value for a chi-square statistic — scipy.stats.chi2.sf(chi2, df).
+   This is what makes a Cramer's V reportable: V says how strong, p says whether
+   the table is distinguishable from independence at all. */
+export function chiSquarePValue(chi2, df) {
+  if (!Number.isFinite(chi2) || df <= 0) return null;
+  if (chi2 <= 0) return 1;
+  const a = df / 2, x = chi2 / 2;
+  return x < a + 1 ? 1 - gammaSeries(a, x) : gammaCF(a, x);
+}
+
+/* p-value for a correlation ratio eta over k groups and n observations, via the
+   one-way ANOVA F it is equivalent to: F = (eta^2/(k-1)) / ((1-eta^2)/(n-k)).
+   Answers "could this separation be chance?", which eta alone cannot. */
+export function etaPValue(eta, n, k) {
+  if (!Number.isFinite(eta) || k < 2 || n <= k) return null;
+  const e2 = Math.min(1, eta * eta);
+  if (e2 >= 1) return 0;
+  const d1 = k - 1, d2 = n - k;
+  const F  = (e2 / d1) / ((1 - e2) / d2);
+  return betaI(d2 / 2, d1 / 2, d2 / (d2 + d1 * F));
+}
+
+/* Average ranks, ties shared — the transform Spearman is defined on. */
+function rankValues(values) {
+  const order = values.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]);
+  const ranks = new Array(values.length);
+  let i = 0;
+  while (i < order.length) {
+    let j = i;
+    while (j + 1 < order.length && order[j + 1][0] === order[i][0]) j++;
+    const shared = (i + j) / 2 + 1;              // 1-based, averaged over the tie
+    for (let k = i; k <= j; k++) ranks[order[k][1]] = shared;
+    i = j + 1;
+  }
+  return ranks;
+}
+
+/* Pearson over two aligned arrays. */
+function pearsonOf(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return 0;
+  let mx = 0, my = 0;
+  for (let i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
+  mx /= n; my /= n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx, dy = ys[i] - my;
+    num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+  }
+  const denom = Math.sqrt(dx2 * dy2);
+  return denom === 0 ? 0 : num / denom;
+}
+
+/* Spearman rank correlation — Pearson on average ranks. Monotonic rather than
+   linear, so it survives the skew and the outliers that flatten Pearson.
+   Returns { rho, n } so the caller can attach a p-value with the same n. */
+export function spearmanOf(xs, ys) {
+  if (xs.length < 3) return 0;
+  return pearsonOf(rankValues(xs), rankValues(ys));
+}
+
+export function spearman(data, colA, colB) {
+  const xs = [], ys = [];
+  for (let i = 0; i < data.length; i++) {
+    const a = parseFloat(data[i][colA]);
+    const b = parseFloat(data[i][colB]);
+    if (isNaN(a) || isNaN(b)) continue;
+    xs.push(a); ys.push(b);
+  }
+  return { rho: spearmanOf(xs, ys), n: xs.length };
 }
 
 /* ── FIX #8: isIdentifierCol — guard against year-like sequential features ── */

@@ -142,6 +142,59 @@
       }
     }
   },
+  "monotonic": {
+    "_note": "Spearman rho, Pearson r and their two-sided p-values, plus chi2 survival-function values. All COMPUTED by scipy.",
+    "chi2_sf": {
+      "0.5|1": 0.47950012218695337,
+      "0.5|2": 0.7788007830714049,
+      "0.5|20": 0.9999999999997906,
+      "0.5|5": 0.9921232932326296,
+      "10.0|1": 0.001565402258002549,
+      "10.0|2": 0.006737946999085468,
+      "10.0|20": 0.9681719426937951,
+      "10.0|5": 0.07523524614651217,
+      "3.84|1": 0.05004352124870519,
+      "3.84|2": 0.14660696213035013,
+      "3.84|20": 0.9999667953164147,
+      "3.84|5": 0.5726744598320888,
+      "50.0|1": 1.537459794428033e-12,
+      "50.0|2": 1.3887943864964e-11,
+      "50.0|20": 0.0002214766382487835,
+      "50.0|5": 1.3857973367009573e-09
+    },
+    "pairs": {
+      "linear|exponential": {
+        "n": 150,
+        "pearson_p": 3.382449740284242e-09,
+        "pearson_r": 0.4592996135154594,
+        "spearman_rho": 0.9820436463842839
+      },
+      "linear|noise": {
+        "n": 150,
+        "pearson_p": 0.1379222925926058,
+        "pearson_r": -0.12170056273297011,
+        "spearman_rho": -0.1094004177963465
+      },
+      "x|exponential": {
+        "n": 150,
+        "pearson_p": 1.881583576081165e-09,
+        "pearson_r": 0.4658786570898163,
+        "spearman_rho": 1.0
+      },
+      "x|linear": {
+        "n": 150,
+        "pearson_p": 4.5958589909017344e-113,
+        "pearson_r": 0.984141663447079,
+        "spearman_rho": 0.9820436463842839
+      },
+      "x|noise": {
+        "n": 150,
+        "pearson_p": 0.13500175729426483,
+        "pearson_r": -0.12260367056398375,
+        "spearman_rho": -0.10698964398417707
+      }
+    }
+  },
   "roles_missing": {
     "_note": "missing_count, true_distinct, numeric_count are COMPUTED by pandas/scipy (objective reference). expected_role is INTENDED by fixture design (what detectColumnRoles SHOULD output) \u2014 it is asserted, not computed.",
     "columns": {

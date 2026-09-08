@@ -1,7 +1,24 @@
 import {
   getValues, getNumericValues,
   mean, pearson, isNumeric, isMissing, etaCorrelation, normalizeValue,
+  spearmanOf, correlationPValue, chiSquarePValue, etaPValue,
 } from "../helpers.js";
+
+/* Display rounding lives at the call site now, never inside a numeric helper —
+   a p-value computed from an already-rounded r is wrong by enough to flip a
+   borderline call. */
+const r2 = v => Math.round(v * 100) / 100;
+
+/* A correlation used to carry a confidence LABEL derived from the pair count
+   alone, so r=0.5 over 8 rows and r=0.5 over 891 both read "moderate". It is a
+   real two-sided p-value now; the three labels are kept so consumers don't
+   break, but they finally mean something. */
+function confidenceFrom(pValue) {
+  if (pValue == null)   return "unreliable";
+  if (pValue < 0.001)   return "reliable";
+  if (pValue < 0.05)    return "moderate";
+  return "unreliable";
+}
 
 export function getRelationshipsV3(data, numericCols, target, skipCols = new Set()) {
 
@@ -110,9 +127,25 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
             num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
           }
           const denom = Math.sqrt(dx2 * dy2);
-          const r = denom === 0 ? 0 : Math.round((num / denom) * 100) / 100;
+          const r = denom === 0 ? 0 : num / denom;
+
+          /* Pearson answers "is it LINEAR?". On a skewed column that is the wrong
+             question, and answering it alone let the engine report "no meaningful
+             association" when it meant "no linear association" — titanic Fare has
+             skew 4.79. Spearman is computed on the same pairs and reported beside
+             it; where the two disagree, the disagreement is the finding. */
+          const rho = spearmanOf(pairs.map(q => q[0]), pairs.map(q => q[1]));
+          const p   = correlationPValue(r, pairs.length);
+
           // FIX #4: store metric type alongside value
-          targetCorrelations[col] = { metric: "pearson", value: r, absValue: Math.abs(r) };
+          targetCorrelations[col] = {
+            metric:   "pearson",
+            value:    r2(r),
+            absValue: Math.abs(r2(r)),
+            spearman: r2(rho),
+            pValue:   p,
+            n:        pairs.length,
+          };
         }
 
       } else if (colIsCategorical) {
@@ -166,11 +199,20 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         // distinct value per row) — that is a zero association, not a NaN. totalN >= 5
         // is guaranteed above, so the (totalN - 1) divisors are always safe.
         const cramersV = minDim <= 0 ? 0 : Math.sqrt(phi2Corr / minDim);
+
+        /* V says HOW STRONG; the chi-square tail says whether the table is
+           distinguishable from independence at all. Without it a small,
+           noisy table and a large, decisive one report the same number. */
+        const p = chiSquarePValue(chi2, (rCats - 1) * (cCats - 1));
+
         // FIX #4: store metric type — Cramér's V is not comparable to Pearson
         targetCorrelations[col] = {
           metric:   "cramers_v",
-          value:    Math.round(cramersV * 100) / 100,
-          absValue: Math.round(cramersV * 100) / 100,
+          value:    r2(cramersV),
+          absValue: r2(cramersV),
+          spearman: null,             // undefined for a nominal pair
+          pValue:   p,
+          n:        totalN,
         };
 
       } else if (colIsNumeric && isCategoricalTarget) {
@@ -191,8 +233,16 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         });
 
         if (values.length >= 3) {
-          const eta = Math.round(etaCorrelation(values, labels) * 100) / 100;
-          targetCorrelations[col] = { metric: "eta", value: eta, absValue: Math.abs(eta) };
+          const eta = etaCorrelation(values, labels);
+          const k   = new Set(labels).size;
+          targetCorrelations[col] = {
+            metric:   "eta",
+            value:    r2(eta),
+            absValue: Math.abs(r2(eta)),
+            spearman: null,           // undefined against a nominal target
+            pValue:   etaPValue(eta, values.length, k),
+            n:        values.length,
+          };
         }
       }
     });
@@ -214,12 +264,18 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         if (!isNaN(va) && !isNaN(vb)) pairs.push([va, vb]);
       });
 
-      const n = pairs.length;
-      const r = pearson(data, a, b);
+      const n   = pairs.length;
+      const raw = pearson(data, a, b);          // full precision since stage 7
+      const r   = r2(raw);                      // matrix is a display surface
+      const rho = spearmanOf(pairs.map(q => q[0]), pairs.map(q => q[1]));
+      const p   = correlationPValue(raw, n);
       matrix[key]            = r;
       matrix[`${b}||${a}`]  = r;
 
-      const abs = Math.abs(r);
+      /* A pair can be strongly MONOTONIC while barely linear — an exponential or
+         heavily skewed pair is the usual case. Reporting only Pearson hid those
+         entirely, so the scan considers whichever of the two is larger. */
+      const abs = Math.max(Math.abs(r), Math.abs(rho));
       if (abs > 0.4) {
         // Strength label
         const strength =
@@ -227,26 +283,38 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           abs >= 0.7 ? "strong"      :
           abs >= 0.5 ? "moderate"    : "weak";
 
-        // Confidence based on n pairs
-        const confidence =
-          n > 100  ? "reliable"  :
-          n >= 30  ? "moderate"  : "unreliable";
 
-        // Interpretive statement
-        const direction = r > 0 ? "positive" : "negative";
-        const trend     = r > 0
+        // Confidence is now the actual two-sided p-value, not a bucket on n.
+        const confidence = confidenceFrom(p);
+
+        // Interpretive statement. Direction follows whichever coefficient is
+        // carrying the relationship, so a monotonic-only pair is not described
+        // by the sign of a near-zero Pearson.
+        const lead      = Math.abs(rho) > Math.abs(r) ? rho : r;
+        const direction = lead > 0 ? "positive" : "negative";
+        const trend     = lead > 0
           ? `As "${a}" increases, "${b}" tends to increase.`
           : `As "${a}" increases, "${b}" tends to decrease.`;
+
+        /* The gap between the two coefficients is itself the finding: a large
+           Spearman with a small Pearson means the relationship is real but not
+           a straight line, and a linear model will underfit it. */
+        const monotonicNotLinear = Math.abs(rho) - Math.abs(r) > 0.15;
 
         strongRelationships.push({
           col1:        a,
           col2:        b,
           correlation: r,
+          spearman:    r2(rho),
+          pValue:      p,
           strength,
           direction,
           confidence,
+          monotonicNotLinear,
           nPairs:      n,
-          statement:   trend,
+          statement:   monotonicNotLinear
+            ? `${trend} The relationship is monotonic but not linear (Spearman ${r2(rho).toFixed(2)} vs Pearson ${r.toFixed(2)}) — a straight-line model will underfit it.`
+            : trend,
         });
       }
     }
@@ -325,6 +393,16 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         .reduce((best, [col, entry]) => (entry?.absValue ?? 0) > (best[1]?.absValue ?? 0) ? [col, entry] : best, ["", { absValue: 0 }]);
       const scVal = strongestCol[1]?.absValue ?? 0; observations.push(`Weak feature-target associations detected. Strongest: "${strongestCol[0]}" (${scVal.toFixed(2)}). Consider feature engineering.`);
     }
+  }
+
+  const nonLinear = strongRelationships.filter(sr => sr.monotonicNotLinear);
+  if (nonLinear.length > 0) {
+    const names = nonLinear.slice(0, 3).map(sr => `"${sr.col1}"~"${sr.col2}"`).join(", ");
+    observations.push(
+      `${nonLinear.length} relationship${nonLinear.length > 1 ? "s are" : " is"} monotonic but not linear ` +
+      `(${names}${nonLinear.length > 3 ? ", …" : ""}) — Pearson understates ${nonLinear.length > 1 ? "them" : "it"}; ` +
+      `consider a rank-based or non-linear model.`
+    );
   }
 
   if (clusterObservation) observations.push(clusterObservation);
