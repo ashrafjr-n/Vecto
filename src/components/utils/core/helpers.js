@@ -313,6 +313,139 @@ export function etaPValue(eta, n, k) {
   return betaI(d2 / 2, d1 / 2, d2 / (d2 + d1 * F));
 }
 
+/* Bergsma-corrected Cramer's V for two aligned label arrays, with the
+   chi-square tail. Same estimator relations.js uses against the target — pulled
+   out here so feature-to-feature categorical pairs get the identical treatment
+   instead of a second, subtly different implementation.
+   Returns null when the table is too small or degenerate to mean anything. */
+export function cramersV(labelsA, labelsB) {
+  const n = Math.min(labelsA.length, labelsB.length);
+  if (n < 5) return null;
+
+  const joint = new Map(), margA = new Map(), margB = new Map();
+  for (let i = 0; i < n; i++) {
+    const a = labelsA[i], b = labelsB[i];
+    const k = `${a}|||${b}`;
+    joint.set(k, (joint.get(k) || 0) + 1);
+    margA.set(a, (margA.get(a) || 0) + 1);
+    margB.set(b, (margB.get(b) || 0) + 1);
+  }
+
+  const rCats = margA.size, cCats = margB.size;
+  if (Math.min(rCats - 1, cCats - 1) <= 0) return null;
+
+  let chi2 = 0;
+  for (const [k, obs] of joint) {
+    const sep = k.indexOf("|||");
+    const exp = (margA.get(k.slice(0, sep)) * margB.get(k.slice(sep + 3))) / n;
+    if (exp > 0) chi2 += ((obs - exp) ** 2) / exp;
+  }
+
+  // Bergsma (2013) — without it V climbs toward 1.0 on cardinality alone.
+  const phi2Corr = Math.max(0, chi2 / n - ((rCats - 1) * (cCats - 1)) / (n - 1));
+  const rTilde   = rCats - ((rCats - 1) ** 2) / (n - 1);
+  const cTilde   = cCats - ((cCats - 1) ** 2) / (n - 1);
+  const minDim   = Math.min(rTilde - 1, cTilde - 1);
+
+  return {
+    v:      minDim <= 0 ? 0 : Math.sqrt(phi2Corr / minDim),
+    pValue: chiSquarePValue(chi2, (rCats - 1) * (cCats - 1)),
+    n,
+    levels: [rCats, cCats],
+  };
+}
+
+/* Equal-frequency bins for a numeric array, returned as bin-index labels.
+   Equal-frequency (quantile) rather than equal-width: an equal-width grid on a
+   skewed column (titanic Fare, skew 4.79) puts almost every row in one bin and
+   reports a mutual information of ~0 no matter what the relationship is. */
+function quantileBins(values, bins) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const edges  = [];
+  for (let i = 1; i < bins; i++) edges.push(sorted[Math.floor((i * sorted.length) / bins)]);
+  return values.map(v => {
+    let b = 0;
+    while (b < edges.length && v >= edges[b]) b++;
+    return b;
+  });
+}
+
+/* Mutual information is an ESTIMATOR, so computing it from a large sample is
+   statistically sound. This is the opposite of a distinct count, which is not a
+   proportion and must see every row (see profileColumn in detectors/roles.js) —
+   the distinction is the whole reason role detection scans full columns and this
+   does not. Full-column discretization costs a sort per column: measured at
+   587ms for ONE numeric column at 800k rows, which doubled total analysis time.
+
+   Deterministic and scattered, with no RNG: i*PHI_PRIME mod n visits distinct
+   indices spread across the entire range, so a sorted or grouped file is not
+   sampled from one end (as a head slice would) nor aliased by a periodic pattern
+   (as a fixed stride can be). PHI_PRIME is prime and larger than any row count
+   we accept, so the indices never repeat. Returns row INDICES, because mutual
+   information needs both columns sampled at the same rows. */
+export const MI_SAMPLE_LIMIT = 20000;
+const PHI_PRIME = 2654435761;
+export function sampleIndices(n, limit = MI_SAMPLE_LIMIT) {
+  if (n <= limit) return Array.from({ length: n }, (_, i) => i);
+  const out = new Array(limit);
+  for (let i = 0; i < limit; i++) out[i] = (i * PHI_PRIME) % n;
+  return out;
+}
+
+/* Normalized mutual information for two aligned label arrays, in [0, 1].
+
+   MI catches what neither Pearson nor Spearman can: a relationship that is real
+   but NOT monotonic (U-shaped, periodic, threshold). Both correlations report
+   ~0 for those.
+
+   Two things this deliberately does NOT pretend away:
+   - The plug-in MI estimator is biased UPWARD, and the bias grows with the
+     number of cells — the exact failure mode that made uncorrected Cramer's V
+     rank a per-row-unique column as the top predictor. Miller-Madow correction
+     is applied to all three entropies, and the result is clamped at 0.
+   - Continuous columns must be binned, and the binning is a judgement, not a
+     measurement. Equal-frequency bins, count = MI_BINS, stated openly here. */
+export function mutualInformation(labelsA, labelsB) {
+  const n = Math.min(labelsA.length, labelsB.length);
+  if (n < 10) return null;
+
+  const joint = new Map(), margA = new Map(), margB = new Map();
+  for (let i = 0; i < n; i++) {
+    const k = `${labelsA[i]}|||${labelsB[i]}`;
+    joint.set(k, (joint.get(k) || 0) + 1);
+    margA.set(labelsA[i], (margA.get(labelsA[i]) || 0) + 1);
+    margB.set(labelsB[i], (margB.get(labelsB[i]) || 0) + 1);
+  }
+
+  const entropy = counts => {
+    let h = 0;
+    for (const c of counts.values()) { const p = c / n; if (p > 0) h -= p * Math.log(p); }
+    // Miller-Madow: the plug-in entropy is biased LOW by (K-1)/(2n).
+    return h + (counts.size - 1) / (2 * n);
+  };
+
+  const hA  = entropy(margA);
+  const hB  = entropy(margB);
+  const hAB = entropy(joint);
+  const mi  = Math.max(0, hA + hB - hAB);
+
+  // Normalize by min(H(A), H(B)) so the result is comparable across columns and
+  // reaches 1.0 exactly when one variable determines the other.
+  const denom = Math.min(hA, hB);
+  return denom <= 0 ? null : { mi, normalized: Math.min(1, mi / denom), n };
+}
+
+/* Discretize a column for mutual information: numeric columns into equal-frequency
+   bins, everything else by its canonical level. */
+export const MI_BINS = 8;
+export function discretize(values) {
+  const numeric = values.filter(v => isNumeric(v));
+  if (numeric.length / values.length > 0.8 && new Set(numeric).size > MI_BINS) {
+    return quantileBins(values.map(v => parseFloat(v)), MI_BINS).map(String);
+  }
+  return values.map(normalizeValue);
+}
+
 /* Average ranks, ties shared — the transform Spearman is defined on. */
 function rankValues(values) {
   const order = values.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]);
@@ -329,7 +462,7 @@ function rankValues(values) {
 }
 
 /* Pearson over two aligned arrays. */
-function pearsonOf(xs, ys) {
+export function pearsonOf(xs, ys) {
   const n = xs.length;
   if (n < 2) return 0;
   let mx = 0, my = 0;
@@ -347,6 +480,28 @@ function pearsonOf(xs, ys) {
 /* Spearman rank correlation — Pearson on average ranks. Monotonic rather than
    linear, so it survives the skew and the outliers that flatten Pearson.
    Returns { rho, n } so the caller can attach a p-value with the same n. */
+/* Average ranks for a whole column, aligned to `data` (NaN where the value is
+   missing or non-numeric). Used to rank ONCE PER COLUMN instead of once per
+   pair — see the note at the matrix scan in relations.js. */
+export function rankColumn(data, col) {
+  const idx = [];
+  for (let i = 0; i < data.length; i++) {
+    const v = parseFloat(data[i][col]);
+    if (!isNaN(v)) idx.push([v, i]);
+  }
+  const ranks = new Array(data.length).fill(NaN);
+  idx.sort((p, q) => p[0] - q[0]);
+  let i = 0;
+  while (i < idx.length) {
+    let j = i;
+    while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++;
+    const shared = (i + j) / 2 + 1;
+    for (let k = i; k <= j; k++) ranks[idx[k][1]] = shared;
+    i = j + 1;
+  }
+  return ranks;
+}
+
 export function spearmanOf(xs, ys) {
   if (xs.length < 3) return 0;
   return pearsonOf(rankValues(xs), rankValues(ys));

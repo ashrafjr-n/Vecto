@@ -1,7 +1,8 @@
 import {
   getValues, getNumericValues,
-  mean, pearson, isNumeric, isMissing, etaCorrelation, normalizeValue,
+  mean, isNumeric, isMissing, etaCorrelation, normalizeValue,
   spearmanOf, correlationPValue, chiSquarePValue, etaPValue,
+  cramersV, mutualInformation, discretize, sampleIndices, rankColumn, pearsonOf,
 } from "../helpers.js";
 
 /* Display rounding lives at the call site now, never inside a numeric helper —
@@ -20,7 +21,7 @@ function confidenceFrom(pValue) {
   return "unreliable";
 }
 
-export function getRelationshipsV3(data, numericCols, target, skipCols = new Set()) {
+export function getRelationshipsV3(data, numericCols, target, skipCols = new Set(), categoricalCols = []) {
 
   /* ── Column selection for the correlation scan (FIX #5b) ──
      The pairwise scan is O(k²·n) in the number of numeric columns k. Below the
@@ -85,6 +86,14 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
 
     // ── Use all columns for target correlation ──
     // FIX: removed dead targetEncoded block (keyed by object → "[object Object]" bug)
+    /* Mutual information is the fallback detector: it is the only measure here
+       that sees a relationship which is real but NOT monotonic (U-shaped,
+       threshold, periodic), where Pearson AND Spearman both report ~0. It is
+       computed only when both correlations came back weak — when they are
+       strong the signal is already found, and MI costs a sort per column. */
+    const miIdx        = sampleIndices(data.length);
+    const targetLevels = discretize(miIdx.map(k => data[k][target]));
+
     const allCols = Object.keys(data[0] || {});
     allCols.forEach(col => {
       if (col === target) return;
@@ -138,6 +147,11 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           const p   = correlationPValue(r, pairs.length);
 
           // FIX #4: store metric type alongside value
+          const weak = Math.abs(r) < 0.3 && Math.abs(rho) < 0.3;
+          const mi   = weak
+            ? mutualInformation(discretize(miIdx.map(k => data[k][col])), targetLevels)
+            : null;
+
           targetCorrelations[col] = {
             metric:   "pearson",
             value:    r2(r),
@@ -145,6 +159,8 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
             spearman: r2(rho),
             pValue:   p,
             n:        pairs.length,
+            // Non-null only where both correlations were weak — see above.
+            mi:       mi ? r2(mi.normalized) : null,
           };
         }
 
@@ -248,6 +264,19 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     });
   }
 
+  /* Ranks are computed ONCE PER COLUMN, not once per pair. Ranking inside the
+     pair loop costs a sort per pair — O(k^2 · n log n) — which at the 40-column
+     limit and 800k rows is minutes, not seconds. This is k sorts total and
+     leaves the pair loop O(n), the order it already was.
+
+     Trade-off, stated rather than hidden: when two columns are missing on
+     DIFFERENT rows, these ranks come from each column's own non-missing set
+     instead of being re-ranked inside the pair's common subset, so rho can
+     differ slightly from scipy's pairwise spearmanr. The per-feature Spearman
+     that actually gets reported against the target is computed exactly on the
+     pair, above. */
+  const columnRanks = new Map(cols.map(c => [c, rankColumn(data, c)]));
+
   for (let i = 0; i < cols.length; i++) {
     for (let j = i; j < cols.length; j++) {
       const a   = cols[i];
@@ -256,18 +285,20 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
 
       if (i === j) { matrix[key] = 1; continue; }
 
-      // Count usable pairs for confidence
-      const pairs = [];
-      data.forEach(row => {
-        const va = parseFloat(row[a]);
-        const vb = parseFloat(row[b]);
-        if (!isNaN(va) && !isNaN(vb)) pairs.push([va, vb]);
-      });
+      // One pass collects the value pairs AND the rank pairs (pairwise-complete).
+      const ra = columnRanks.get(a), rb = columnRanks.get(b);
+      const xs = [], ys = [], rxs = [], rys = [];
+      for (let k = 0; k < data.length; k++) {
+        const va = parseFloat(data[k][a]);
+        const vb = parseFloat(data[k][b]);
+        if (isNaN(va) || isNaN(vb)) continue;
+        xs.push(va); ys.push(vb); rxs.push(ra[k]); rys.push(rb[k]);
+      }
 
-      const n   = pairs.length;
-      const raw = pearson(data, a, b);          // full precision since stage 7
-      const r   = r2(raw);                      // matrix is a display surface
-      const rho = spearmanOf(pairs.map(q => q[0]), pairs.map(q => q[1]));
+      const n   = xs.length;
+      const raw = n < 3 ? 0 : pearsonOf(xs, ys);   // full precision since stage 7
+      const r   = r2(raw);                         // matrix is a display surface
+      const rho = n < 3 ? 0 : pearsonOf(rxs, rys); // Pearson on ranks = Spearman
       const p   = correlationPValue(raw, n);
       matrix[key]            = r;
       matrix[`${b}||${a}`]  = r;
@@ -371,6 +402,43 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       warning: `"${col}" has near-perfect correlation with target (r = ${entry.value.toFixed(2)}). Possible target leakage — verify this column is not derived from the target.`,
     }));
 
+  /* ── Categorical <-> categorical associations among features ──
+     The correlation matrix covers numericCols only — 4 of titanic's 12 columns —
+     so redundancy between two categorical features was undetectable: the engine
+     could tell you Age and Fare move together but not that two category columns
+     encode the same thing. Same Bergsma-corrected estimator used against the
+     target, so the two can be read on one scale. Capped like the numeric scan,
+     which is O(k^2) in columns for the same reason. */
+  const CATEGORICAL_PAIR_LIMIT = 25;
+  const catCols = categoricalCols.filter(c => c !== target && !skipCols.has(c))
+                                 .slice(0, CATEGORICAL_PAIR_LIMIT);
+  const catLevels = new Map(catCols.map(c => [c, data.map(r => r[c]).map(normalizeValue)]));
+
+  const categoricalAssociations = [];
+  for (let i = 0; i < catCols.length; i++) {
+    for (let j = i + 1; j < catCols.length; j++) {
+      const a = catCols[i], b = catCols[j];
+      const la = catLevels.get(a), lb = catLevels.get(b);
+      const va = [], vb = [];
+      for (let k = 0; k < data.length; k++) {
+        if (isMissing(data[k][a]) || isMissing(data[k][b])) continue;
+        va.push(la[k]); vb.push(lb[k]);
+      }
+      if (va.length < 5) continue;
+      const res = cramersV(va, vb);
+      if (!res || res.v < 0.3) continue;
+      categoricalAssociations.push({
+        col1: a, col2: b,
+        cramersV: r2(res.v),
+        pValue:   res.pValue,
+        nPairs:   res.n,
+        levels:   res.levels,
+        statement: `"${a}" and "${b}" are associated (Cramér's V ${r2(res.v).toFixed(2)}) — they may encode overlapping information.`,
+      });
+    }
+  }
+  categoricalAssociations.sort((x, y) => y.cramersV - x.cramersV);
+
   /* ── Dataset-level observations ── */
   const observations = [];
 
@@ -405,6 +473,28 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     );
   }
 
+  /* The case that exists only because MI is here: a feature the correlations
+     both call noise, which nonetheless carries information about the target. */
+  const nonMonotonic = Object.entries(targetCorrelations)
+    .filter(([, e]) => (e.mi ?? 0) >= 0.15 && (e.absValue ?? 0) < 0.15);
+  if (nonMonotonic.length > 0) {
+    const names = nonMonotonic.slice(0, 3).map(([c]) => `"${c}"`).join(", ");
+    observations.push(
+      `${names} show${nonMonotonic.length === 1 ? "s" : ""} little linear or monotonic correlation with the target ` +
+      `but still carr${nonMonotonic.length === 1 ? "ies" : "y"} information about it (mutual information ` +
+      `${nonMonotonic.slice(0, 3).map(([, e]) => e.mi.toFixed(2)).join(", ")}) — the relationship is real but not monotonic, ` +
+      `so a linear model will miss it.`
+    );
+  }
+
+  if (categoricalAssociations.length > 0) {
+    observations.push(
+      `${categoricalAssociations.length} categorical feature pair${categoricalAssociations.length > 1 ? "s are" : " is"} ` +
+      `associated (strongest: "${categoricalAssociations[0].col1}"~"${categoricalAssociations[0].col2}", ` +
+      `V=${categoricalAssociations[0].cramersV.toFixed(2)}) — possible redundancy.`
+    );
+  }
+
   if (clusterObservation) observations.push(clusterObservation);
 
   // FIX #5b: never drop columns silently — name what was excluded when capped.
@@ -426,6 +516,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     clusterCols,
     leakageSuspects,
     targetCorrelations,
+    categoricalAssociations,
     observations,
     excludedColumns,
   };
