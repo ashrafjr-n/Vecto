@@ -479,5 +479,81 @@ check("every target correlation carries a p-value and its sample size",
   Object.values(depth.relationships.targetCorrelations)
     .every(e => "pValue" in e && Number.isFinite(e.n)));
 
+/* ══════════════════════════════════════════
+   10. RECOMMENDATIONS — stage 8
+   Advice was type-blind: rules keyed off a quality flag or a lone statistic and
+   never asked what KIND of column they were talking about. The worst case was
+   not unhelpful advice, it was DESTRUCTIVE advice — a near-unique column told
+   to group every level below 1% into "Other", which merges all of them and
+   leaves a constant column.
+══════════════════════════════════════════ */
+console.log("\nRecommendations know what kind of column they are advising on\n");
+
+const adviceRows = Array.from({ length: 400 }, (_, i) => ({
+  free_text: `record number ${i} with unique text`,   // 400/400 distinct
+  city:      ["london", "paris", "berlin"][i % 3],
+  kids:      String(i % 9),                            // count, 0-8, skewed
+  amount:    String(Math.exp(i / 55)),                 // continuous, long tail
+  y:         i % 2 ? "yes" : "no",
+}));
+const advice = analyzeDataset(adviceRows, ["free_text", "city", "kids", "amount", "y"], "y").recommendations;
+const forCol = col => advice.filter(r => r.column === col);
+
+/* THE regression guard. This exact sentence, aimed at a near-unique column,
+   is the defect stage 8 exists to remove. */
+check("a near-unique column is never told to group rare levels into \"Other\"",
+  forCol("free_text").every(r => !/into "Other"/.test(r.action)));
+
+check("a near-unique column is told it behaves like an identifier or free text",
+  forCol("free_text").some(r => /derive|drop/i.test(r.action)));
+
+/* Counts and continuous measures both skew; only one of them wants a log. */
+const kidsAdvice   = forCol("kids").map(r => r.action).join(" ");
+const amountAdvice = forCol("amount").map(r => r.action).join(" ");
+check("a small-integer count is not told to log-transform",
+  !/log1p/.test(kidsAdvice));
+check("a continuous long-tailed column still is",
+  /log1p/.test(amountAdvice));
+
+/* Imputation must follow the role, not whether a statistics row happened to exist. */
+const impRows = Array.from({ length: 300 }, (_, i) => ({
+  when:  i % 10 === 0 ? "" : `2024-0${(i % 9) + 1}-15`,
+  label: i % 11 === 0 ? "" : ["a", "b", "c"][i % 3],
+  num:   i % 12 === 0 ? "" : String(i % 50),
+  y:     i % 2 ? "p" : "q",
+}));
+const impAdvice = analyzeDataset(impRows, ["when", "label", "num", "y"], "y").recommendations;
+const actionFor = col => impAdvice.filter(r => r.column === col && /Missing/.test(r.issue)).map(r => r.action).join(" ");
+
+check("a date column is not told to impute with a mean or a mode",
+  !/mean|mode/i.test(actionFor("when")) && /forward-fill|interpolat/i.test(actionFor("when")));
+check("a categorical column is told to use the most frequent level or Unknown",
+  /most frequent level|Unknown/i.test(actionFor("label")));
+
+/* A mostly-empty column still carries whether it was present. */
+const sparseRows = Array.from({ length: 300 }, (_, i) => ({
+  sparse: i % 4 === 0 ? "value" : "",     // 75% missing
+  other:  String(i % 17),
+  y:      i % 2 ? "a" : "b",
+}));
+const sparseAdvice = analyzeDataset(sparseRows, ["sparse", "other", "y"], "y")
+  .recommendations.filter(r => r.column === "sparse");
+check("a mostly-empty column is turned into a presence indicator, not simply discarded",
+  sparseAdvice.some(r => /_present/.test(r.action)));
+
+/* The target itself must be questioned — every other item is scoped to it. */
+const idTargetAdvice = analyzeDataset(idRows, ["pid", "v"], "pid").recommendations;
+check("an identifier target produces advice to change the target",
+  idTargetAdvice.some(r => /different target/i.test(r.action)));
+check("that advice is ranked above the feature advice it invalidates",
+  idTargetAdvice.findIndex(r => /different target/i.test(r.action)) === 0);
+
+/* Every recommendation has to be actionable and explain itself — the reason is
+   what lets a user disagree on the evidence instead of obeying or ignoring. */
+check("every recommendation carries an action and a rationale",
+  advice.length > 0 && advice.every(r =>
+    typeof r.action === "string" && r.action.length > 10 &&
+    typeof r.rationale === "string" && r.rationale.length > 20));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
