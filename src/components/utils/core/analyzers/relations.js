@@ -1,6 +1,6 @@
 import {
   getValues, getNumericValues,
-  mean, pearson, isNumeric, isMissing, etaCorrelation,
+  mean, pearson, isNumeric, isMissing, etaCorrelation, normalizeValue,
 } from "../helpers.js";
 
 export function getRelationshipsV3(data, numericCols, target, skipCols = new Set()) {
@@ -60,7 +60,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       ? parseFloat(a) - parseFloat(b)
       : (a < b ? -1 : a > b ? 1 : 0);
 
-    const targetUnique  = [...new Set(targetVals.map(v => String(v).toLowerCase().trim()))].sort(byLevel);
+    const targetUnique  = [...new Set(targetVals.map(normalizeValue))].sort(byLevel);
     const targetNumeric = targetVals.filter(v => isNumeric(v));
     const isNumericTarget     = targetVals.length > 0 && targetNumeric.length / targetVals.length > 0.8;
     const isBinaryTarget      = targetUnique.length === 2;
@@ -77,7 +77,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       if (skipCols.has(col)) return;
 
       const colVals = getValues(data, col);
-      const colUnique = [...new Set(colVals.map(v => String(v).toLowerCase().trim()))].sort(byLevel);
+      const colUnique = [...new Set(colVals.map(normalizeValue))].sort(byLevel);
       const colNumericVals = colVals.filter(v => isNumeric(v));
       const colIsNumeric = colNumericVals.length / colVals.length > 0.8;
       const colIsBinary  = colUnique.length === 2;
@@ -92,11 +92,10 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
 
         const pairs = [];
         data.forEach(row => {
-          let a = colIsNumeric ? parseFloat(row[col]) : (colMap ? colMap[String(row[col]).toLowerCase().trim()] : null);
+          const a = colIsNumeric ? parseFloat(row[col]) : (colMap ? colMap[normalizeValue(row[col])] : null);
           const bRaw = row[target];
-          let b = isNumericTarget
-            ? parseFloat(bRaw)
-            : (isBinaryTarget ? (targetUnique.indexOf(String(bRaw).toLowerCase().trim()) >= 0 ? targetUnique.indexOf(String(bRaw).toLowerCase().trim()) : null) : null);
+          const bIdx = isBinaryTarget ? targetUnique.indexOf(normalizeValue(bRaw)) : -1;
+          const b = isNumericTarget ? parseFloat(bRaw) : (bIdx >= 0 ? bIdx : null);
 
           if (a == null || b == null || isNaN(a) || isNaN(b)) return;
           pairs.push([a, b]);
@@ -124,9 +123,13 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         const colMarg   = {};
 
         data.forEach(row => {
-          const rVal = String(row[col] ?? "").trim();
-          const cVal = String(row[target] ?? "").trim();
-          if (!rVal || !cVal) return;
+          // Was trim()-only, and skipped only empty strings: "Male" and "male"
+          // became two rows of the contingency table (inflating the cardinality the
+          // Bergsma correction then penalises), and "NA"/"None" were counted as
+          // real categories. Both now follow the engine-wide policy.
+          if (isMissing(row[col]) || isMissing(row[target])) return;
+          const rVal = normalizeValue(row[col]);
+          const cVal = normalizeValue(row[target]);
           const key = `${rVal}|||${cVal}`;
           freqTable[key]  = (freqTable[key]  || 0) + 1;
           rowMarg[rVal]   = (rowMarg[rVal]   || 0) + 1;
@@ -184,7 +187,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           const v = parseFloat(rawV);
           if (isNaN(v)) return;
           values.push(v);
-          labels.push(String(rawL).toLowerCase().trim());   // normalize like targetUnique
+          labels.push(normalizeValue(rawL));                // same key as targetUnique
         });
 
         if (values.length >= 3) {

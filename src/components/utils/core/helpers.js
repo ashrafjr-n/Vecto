@@ -24,6 +24,39 @@ export function isMissing(v) {
   return MISSING_TOKENS.has(v.trim().toLowerCase());  // trims whitespace-only too
 }
 
+/* ── The ONE canonical value normalizer ──
+   Three policies used to coexist: roles.js lowercased+trimmed, classBalance and
+   visualizations keyed on the raw string, and Cramer's V trimmed only. So
+   " Male ", "MALE" and "male" were a single level to role detection and three
+   separate classes in the report rendered right next to it — a column could be
+   labelled binary above a list of four classes.
+
+   This returns a GROUPING KEY, not a label: numeric-looking values by their
+   parsed value (so "1", "1.0" and " 1 " are one level), everything else
+   lowercased and trimmed. For anything a user reads, group by this key but
+   display an original spelling — see valueFrequencies(). */
+export function normalizeValue(v) {
+  return isNumeric(v) ? String(parseFloat(v)) : String(v).toLowerCase().trim();
+}
+
+/* Level frequencies for a column, grouped by the canonical key but LABELLED with
+   the first spelling seen in the file, so collapsing " Male "/"MALE"/"male" into
+   one class still displays it as "Male" and not as a lowercased key. Missing
+   tokens are excluded, matching every other consumer of a column's levels.
+   Returns [{ value, count }], most frequent first. */
+export function valueFrequencies(data, col) {
+  const groups = new Map();
+  for (let i = 0; i < data.length; i++) {
+    const raw = data[i][col];
+    if (isMissing(raw)) continue;
+    const key = normalizeValue(raw);
+    const hit = groups.get(key);
+    if (hit) hit.count++;
+    else groups.set(key, { value: String(raw).trim(), count: 1 });
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
 export function mean(arr) {
   if (!arr.length) return 0;
   return arr.reduce((a, b) => a + b, 0) / arr.length;

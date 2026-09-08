@@ -19,6 +19,7 @@ import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 import { validateFile, inspectParseResult, MAX_SIZE_B } from "../src/lib/csvIntake.js";
+import { normalizeValue, valueFrequencies } from "../src/components/utils/core/helpers.js";
 
 let failures = 0;
 
@@ -284,6 +285,58 @@ check("numeric levels are counted by value, so \"1\", \"1.0\" and \" 1 \" are on
    for a binary flag. */
 check("a constant column is not reported as binary",
   roleAt(300, () => ({ c: "7" }), "c") !== ROLE.BINARY);
+
+/* ══════════════════════════════════════════
+   7. VALUE NORMALIZATION — stage 4
+   Three policies used to coexist: roles.js lowercased+trimmed, classBalance and
+   visualizations keyed on the raw string, Cramer's V trimmed only. Measured
+   before the fix: a column correctly detected as BINARY reported SIX classes
+   (" Male ", "MALE", "male", "Female", "FEMALE", " female ") in the report shown
+   directly beneath that label, and the headline read
+   `" Male " is the most frequent value at 16.7%`.
+══════════════════════════════════════════ */
+console.log("\nValue normalization is one policy, engine-wide\n");
+
+const messyRows = Array.from({ length: 300 }, (_, i) => ({
+  sex: [" Male ", "MALE", "male", "Female", "FEMALE", " female "][i % 6],
+  y:   i % 6 < 3 ? "1" : "0",
+}));
+const messy = analyzeDataset(messyRows, ["sex", "y"], "sex");
+
+check("one level written six ways collapses to one class",
+  messy.classBalance.classes.filter(c => !c.missing).length === 2);
+
+/* A grouping KEY is lowercase; a LABEL a user reads must not be. Collapsing the
+   levels must not cost the report its capitalisation. */
+check("the surviving class label keeps its original capitalisation",
+  messy.classBalance.classes.some(c => c.value === "Male")
+    && messy.classBalance.classes.some(c => c.value === "Female"));
+
+/* The invariant Stage 4 exists to protect: role detection and the rendered
+   report must count a column's levels the same way. A column labelled BINARY
+   above a list of six classes is the product contradicting itself on one screen. */
+const messyViz = analyzeDataset(messyRows, ["sex", "y"], "y")
+  .visualizations.find(v => v.col === "sex");
+check("role detection and the rendered report agree on how many levels a column has",
+  messy.meta.columnRoles.sex === ROLE.BINARY && messyViz.data.length === 2);
+
+check("the frequency headline reports the collapsed count, not the raw spellings",
+  messyViz.insight.includes("2 unique categories"));
+
+/* Missing tokens are excluded everywhere else; Cramer's V used to count them as
+   real categories because it only trimmed. */
+const naRows = Array.from({ length: 200 }, (_, i) => ({
+  grp: ["a", "b", "NA", "None"][i % 4],
+  y:   i % 2 ? "1" : "0",
+}));
+check("missing tokens do not become categories",
+  valueFrequencies(naRows, "grp").length === 2);
+
+check("normalizeValue keys numbers by value, so \"1\", \"1.0\" and \" 1 \" agree",
+  normalizeValue("1") === normalizeValue("1.0") && normalizeValue("1.0") === normalizeValue(" 1 "));
+
+check("normalizeValue is case- and whitespace-insensitive for text",
+  normalizeValue(" Male ") === normalizeValue("MALE"));
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
