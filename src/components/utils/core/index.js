@@ -44,7 +44,7 @@ export function analyzeDataset(data, columns, target) {
   const quality        = getQuality(data, columns, identifierCols, temporalCols);
   const statistics     = getStatistics(data, numericCols);
   const visualizations = getVisualizations(data, columns, numericCols, categoricalCols);
-  const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation);
+  const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation, categoricalCols);
   const classBalance   = getClassBalance(data, target);
   const snapshot       = getDatasetSnapshot(data, columns);
 

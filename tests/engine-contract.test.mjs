@@ -107,8 +107,10 @@ if (categoricalViz) {
 assertKeysExact(withTarget.relationships, [
   "cols", "correlationMatrix", "strongRelationships", "multicollinearPairs",
   "clusterDetected", "clusterCols", "leakageSuspects", "targetCorrelations",
-  "observations", "excludedColumns",
+  "categoricalAssociations", "observations", "excludedColumns",
 ], "relationships");
+assertType(withTarget.relationships.categoricalAssociations, "array",
+  "relationships.categoricalAssociations (always an array, [] when nothing qualifies)");
 
 assertType(withTarget.classBalance, "object", "classBalance (target set → non-null)");
 if (withTarget.classBalance) {

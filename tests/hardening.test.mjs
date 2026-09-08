@@ -19,7 +19,8 @@ import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 import { validateFile, inspectParseResult, MAX_SIZE_B } from "../src/lib/csvIntake.js";
-import { normalizeValue, valueFrequencies } from "../src/components/utils/core/helpers.js";
+import { normalizeValue, valueFrequencies, cramersV, mutualInformation,
+         discretize, sampleIndices, pearson, spearman } from "../src/components/utils/core/helpers.js";
 
 let failures = 0;
 
@@ -402,6 +403,81 @@ check("a large clean dataset still reaches Excellent (caps bound overreach, not 
 
 check("an uncapped run reports no limits",
   clean.healthScore.limits.length === 0);
+
+/* ══════════════════════════════════════════
+   9. STATISTICAL DEPTH — stage 7
+   phase0 pins Spearman and the p-values against scipy to machine precision.
+   What is checked here is the behaviour those numbers were added FOR: that the
+   engine stops saying "no association" when it means "no LINEAR association",
+   and that the new estimators are not the biased kind stage 2 had to remove.
+══════════════════════════════════════════ */
+console.log("\nStatistical depth: relationships Pearson alone cannot see\n");
+
+/* A U-shaped relationship is invisible to BOTH correlations — every increase on
+   the left is matched by a decrease on the right — yet y is fully determined by
+   x. Mutual information is the only measure here that sees it. */
+const uRows = Array.from({ length: 400 }, (_, i) => {
+  const x = -2 + (4 * i) / 400;
+  return { x: String(x), y: String(x * x) };
+});
+const uPearson  = Math.abs(pearson(uRows, "x", "y"));
+const uSpearman = Math.abs(spearman(uRows, "x", "y").rho);
+const uMI = mutualInformation(discretize(uRows.map(r => r.x)), discretize(uRows.map(r => r.y)));
+
+check("both correlations report ~0 on a U-shaped relationship",
+  uPearson < 0.1 && uSpearman < 0.1);
+
+check("mutual information detects the relationship both correlations miss",
+  uMI.normalized > 0.3);
+
+/* The bias trap stage 2 existed to fix, in a new estimator: a plug-in MI grows
+   with the number of cells, so independent columns must not score above zero. */
+const indepA = Array.from({ length: 2000 }, (_, i) => String(i % 7));
+const indepB = Array.from({ length: 2000 }, (_, i) => String((i * 13) % 11));
+check("mutual information of independent columns is ~0 (Miller-Madow correction holds)",
+  mutualInformation(indepA, indepB).normalized < 0.02);
+
+/* Categorical<->categorical association between FEATURES — the correlation
+   matrix covers numeric columns only, so two category columns encoding the same
+   thing were previously undetectable. */
+const dupCatRows = Array.from({ length: 400 }, (_, i) => {
+  const base = ["red", "green", "blue"][i % 3];
+  return { colour: base, shade: base === "red" ? "warm" : "cool", unrelated: ["p", "q"][i % 2] };
+});
+const dupAssoc = analyzeDataset(dupCatRows, ["colour", "shade", "unrelated"], "unrelated")
+  .relationships.categoricalAssociations;
+check("two categorical features encoding the same thing are reported as associated",
+  dupAssoc.some(a => (a.col1 === "colour" && a.col2 === "shade") || (a.col1 === "shade" && a.col2 === "colour")));
+
+check("every categorical association carries a p-value and its level counts",
+  dupAssoc.every(a => a.pValue != null && Array.isArray(a.levels) && a.levels.length === 2));
+
+/* Same Bergsma correction as the target-side estimator — a per-row-unique pair
+   must not score, or stage 2's defect is simply re-introduced elsewhere. */
+const uniqA = Array.from({ length: 300 }, (_, i) => `a_${i}`);
+const uniqB = Array.from({ length: 300 }, (_, i) => `b_${i}`);
+check("feature-to-feature Cramér's V is Bergsma-corrected too (per-row-unique pair scores ~0)",
+  (cramersV(uniqA, uniqB)?.v ?? 1) < 0.1);
+
+/* Sampling is legitimate for an estimator like MI but must be deterministic —
+   the same file has to produce the same report twice. */
+const s1 = sampleIndices(1_000_000);
+const s2 = sampleIndices(1_000_000);
+check("MI subsampling is deterministic and visits distinct rows",
+  s1.length === s2.length && s1.every((v, i) => v === s2[i]) && new Set(s1).size === s1.length);
+
+check("a small dataset is not subsampled at all",
+  sampleIndices(500).length === 500);
+
+/* Every reported coefficient must be able to say whether it is distinguishable
+   from chance — that is what makes it reportable rather than decorative. */
+const depth = analyzeDataset(
+  Array.from({ length: 500 }, (_, i) => ({
+    strong: String(i), noise: String((i * 37) % 101), y: i % 2 ? "1" : "0",
+  })), ["strong", "noise", "y"], "y");
+check("every target correlation carries a p-value and its sample size",
+  Object.values(depth.relationships.targetCorrelations)
+    .every(e => "pValue" in e && Number.isFinite(e.n)));
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
