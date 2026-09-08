@@ -2,7 +2,7 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { getPendingDataset } from "../lib/datasetHandoff.js";
 import { AnimatePresence, motion } from "framer-motion";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, TriangleAlert } from "lucide-react";
 
 import Header         from "../components/layout/Header.jsx";
 import TargetStep     from "../components/analyze/TargetStep/TargetStep.jsx";
@@ -22,6 +22,20 @@ const stepVariants = {
 /* Minimal spinner-only loading step. No copy, no fake progress — see frontend.md
    "Processing step" spec. Held for a minimum visible duration so a near-instant
    analyzeDataset() call never flashes for a single frame. */
+/* analyzeDataset() is pure and synchronous, but it runs over the entire parsed
+   file on the main thread — a hostile or very large CSV can still make it throw.
+   Wrapped here because the results-step call site is a setTimeout callback, and
+   an ErrorBoundary only catches errors thrown during render: a throw there used
+   to escape unhandled and leave the spinner turning forever with no message. */
+function runAnalysis(data, columns, target) {
+  try {
+    return { result: analyzeDataset(data, columns, target), error: null };
+  } catch (err) {
+    console.error("analyzeDataset() failed:", err);
+    return { result: null, error: err?.message ?? "Unknown error" };
+  }
+}
+
 const MIN_VISIBLE_MS = 550;
 function ProcessingStep({ onComplete }) {
   // Subscribing to a real external timer — the one legitimate useEffect case here
@@ -52,15 +66,16 @@ function Analyze() {
     if (new URLSearchParams(location.search).get("sample")) {
       const { data, columns: cols } = generateSampleData();
       const detectedTarget          = detectTarget(cols, data);
+      const { result, error }       = runAnalysis(data, cols, detectedTarget);
       return {
-        step: "results", data, columns: cols, target: detectedTarget,
-        result: analyzeDataset(data, cols, detectedTarget),
+        step: error ? "failed" : "results",
+        data, columns: cols, target: detectedTarget, result, error,
       };
     }
     const pending = getPendingDataset();
     if (pending) {
       const { data, columns: cols } = pending;
-      return { step: "target", data, columns: cols, target: detectTarget(cols, data), result: null };
+      return { step: "target", data, columns: cols, target: detectTarget(cols, data), result: null, error: null };
     }
     return null;
   });
@@ -70,6 +85,7 @@ function Analyze() {
   const [columns]                           = useState(entry?.columns ?? []);
   const [target,         setTarget]         = useState(entry?.target ?? "");
   const [analysisResult, setAnalysisResult] = useState(entry?.result ?? null);
+  const [failure,        setFailure]        = useState(entry?.error  ?? null);
 
   if (!entry) return <Navigate to="/" replace />;
 
@@ -79,7 +95,13 @@ function Analyze() {
   };
 
   const handleAnalysisComplete = () => {
-    setAnalysisResult(analyzeDataset(csvData, columns, target));
+    const { result, error } = runAnalysis(csvData, columns, target);
+    if (error) {
+      setFailure(error);
+      setStep("failed");
+      return;
+    }
+    setAnalysisResult(result);
     setStep("results");
   };
 
@@ -107,6 +129,27 @@ function Analyze() {
           {step === "processing" && (
             <motion.div key="processing" {...stepVariants}>
               <ProcessingStep onComplete={handleAnalysisComplete} />
+            </motion.div>
+          )}
+
+          {step === "failed" && (
+            <motion.div key="failed" {...stepVariants}>
+              <div className="mx-auto max-w-xl px-6 py-24 text-center">
+                <TriangleAlert size={28} className="mx-auto text-critical" />
+                <h1 className="mt-4 text-xl font-semibold text-ink">Analysis could not be completed.</h1>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-ink-soft">
+                  The file was read, but the report failed to build. This usually means the
+                  dataset is larger or more irregular than the analyzer can handle in the browser.
+                </p>
+                <p className="mt-3 font-mono text-[12px] text-ink-faint">{failure}</p>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="mt-6 rounded-lg bg-ink px-5 py-2.5 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
+                >
+                  Start over
+                </button>
+              </div>
             </motion.div>
           )}
 
