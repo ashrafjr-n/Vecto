@@ -98,7 +98,7 @@ if (numericViz) {
   console.log("FAIL  expected at least one type:\"numeric\" visualization entry");
 }
 if (categoricalViz) {
-  assertKeysExact(categoricalViz, ["col", "type", "data", "insight"], "visualizations[] categorical entry");
+  assertKeysExact(categoricalViz, ["col", "type", "data", "uniqueCount", "topPct", "insight"], "visualizations[] categorical entry");
 } else {
   failures++;
   console.log("FAIL  expected at least one type:\"categorical\" visualization entry");

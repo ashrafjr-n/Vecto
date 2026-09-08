@@ -1,7 +1,12 @@
-export function getRecommendations({ meta, quality, statistics, relationships, classBalance }) {
+export function getRecommendations({ meta, quality, statistics, relationships, classBalance, visualizations = [] }) {
   const recs = [];
 
   const push = (rec) => recs.push(rec);
+
+  /* Advice was type-blind: every rule keyed off a quality flag or a statistic
+     and never asked what KIND of column it was talking about. meta.columnRoles
+     has existed all along and was never consulted here. */
+  const catViz   = new Map(visualizations.filter(v => v.type === "categorical").map(v => [v.col, v]));
 
   /* ── Missing values ── */
   quality.columnsWithIssues
@@ -137,17 +142,50 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       });
     });
 
-  /* ── High cardinality categorical ── */
+  /* ── High cardinality categorical ──
+     The old rule emitted ONE piece of advice for every high-cardinality column:
+     "group rare categories (< 1% frequency) into Other". On titanic's `Name`,
+     891 distinct values over 891 rows, EVERY level is below 1% — so following
+     that advice merges all 891 into a single bucket and leaves a constant
+     column carrying no information at all. The advice destroyed the column it
+     was meant to rescue, and quality.js had already labelled the same column
+     "likely an ID column" in its own detail string.
+
+     The fix is to ask what the column actually is before advising on it. The
+     top level's share is the decisive figure: if the most COMMON level is under
+     1%, then by definition every level is, and bucketing cannot do anything but
+     collapse the column. */
   quality.columnsWithIssues
     .filter(c => c.issue === "high_cardinality")
     .forEach(c => {
+      const viz    = catViz.get(c.col);
+      const levels = viz?.uniqueCount ?? null;
+      const topPct = viz?.topPct ?? 0;
+      const ratio  = levels != null && meta.rows > 0 ? levels / meta.rows : null;
+
+      // Nothing repeats: this is free text, a code, or an identifier — not a
+      // category. Bucketing is not merely unhelpful here, it is destructive.
+      if (topPct > 0 && topPct < 1) {
+        push({
+          category:  "Feature Engineering",
+          priority:  "medium",
+          column:    c.col,
+          issue:     `Near-unique values${levels ? ` (${levels} distinct over ${meta.rows} rows)` : ""}`,
+          action:    `Do NOT one-hot encode or bucket "${c.col}". Either drop it, or derive features from it — length, word count, or a shared prefix/title extracted from the text.`,
+          rationale: `The most frequent value in "${c.col}" appears in only ${topPct}% of rows, so EVERY level is below the 1% threshold. Grouping rare levels into "Other" would merge${levels ? ` all ${levels}` : " every"} of them into one bucket and leave a constant column. A column this unique behaves like an identifier or free text, not a category.`,
+        });
+        return;
+      }
+
+      // Repeating, but with a long tail — grouping is sound here, which is the
+      // case the original rule was actually written for.
       push({
         category:  "Feature Engineering",
         priority:  "medium",
         column:    c.col,
-        issue:     "High cardinality categorical",
-        action:    `Group rare categories in "${c.col}" (< 1% frequency) into "Other", then apply target or frequency encoding.`,
-        rationale: "High-cardinality columns create sparse one-hot matrices and may cause overfitting.",
+        issue:     `High cardinality categorical${levels ? ` (${levels} levels)` : ""}`,
+        action:    `Group rare categories in "${c.col}" (< 1% frequency) into "Other", then apply target or frequency encoding rather than one-hot.`,
+        rationale: `${levels ? `${levels} levels` : "High cardinality"}${ratio ? ` across ${meta.rows} rows` : ""} creates a sparse one-hot matrix and invites overfitting. The most common level covers ${topPct}% of rows, so grouping the tail still leaves usable categories.`,
       });
     });
 

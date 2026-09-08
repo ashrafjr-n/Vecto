@@ -141,7 +141,15 @@ export function getVisualizations(data, columns, numericCols, categoricalCols) {
       ? `"${topValue.value}" is the most frequent value at ${topValue.pct}%. ${uniqueCount} unique categories total.`
       : "No data available.";
 
-    result.push({ col, type: "categorical", data: sorted, insight });
+    /* uniqueCount and the top level's share are FIELDS now, not just words in a
+       sentence. Type-aware advice has to know how many levels a column has and
+       whether any of them is common — parsing that back out of `insight` would
+       be absurd. */
+    result.push({
+      col, type: "categorical", data: sorted, uniqueCount,
+      topPct: topValue?.pct ?? 0,
+      insight,
+    });
   });
 
   return result;
