@@ -19,6 +19,7 @@ import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 import { validateFile, inspectParseResult, MAX_SIZE_B } from "../src/lib/csvIntake.js";
+import { runAnalysis, runAnalysisSync } from "../src/lib/runAnalysis.js";
 import { normalizeValue, valueFrequencies, cramersV, mutualInformation,
          discretize, sampleIndices, pearson, spearman } from "../src/components/utils/core/helpers.js";
 
@@ -554,6 +555,40 @@ check("every recommendation carries an action and a rationale",
   advice.length > 0 && advice.every(r =>
     typeof r.action === "string" && r.action.length > 10 &&
     typeof r.rationale === "string" && r.rationale.length > 20));
+
+/* ══════════════════════════════════════════
+   11. OFF THE MAIN THREAD — stage 8.5
+   The worker itself needs a browser and is verified there (0 animation frames
+   during a main-thread run, 97 during a worker run, identical scores). What is
+   checked HERE is the fallback, because the fallback is what runs when the
+   worker cannot: in Node, under a Content Security Policy that blocks module
+   workers, or if bundling ever breaks. It must never be the path that fails.
+══════════════════════════════════════════ */
+console.log("\nAnalysis runs off the main thread, and still runs when it cannot\n");
+
+const wRows = Array.from({ length: 500 }, (_, i) => ({
+  a: String(i % 97), b: String((i * 7) % 13), y: i % 2 ? "yes" : "no",
+}));
+
+const syncRun = runAnalysisSync(wRows, ["a", "b", "y"], "y");
+check("the synchronous path returns a result and a null error",
+  syncRun.error === null && Number.isFinite(syncRun.result?.healthScore?.score));
+
+check("the synchronous path RETURNS a failure instead of throwing",
+  (() => { const r = runAnalysisSync(null, null, null);
+           return r.result === null && typeof r.error === "string" && r.error.length > 0; })());
+
+/* `Worker` is undefined in Node, so this exercises the exact fallback branch a
+   blocked or broken worker would take in a browser. */
+const asyncRun = await runAnalysis(wRows, ["a", "b", "y"], "y");
+check("the async wrapper falls back cleanly where Worker does not exist",
+  Number.isFinite(asyncRun.result?.healthScore?.score));
+
+check("fallback and direct paths produce an identical score",
+  asyncRun.result.healthScore.score === syncRun.result.healthScore.score);
+
+check("a hostile input through the async wrapper resolves as an error, never rejects",
+  await runAnalysis(null, null, null).then(r => r.result === null && !!r.error, () => false));
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
