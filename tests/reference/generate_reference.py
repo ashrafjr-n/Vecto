@@ -193,6 +193,36 @@ def eta_numeric_cat_reference(path: str):
     return etas, group_means
 
 
+def monotonic_reference(path: str) -> dict:
+    """Stage 7 — Spearman, and the p-values that make a coefficient reportable.
+
+      pearson_r / pearson_p -> scipy.stats.pearsonr(...)  (two-sided)
+      spearman_rho          -> scipy.stats.spearmanr(...) (average ranks on ties)
+      chi2_sf               -> scipy.stats.chi2.sf(chi2, df)
+
+    The point of the fixture is the `exponential` column: perfectly monotonic in
+    x and strongly non-linear, so Pearson understates it while Spearman does not.
+    """
+    df = pd.read_csv(path)
+    pairs = [("x", "linear"), ("x", "exponential"), ("x", "noise"),
+             ("linear", "exponential"), ("linear", "noise")]
+    out = {"pairs": {}, "chi2_sf": {}}
+    for a, b in pairs:
+        pr = stats.pearsonr(df[a], df[b])
+        sr = stats.spearmanr(df[a], df[b])
+        out["pairs"][f"{a}|{b}"] = {
+            "pearson_r":    float(pr.statistic),
+            "pearson_p":    float(pr.pvalue),
+            "spearman_rho": float(sr.statistic),
+            "n":            int(len(df)),
+        }
+    # chi-square upper tail, across a spread of statistics and dof
+    for chi2 in (0.5, 3.84, 10.0, 50.0):
+        for dof in (1, 2, 5, 20):
+            out["chi2_sf"][f"{chi2}|{dof}"] = float(stats.chi2.sf(chi2, dof))
+    return out
+
+
 def main():
     expected = {}
 
@@ -239,6 +269,13 @@ def main():
             "asserted, not computed."
         ),
         "columns": roles_missing_reference(os.path.join(DATA, "roles_missing.csv")),
+    }
+
+    # g. monotonic.csv — stage 7: Spearman vs Pearson, and p-values
+    expected["monotonic"] = {
+        "_note": "Spearman rho, Pearson r and their two-sided p-values, plus "
+                 "chi2 survival-function values. All COMPUTED by scipy.",
+        **monotonic_reference(os.path.join(DATA, "monotonic.csv")),
     }
 
     with open(OUT, "w") as f:

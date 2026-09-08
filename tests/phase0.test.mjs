@@ -4,7 +4,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { stdDev, skewness, kurtosis, isMissing } from "../src/components/utils/core/helpers.js";
+import { stdDev, skewness, kurtosis, isMissing,
+         spearman, correlationPValue, chiSquarePValue,
+         pearson } from "../src/components/utils/core/helpers.js";
 import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
@@ -552,4 +554,53 @@ console.log(`  few body:    ${bodyFew}`);
 console.log(`  enough body: ${bodyEnough}`);
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
+
+/* ── Stage 7 — Spearman and p-values vs scipy ──
+   Pearson answers "is it LINEAR?". Reporting only Pearson let the engine say
+   "no meaningful association" when it meant "no linear association" — the
+   `exponential` column below is perfectly monotonic in x and Pearson still
+   understates it badly. And a coefficient without a p-value is not reportable:
+   r=0.5 over 8 rows and r=0.5 over 891 are not the same claim. */
+const mono    = parseCsv(join(__dirname, "reference", "datasets", "monotonic.csv"));
+const monoRef = expected.monotonic;
+
+console.log("\nStage 7 — Spearman rho and two-sided p-values vs scipy\n");
+
+for (const [key, want] of Object.entries(monoRef.pairs)) {
+  const [a, b] = key.split("|");
+
+  const rho  = spearman(mono.rows, a, b).rho;
+  const dRho = Math.abs(rho - want.spearman_rho);
+  const rhoOk = dRho <= TOL;
+  if (!rhoOk) failures++;
+  console.log(`${rhoOk ? "PASS" : "FAIL"}  ${key.padEnd(20)} spearman rho actual=${rho.toFixed(12)} expected=${want.spearman_rho.toFixed(12)} |diff|=${dRho.toExponential(3)}`);
+
+  const r  = pearson(mono.rows, a, b);
+  const dR = Math.abs(r - want.pearson_r);
+  const rOk = dR <= TOL;
+  if (!rOk) failures++;
+  console.log(`${rOk ? "PASS" : "FAIL"}  ${key.padEnd(20)} pearson r    actual=${r.toFixed(12)} expected=${want.pearson_r.toFixed(12)} |diff|=${dR.toExponential(3)}`);
+
+  const pv = correlationPValue(r, want.n);
+  const dP = Math.abs(pv - want.pearson_p);
+  const pOk = dP <= 1e-12;
+  if (!pOk) failures++;
+  console.log(`${pOk ? "PASS" : "FAIL"}  ${key.padEnd(20)} pearson p    actual=${pv.toExponential(6)} expected=${want.pearson_p.toExponential(6)} |diff|=${dP.toExponential(3)}`);
+}
+
+let chiBad = 0;
+for (const [key, want] of Object.entries(monoRef.chi2_sf)) {
+  const [chi2, df] = key.split("|").map(Number);
+  if (Math.abs(chiSquarePValue(chi2, df) - want) > 1e-12) chiBad++;
+}
+if (chiBad > 0) failures++;
+console.log(`${chiBad === 0 ? "PASS" : "FAIL"}  chi-square survival function matches scipy across ${Object.keys(monoRef.chi2_sf).length} (chi2, df) combinations`);
+
+/* The finding the whole stage exists for, asserted on the reference numbers. */
+const expPair = monoRef.pairs["x|exponential"];
+const understates = Math.abs(expPair.spearman_rho) - Math.abs(expPair.pearson_r) > 0.15;
+if (!understates) failures++;
+console.log(`${understates ? "PASS" : "FAIL"}  Pearson materially understates a monotonic non-linear pair ` +
+            `(r=${expPair.pearson_r.toFixed(3)} vs rho=${expPair.spearman_rho.toFixed(3)}) — the case Spearman exists to catch`);
+
 process.exit(failures === 0 ? 0 : 1);
