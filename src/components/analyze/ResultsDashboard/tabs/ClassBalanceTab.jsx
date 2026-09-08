@@ -4,6 +4,10 @@ import { TriangleAlert } from "lucide-react";
 import SectionCard from "../../shared/SectionCard.jsx";
 import StatusBadge  from "../../shared/StatusBadge.jsx";
 
+/* A real classification target has a handful of classes. Anything past this is
+   a symptom (an id picked as the target), not something to render in full. */
+const MAX_CLASS_ROWS = 15;
+
 function ClassBalanceTab({ result }) {
   const { classBalance, meta } = result;
 
@@ -16,7 +20,19 @@ function ClassBalanceTab({ result }) {
   }
 
   const { classes, isImbalanced } = classBalance;
-  const maxPct = Math.max(...classes.map((c) => c.pct));
+
+  /* reduce(), not Math.max(...classes.map(...)): the spread passes one call
+     argument per class and throws RangeError past ~125k of them. `classes` is
+     unbounded — it is one entry per distinct target value, and nothing stops a
+     user picking a near-unique column (an id, a name, a ticket number) as the
+     target. */
+  const maxPct = classes.reduce((m, c) => (c.pct > m ? c.pct : m), 0);
+
+  /* Same reason, for the DOM: rendering one animated bar per class melts the
+     page on a high-cardinality target. `classes` arrives sorted by count, so
+     the head is the informative part; the rest is summarised in one line. */
+  const shown  = classes.slice(0, MAX_CLASS_ROWS);
+  const hidden = classes.length - shown.length;
 
   return (
     <div className="space-y-4">
@@ -27,7 +43,7 @@ function ClassBalanceTab({ result }) {
         <div className="mb-5 font-mono text-lg font-semibold text-ink">{meta.target}</div>
 
         <div className="space-y-4">
-          {classes.map((cls, i) => {
+          {shown.map((cls, i) => {
             const isMax = cls.pct === maxPct;
             return (
               <div key={i}>
@@ -46,7 +62,7 @@ function ClassBalanceTab({ result }) {
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${cls.pct}%` }}
-                    transition={{ delay: i * 0.05, duration: 0.5, ease: "easeOut" }}
+                    transition={{ delay: Math.min(i * 0.05, 0.6), duration: 0.5, ease: "easeOut" }}
                     className={`h-full rounded-full ${isMax ? "bg-gold" : "bg-ink-faint/60"}`}
                   />
                 </div>
@@ -54,6 +70,14 @@ function ClassBalanceTab({ result }) {
             );
           })}
         </div>
+
+        {hidden > 0 && (
+          <div className="mt-4 border-t border-line pt-3 text-[12.5px] text-ink-faint">
+            Showing the {MAX_CLASS_ROWS} largest of {classes.length.toLocaleString()} distinct
+            values. A target with this many classes is usually an identifier rather than a
+            label — check the target column.
+          </div>
+        )}
       </SectionCard>
 
       {isImbalanced && (
