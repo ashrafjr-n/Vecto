@@ -158,18 +158,56 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       }
     });
 
-  /* ── Skewed features ── */
+  /* ── Skewed features ──
+     A log transform is for a CONTINUOUS measurement with a long tail. Applied to
+     a small-integer COUNT it does close to nothing useful: titanic's SibSp has
+     skew 3.7, but it takes 7 distinct values from 0 to 8, and its skew is the
+     shape of a count that is mostly zero rather than a heavy tail to compress.
+     The old rule could not tell those apart because it looked only at the
+     skewness number, so it advised log1p on both.
+
+     A negative minimum matters too: log1p is undefined at or below -1, and the
+     old text mentioned that only as a trailing note the user had to check by
+     hand. Now it decides the advice. */
   statistics
     .filter(s => !s.empty && Math.abs(s.skewness) > 2)
     .forEach(s => {
       const direction = s.skewness > 0 ? "right" : "left";
+      const spread    = s.max - s.min;
+      const isCount   = Number.isInteger(s.min) && Number.isInteger(s.max)
+                        && s.min >= 0 && spread <= 20;
+
+      if (isCount) {
+        push({
+          category:  "Feature Engineering",
+          priority:  "low",
+          column:    s.col,
+          issue:     `Skewed count (${s.skewness > 0 ? "+" : ""}${s.skewness}, values ${s.min}–${s.max})`,
+          action:    `Leave "${s.col}" as-is, or bin it into ranges (e.g. 0 / 1 / 2+). A log transform is not useful here.`,
+          rationale: `"${s.col}" is a small-integer count spanning only ${s.min}–${s.max}. Its skew of ${s.skewness} comes from most rows sitting at the low end, not from a long tail that a log would compress — the transform would barely change the ordering. Binning captures the real distinction (none / one / several).`,
+        });
+        return;
+      }
+
+      if (s.min <= -1) {
+        push({
+          category:  "Feature Engineering",
+          priority:  "low",
+          column:    s.col,
+          issue:     `High skewness (${s.skewness > 0 ? "+" : ""}${s.skewness})`,
+          action:    `Use a Yeo-Johnson power transform for "${s.col}" — not log1p.`,
+          rationale: `Skewness of ${s.skewness} is high, but "${s.col}" reaches ${s.min}, and log1p is undefined at or below -1. Yeo-Johnson handles negative values; a signed square root is a simpler alternative.`,
+        });
+        return;
+      }
+
       push({
         category:  "Feature Engineering",
         priority:  "low",
         column:    s.col,
         issue:     `High skewness (${s.skewness > 0 ? "+" : ""}${s.skewness})`,
-        action:    `Consider log1p transform for "${s.col}" to reduce ${direction}-skew.`,
-        rationale: `Skewness of ${s.skewness} is high. Many algorithms assume normally distributed features. Note: only apply if all values are ≥ 0.`,
+        action:    `Apply a log1p transform to "${s.col}" to reduce ${direction}-skew.`,
+        rationale: `Skewness of ${s.skewness} over a range of ${s.min}–${s.max} is a genuine long tail, and many algorithms assume roughly symmetric features. All values are ≥ 0, so log1p is safe to apply directly.`,
       });
     });
 
