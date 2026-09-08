@@ -291,6 +291,78 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
     });
   });
 
+  /* ── Monotonic but not linear (stage 7) ──
+     Pearson and Spearman disagreeing IS the finding, and until now nothing acted
+     on it. A pair the linear scan calls weak while the rank scan calls it strong
+     is a relationship a linear model will underfit. */
+  relationships.strongRelationships
+    .filter(sr => sr.monotonicNotLinear)
+    .forEach(sr => {
+      push({
+        category:  "Modeling",
+        priority:  "medium",
+        column:    null,
+        issue:     `Non-linear relationship: "${sr.col1}" ↔ "${sr.col2}" (Pearson ${sr.correlation.toFixed(2)}, Spearman ${sr.spearman.toFixed(2)})`,
+        action:    `Use a rank-based or non-linear model for "${sr.col1}" and "${sr.col2}", or transform one of them so the relationship straightens out.`,
+        rationale: `Spearman ${sr.spearman.toFixed(2)} against Pearson ${sr.correlation.toFixed(2)} means the two move together reliably but not along a straight line. A linear model reads only the Pearson figure and will treat this as a weak relationship when it is not.`,
+      });
+    });
+
+  /* ── Categorical redundancy (stage 7) ──
+     multicollinearPairs only ever covered NUMERIC columns, so two categorical
+     features encoding the same thing produced no advice at all. */
+  (relationships.categoricalAssociations ?? [])
+    .filter(a => a.cramersV >= 0.6)
+    .forEach(a => {
+      push({
+        category:  "Feature Selection",
+        priority:  "medium",
+        column:    null,
+        issue:     `Redundant categoricals: "${a.col1}" ↔ "${a.col2}" (Cramér's V ${a.cramersV.toFixed(2)})`,
+        action:    `Keep one of "${a.col1}" or "${a.col2}" — they encode largely overlapping information.`,
+        rationale: `Cramér's V of ${a.cramersV.toFixed(2)} over ${a.nPairs} rows (p = ${a.pValue < 0.001 ? "< 0.001" : a.pValue.toFixed(3)}) means knowing one largely tells you the other. Encoding both inflates the feature space — ${a.levels[0]} × ${a.levels[1]} levels — without adding information.`,
+      });
+    });
+
+  /* ── Signal the correlations cannot see (stage 7) ──
+     Mutual information is non-zero while both correlations are ~0: the feature
+     carries information about the target through a shape that is not monotonic.
+     Dropping it for "low correlation" would be a mistake. */
+  Object.entries(relationships.targetCorrelations ?? {})
+    .filter(([, e]) => (e.mi ?? 0) >= 0.15 && (e.absValue ?? 0) < 0.15)
+    .forEach(([col, e]) => {
+      push({
+        category:  "Feature Selection",
+        priority:  "medium",
+        column:    col,
+        issue:     `Non-monotonic signal (correlation ${e.value}, mutual information ${e.mi})`,
+        action:    `Keep "${col}" despite its low correlation, and give it to a model that can use non-linear structure (trees, gradient boosting).`,
+        rationale: `"${col}" correlates with the target at only ${e.value}, so a correlation-based feature filter would drop it — but mutual information of ${e.mi} says it does carry information about the target. The relationship is real and simply is not monotonic.`,
+      });
+    });
+
+  /* ── Statistically indistinguishable from chance (stage 7) ──
+     Columns already handled by a mostly-missing rule are excluded. Telling the
+     user to keep "Cabin_present" and to drop "Cabin" in the same list reads as
+     the engine contradicting itself, and the missing-value advice is the more
+     specific of the two. */
+  const alreadyHandled = new Set(
+    recs.filter(r => r.priority === "high" && /Missing values/.test(r.issue)).map(r => r.column),
+  );
+  Object.entries(relationships.targetCorrelations ?? {})
+    .filter(([col, e]) => !alreadyHandled.has(col)
+      && e.pValue != null && e.pValue > 0.05 && (e.mi ?? 0) < 0.15)
+    .forEach(([col, e]) => {
+      push({
+        category:  "Feature Selection",
+        priority:  "low",
+        column:    col,
+        issue:     `No detectable relationship with target (p = ${e.pValue.toFixed(2)})`,
+        action:    `Consider dropping "${col}" — or keep it only if domain knowledge says it matters.`,
+        rationale: `The association with "${meta.target}" is ${e.value}, and at ${e.n} rows that is not distinguishable from chance (p = ${e.pValue.toFixed(2)}). This is a statement about THIS sample, not proof the column is useless — a larger dataset could separate it.`,
+      });
+    });
+
   /* ── Target leakage ── */
   relationships.leakageSuspects.forEach(leak => {
     push({
