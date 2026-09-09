@@ -99,6 +99,53 @@ function SignalRow({ col, entry, index }) {
   );
 }
 
+/* ── Missingness as a feature ───────────────────────────────────────────────
+   Whether a column was RECORDED is a second variable, separate from its values,
+   and it is often the one carrying the signal. This sits above the metric groups
+   because on a dataset where it fires it is usually the strongest thing in the
+   report: on smoking.csv three columns score V = 1.00 here while the best value-
+   based association in the groups below is 0.22. */
+function PresenceSignals({ signals, target }) {
+  if (!signals.length) return null;
+  return (
+    <SectionCard
+      title="Missingness carries signal"
+      action={<StatusBadge severity="warning">{signals.length} column{signals.length > 1 ? "s" : ""}</StatusBadge>}
+    >
+      <p className="-mt-2 mb-3 text-[12px] leading-relaxed text-ink-faint">
+        Cramér's V between a <span className="font-mono">present / absent</span> indicator and{" "}
+        <span className="font-mono text-ink-soft">{target}</span> — measured on the column&apos;s
+        missingness, not on its values. A high score means the rows where the value is
+        recorded are not a random sample.
+      </p>
+      <div className="divide-y divide-line">
+        {signals.map((p) => (
+          <div key={p.col} className="py-3 first:pt-0 last:pb-0">
+            <div className="flex items-center gap-3">
+              <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-ink">
+                {p.col}_present
+              </span>
+              <span className="shrink-0 font-mono text-[11.5px] text-ink-faint">
+                present in {p.presentPct}% of rows
+              </span>
+              <span className="w-14 shrink-0 text-right font-mono text-[12px] font-semibold text-ink">
+                {p.cramersV.toFixed(2)}
+              </span>
+            </div>
+            <div className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
+              {/* A perfect separator is as likely to be the label restated as it is
+                  to be a finding — say so rather than presenting it as a win. */}
+              {p.cramersV >= 0.95
+                ? `Separates ${target} almost perfectly over ${p.n} rows — check this is not the label itself, recorded twice.`
+                : `Measured over ${p.n} rows. Build "${p.col}_present" and keep it even if the column's values are dropped.`}
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 function MetricGroup({ group, entries }) {
   if (!entries.length) return null;
   return (
@@ -173,6 +220,8 @@ function TargetSignalTab({ result }) {
           they measure different kinds of association and are estimated differently.
         </p>
       </SectionCard>
+
+      <PresenceSignals signals={relationships.presenceSignals ?? []} target={meta.target} />
 
       {METRIC_GROUPS.map((g) => (
         <MetricGroup key={g.key} group={g} entries={sorted.filter(([, e]) => e.metric === g.key)} />
