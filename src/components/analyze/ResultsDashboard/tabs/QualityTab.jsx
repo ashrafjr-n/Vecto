@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { CircleCheckBig, Layers, Minus } from "lucide-react";
+import { CircleCheckBig, CircleSlash, Layers, Minus } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
 import StatTile     from "../../shared/StatTile.jsx";
 
-const ISSUE_ICON = { high_cardinality: Layers, constant: Minus };
+const ISSUE_ICON = { high_cardinality: Layers, constant: Minus, mixed_numeric: CircleSlash };
 
 const parseCount = (detail) => {
   const cleaned = String(detail ?? "0").replace(/[^\d.]/g, "");
@@ -62,7 +62,11 @@ function OtherIssues({ items }) {
         {items.map((item) => {
           const Icon = ISSUE_ICON[item.issue] ?? Minus;
           return (
-            <div key={item.col} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+            /* Keyed by column AND issue: a column can now carry more than one
+               entry here (a near-unique column with a few unparseable values is
+               both high_cardinality and mixed_numeric), and the column name
+               alone stopped being unique the moment mixed_numeric was added. */
+            <div key={`${item.col}-${item.issue}`} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
               <Icon size={14} className="mt-0.5 shrink-0 text-ink-faint" />
               <div>
                 <div className="font-mono text-[12.5px] text-ink">{item.col}</div>
