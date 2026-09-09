@@ -1,7 +1,7 @@
 import {
   getValues, getNumericValues,
   mean, isNumeric, isMissing, etaCorrelation, normalizeValue,
-  spearmanOf, correlationPValue, chiSquarePValue, etaPValue,
+  spearmanOf, correlationPValue, etaPValue,
   cramersV, mutualInformation, discretize, sampleIndices, rankColumn, pearsonOf,
 } from "../helpers.js";
 
@@ -165,70 +165,36 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         }
 
       } else if (colIsCategorical) {
-        // Cramér's V between categorical col and target
-        // Range 0-1, higher = stronger association
-        const freqTable = {};
-        const rowMarg   = {};
-        const colMarg   = {};
+        /* Cramer's V between a categorical column and the target, via the SHARED
+           estimator. This branch used to carry its own copy of the whole
+           calculation — contingency table, chi-square, Bergsma correction — which
+           is how the two drifted: the fix for empty contingency cells landed in
+           helpers.cramersV and left the copy here reporting the old, understated
+           number. One implementation cannot disagree with itself. */
+        const la = [], lb = [];
+        for (let i = 0; i < data.length; i++) {
+          const row = data[i];
+          if (isMissing(row[col]) || isMissing(row[target])) continue;
+          la.push(normalizeValue(row[col]));
+          lb.push(normalizeValue(row[target]));
+        }
 
-        data.forEach(row => {
-          // Was trim()-only, and skipped only empty strings: "Male" and "male"
-          // became two rows of the contingency table (inflating the cardinality the
-          // Bergsma correction then penalises), and "NA"/"None" were counted as
-          // real categories. Both now follow the engine-wide policy.
-          if (isMissing(row[col]) || isMissing(row[target])) return;
-          const rVal = normalizeValue(row[col]);
-          const cVal = normalizeValue(row[target]);
-          const key = `${rVal}|||${cVal}`;
-          freqTable[key]  = (freqTable[key]  || 0) + 1;
-          rowMarg[rVal]   = (rowMarg[rVal]   || 0) + 1;
-          colMarg[cVal]   = (colMarg[cVal]   || 0) + 1;
-        });
-
-        const totalN = Object.values(freqTable).reduce((s, v) => s + v, 0);
-        if (totalN < 5) return;
-
-        let chi2 = 0;
-        Object.entries(freqTable).forEach(([key, obs]) => {
-          const [rVal, cVal] = key.split("|||");
-          const expected = (rowMarg[rVal] * colMarg[cVal]) / totalN;
-          if (expected > 0) chi2 += ((obs - expected) ** 2) / expected;
-        });
-
-        const rCats = Object.keys(rowMarg).length;
-        const cCats = Object.keys(colMarg).length;
-        if (Math.min(rCats - 1, cCats - 1) <= 0) return;
-
-        /* Bergsma (2013) bias correction. Uncorrected V = sqrt(chi2/(N*min(r-1,c-1)))
-           rises toward 1.0 from cardinality alone: on Titanic "Name" (891 distinct
-           values over 891 rows) scored 0.73 and was reported as the TOP predictor of
-           Survived, ahead of "Sex" (0.54) — a column that generalizes to nothing beat
-           the real signal. The correction subtracts the chi-square expected under
-           independence and shrinks both dimensions the same way, sending per-row-unique
-           columns to 0 while leaving Sex/Pclass/Embarked untouched (delta < 0.01 at N=891). */
-        const phi2     = chi2 / totalN;
-        const phi2Corr = Math.max(0, phi2 - ((rCats - 1) * (cCats - 1)) / (totalN - 1));
-        const rTilde   = rCats - ((rCats - 1) ** 2) / (totalN - 1);
-        const cTilde   = cCats - ((cCats - 1) ** 2) / (totalN - 1);
-        const minDim   = Math.min(rTilde - 1, cTilde - 1);
-        // A dimension shrinks to <= 0 exactly when it carried no usable signal (one
-        // distinct value per row) — that is a zero association, not a NaN. totalN >= 5
-        // is guaranteed above, so the (totalN - 1) divisors are always safe.
-        const cramersV = minDim <= 0 ? 0 : Math.sqrt(phi2Corr / minDim);
-
-        /* V says HOW STRONG; the chi-square tail says whether the table is
-           distinguishable from independence at all. Without it a small,
-           noisy table and a large, decisive one report the same number. */
-        const p = chiSquarePValue(chi2, (rCats - 1) * (cCats - 1));
+        // null = too few rows, or only one level left on a side: no association is
+        // measurable there, which is not the same as an association of zero.
+        const cv = cramersV(la, lb);
+        if (!cv) return;
 
         // FIX #4: store metric type — Cramér's V is not comparable to Pearson
         targetCorrelations[col] = {
           metric:   "cramers_v",
-          value:    r2(cramersV),
-          absValue: r2(cramersV),
+          value:    r2(cv.v),
+          absValue: r2(cv.v),
           spearman: null,             // undefined for a nominal pair
-          pValue:   p,
-          n:        totalN,
+          /* V says HOW STRONG; the chi-square tail says whether the table is
+             distinguishable from independence at all. Without it a small, noisy
+             table and a large, decisive one report the same number. */
+          pValue:   cv.pValue,
+          n:        cv.n,
         };
 
       } else if (colIsNumeric && isCategoricalTarget) {
