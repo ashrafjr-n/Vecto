@@ -7,12 +7,14 @@ import StatisticsTab     from "./tabs/StatisticsTab.jsx";
 import VisualizationsTab from "./tabs/VisualizationsTab.jsx";
 import RelationshipsTab  from "./tabs/RelationshipsTab.jsx";
 import ClassBalanceTab   from "./tabs/ClassBalanceTab.jsx";
+import TargetSignalTab   from "./tabs/TargetSignalTab.jsx";
 
 const BASE_TABS = [
   { id: "overview",       label: "Overview"                            },
   { id: "quality",        label: "Quality"                             },
   { id: "statistics",     label: "Statistics"                          },
   { id: "visualizations", label: "Visualizations"                      },
+  { id: "targetsignal",   label: "Target Signal", requiresTarget: true },
   { id: "relationships",  label: "Relationships"                       },
   { id: "classbalance",   label: "Class Balance", requiresTarget: true },
 ];
@@ -140,6 +142,7 @@ function ResultsDashboard({ result, onReset }) {
               {activeTab === "quality"        && <QualityTab        result={result} />}
               {activeTab === "statistics"     && <StatisticsTab     result={result} />}
               {activeTab === "visualizations" && <VisualizationsTab result={result} />}
+              {activeTab === "targetsignal"   && <TargetSignalTab   result={result} />}
               {activeTab === "relationships"  && <RelationshipsTab  result={result} />}
               {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
             </motion.div>
