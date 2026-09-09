@@ -108,7 +108,10 @@ assertKeysExact(withTarget.relationships, [
   "cols", "correlationMatrix", "strongRelationships", "multicollinearPairs",
   "clusterDetected", "clusterCols", "leakageSuspects", "targetCorrelations",
   "categoricalAssociations", "observations", "excludedColumns", "unscoredColumns",
+  "presenceSignals",
 ], "relationships");
+assertType(withTarget.relationships.presenceSignals, "array",
+  "relationships.presenceSignals (always an array; columns whose PRESENCE is associated with the target)");
 assertType(withTarget.relationships.unscoredColumns, "array",
   "relationships.unscoredColumns (always an array; every column the target scan could not score, with its reason)");
 assertType(withTarget.relationships.categoricalAssociations, "array",
