@@ -82,6 +82,26 @@ function CorrelationRanking({ strongRelationships }) {
                   ? <StatusBadge severity="critical">redundant</StatusBadge>
                   : <span className="shrink-0 rounded-full bg-paper-sunken px-2.5 py-0.5 text-[11px] text-ink-soft">{rel.strength}</span>}
               </div>
+
+              {/* Stage 7 computed a Spearman and a p-value for every pair here and
+                  the row showed neither — so a pair that is strongly monotonic but
+                  barely linear looked weak, and a coefficient from 8 rows read the
+                  same as one from 891. */}
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 pl-7 text-[11.5px] text-ink-faint">
+                {rel.pValue != null && (
+                  <span>
+                    {rel.pValue < 0.05 ? "distinguishable from chance" : "not distinguishable from chance"}
+                    {" ("}{rel.pValue < 0.001 ? "p < 0.001" : `p = ${rel.pValue.toFixed(3)}`}
+                    {", n = "}{rel.nPairs.toLocaleString()})
+                  </span>
+                )}
+                {rel.monotonicNotLinear && (
+                  <span className="rounded bg-gold-tint px-1.5 py-0.5 text-[11px] text-gold-ink">
+                    Spearman {rel.spearman.toFixed(2)} — monotonic, not linear
+                  </span>
+                )}
+              </div>
+
               {rel.statement && (
                 <div className="mt-1.5 pl-7 text-[11.5px] italic text-ink-faint">{rel.statement}</div>
               )}
