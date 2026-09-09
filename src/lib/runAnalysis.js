@@ -18,9 +18,9 @@ import { analyzeDataset } from "../components/utils/core/index.js";
 /* Direct call, errors returned rather than thrown. The results-step call site is
    asynchronous and ErrorBoundary only catches errors thrown during render, so a
    throw escaping here leaves a spinner turning forever with no message. */
-export function runAnalysisSync(data, columns, target) {
+export function runAnalysisSync(data, columns, target, onPhase) {
   try {
-    return { result: analyzeDataset(data, columns, target), error: null };
+    return { result: analyzeDataset(data, columns, target, onPhase), error: null };
   } catch (err) {
     console.error("analyzeDataset() failed:", err);
     return { result: null, error: err?.message ?? "Unknown error" };
@@ -36,13 +36,13 @@ export function runAnalysisSync(data, columns, target) {
    still returns the same shape — the page just blocks while it does, exactly as
    it did before this file existed. Degrading to the old behaviour is always
    better than showing nothing. */
-export function runAnalysis(data, columns, target) {
+export function runAnalysis(data, columns, target, onPhase) {
   return new Promise((resolve) => {
     let worker;
     try {
       worker = new Worker(new URL("./analysisWorker.js", import.meta.url), { type: "module" });
     } catch {
-      resolve(runAnalysisSync(data, columns, target));
+      resolve(runAnalysisSync(data, columns, target, onPhase));
       return;
     }
 
@@ -54,14 +54,21 @@ export function runAnalysis(data, columns, target) {
       resolve(payload);
     };
 
-    worker.onmessage = (event) => finish(event.data);
-    worker.onerror   = () => finish(runAnalysisSync(data, columns, target));
+    /* A phase update is not the answer. Only the message carrying result/error
+       settles the promise; everything tagged "phase" is forwarded and dropped. */
+    worker.onmessage = (event) => {
+      if (event.data?.type === "phase") { onPhase?.(event.data.phase); return; }
+      finish(event.data);
+    };
+    // The fallback still reports its phases — on the main thread, so the screen
+    // will not repaint between them, but the caller's contract does not change.
+    worker.onerror   = () => finish(runAnalysisSync(data, columns, target, onPhase));
 
     try {
       worker.postMessage({ data, columns, target });
     } catch {
       // Structured clone can refuse a value the engine would have accepted.
-      finish(runAnalysisSync(data, columns, target));
+      finish(runAnalysisSync(data, columns, target, onPhase));
     }
   });
 }
