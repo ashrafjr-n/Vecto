@@ -34,20 +34,6 @@ export function getNumericValues(data, col) {
   return getValues(data, col).map(toNumber).filter(v => !isNaN(v));
 }
 
-/* How many present values in a column are not numbers, alongside how many are.
-   A column that is 93% numeric is still ANALYSED as numeric — the alternative is
-   throwing away a real column over a handful of dirty cells — but the rows that
-   were dropped to do so are a fact about the data, and quality.js reports them
-   rather than letting them disappear between the two policies above. */
-export function countNonNumeric(data, col) {
-  let numeric = 0, nonNumeric = 0;
-  for (let i = 0; i < data.length; i++) {
-    const v = data[i][col];
-    if (isMissing(v)) continue;
-    if (isNumeric(v)) numeric++; else nonNumeric++;
-  }
-  return { numeric, nonNumeric };
-}
 
 /* ── FIX #3: shared missing-value detection (matches reference harness) ── */
 export const MISSING_TOKENS = new Set(["", "na", "n/a", "nan", "null", "none", "?"]);
