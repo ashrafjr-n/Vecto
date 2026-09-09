@@ -1,4 +1,9 @@
-import { isMissing } from "../helpers.js";
+import { isMissing, isNumeric } from "../helpers.js";
+
+/* The share of present values that must parse as numbers before a column is
+   analysed as numeric — the same 0.8 relations.js gates on. Above it, every
+   value that is NOT a number is dropped from every statistic in the report. */
+const NUMERIC_SHARE = 0.8;
 
 export function getQuality(data, columns, identifierCols = [], temporalCols = []) {
   let missingCells = 0;
@@ -20,6 +25,29 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
         count:  missing,                                       // FIX #3: store raw count
         detail: `${missing} missing value${missing > 1 ? "s" : ""}`,
       });
+    }
+
+    /* Values thrown away to treat this column as numeric.
+
+       A column that is 93% numbers is still ANALYSED as numeric — dropping a real
+       column over a handful of dirty cells would be worse — but the values that
+       had to be discarded to do that are a fact about the data, and until now no
+       part of the report mentioned them. openpowerlifting.csv "WeightClassKg"
+       holds 25,813 super-heavyweight classes written "125+" / "120+" / "84+";
+       every mean, median, histogram and correlation in the report is computed
+       without them, and the user was never told which rows went missing. */
+    if (nonEmpty.length > 0) {
+      const nonNumeric = nonEmpty.filter(v => !isNumeric(v));
+      if (nonNumeric.length > 0 && (nonEmpty.length - nonNumeric.length) / nonEmpty.length > NUMERIC_SHARE) {
+        const examples = [...new Set(nonNumeric.map(String))].slice(0, 3);
+        columnsWithIssues.push({
+          col,
+          issue:  "mixed_numeric",
+          count:  nonNumeric.length,
+          detail: `${nonNumeric.length} value${nonNumeric.length > 1 ? "s are" : " is"} not a number `
+                + `(e.g. ${examples.map(e => `"${e}"`).join(", ")}) — excluded from every statistic for this column`,
+        });
+      }
     }
 
     // Only check constant/cardinality on non-empty values
