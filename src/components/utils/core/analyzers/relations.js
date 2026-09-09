@@ -149,58 +149,56 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           return;
         }
 
-        {
-          const mx = mean(pairs.map(p => p[0]));
-          const my = mean(pairs.map(p => p[1]));
-          let num = 0, dx2 = 0, dy2 = 0;
-          for (const [a, b] of pairs) {
-            const dx = a - mx; const dy = b - my;
-            num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
-          }
-
-          /* Zero variance on either side is not a correlation of zero — it is the
-             absence of anything to correlate. Reporting r = 0 here said "measured,
-             and there is no relationship" about a pair that was never measurable,
-             and it did so for exactly the case worth knowing about: a column whose
-             missing rows are the target's other class, so the surviving rows all
-             carry one target value. */
-          if (dy2 === 0) {
-            unscored(col, `"${target}" holds a single value across all ${pairs.length} rows where "${col}" is a number, so there is no variation to correlate against — the PRESENCE of "${col}" may itself predict the target. Worth testing as a yes/no indicator.`);
-            return;
-          }
-          if (dx2 === 0) {
-            unscored(col, `"${col}" is constant across the rows shared with "${target}" — a constant carries no signal.`);
-            return;
-          }
-
-          const denom = Math.sqrt(dx2 * dy2);
-          const r = num / denom;
-
-          /* Pearson answers "is it LINEAR?". On a skewed column that is the wrong
-             question, and answering it alone let the engine report "no meaningful
-             association" when it meant "no linear association" — titanic Fare has
-             skew 4.79. Spearman is computed on the same pairs and reported beside
-             it; where the two disagree, the disagreement is the finding. */
-          const rho = spearmanOf(pairs.map(q => q[0]), pairs.map(q => q[1]));
-          const p   = correlationPValue(r, pairs.length);
-
-          // FIX #4: store metric type alongside value
-          const weak = Math.abs(r) < 0.3 && Math.abs(rho) < 0.3;
-          const mi   = weak
-            ? mutualInformation(discretize(miIdx.map(k => data[k][col])), targetLevels)
-            : null;
-
-          targetCorrelations[col] = {
-            metric:   "pearson",
-            value:    r2(r),
-            absValue: Math.abs(r2(r)),
-            spearman: r2(rho),
-            pValue:   p,
-            n:        pairs.length,
-            // Non-null only where both correlations were weak — see above.
-            mi:       mi ? r2(mi.normalized) : null,
-          };
+        const mx = mean(pairs.map(p => p[0]));
+        const my = mean(pairs.map(p => p[1]));
+        let num = 0, dx2 = 0, dy2 = 0;
+        for (const [a, b] of pairs) {
+          const dx = a - mx; const dy = b - my;
+          num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
         }
+
+        /* Zero variance on either side is not a correlation of zero — it is the
+           absence of anything to correlate. Reporting r = 0 here said "measured,
+           and there is no relationship" about a pair that was never measurable,
+           and it did so for exactly the case worth knowing about: a column whose
+           missing rows are the target's other class, so the surviving rows all
+           carry one target value. */
+        if (dy2 === 0) {
+          unscored(col, `"${target}" holds a single value across all ${pairs.length} rows where "${col}" is a number, so there is no variation to correlate against — the PRESENCE of "${col}" may itself predict the target. Worth testing as a yes/no indicator.`);
+          return;
+        }
+        if (dx2 === 0) {
+          unscored(col, `"${col}" is constant across the rows shared with "${target}" — a constant carries no signal.`);
+          return;
+        }
+
+        const denom = Math.sqrt(dx2 * dy2);
+        const r = num / denom;
+
+        /* Pearson answers "is it LINEAR?". On a skewed column that is the wrong
+           question, and answering it alone let the engine report "no meaningful
+           association" when it meant "no linear association" — titanic Fare has
+           skew 4.79. Spearman is computed on the same pairs and reported beside
+           it; where the two disagree, the disagreement is the finding. */
+        const rho = spearmanOf(pairs.map(q => q[0]), pairs.map(q => q[1]));
+        const p   = correlationPValue(r, pairs.length);
+
+        // FIX #4: store metric type alongside value
+        const weak = Math.abs(r) < 0.3 && Math.abs(rho) < 0.3;
+        const mi   = weak
+          ? mutualInformation(discretize(miIdx.map(k => data[k][col])), targetLevels)
+          : null;
+
+        targetCorrelations[col] = {
+          metric:   "pearson",
+          value:    r2(r),
+          absValue: Math.abs(r2(r)),
+          spearman: r2(rho),
+          pValue:   p,
+          n:        pairs.length,
+          // Non-null only where both correlations were weak — see above.
+          mi:       mi ? r2(mi.normalized) : null,
+        };
 
       } else if (colIsCategorical) {
         /* Cramer's V between a categorical column and the target, via the SHARED
