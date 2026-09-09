@@ -184,17 +184,22 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
       };
 
   const LABEL = { missing: "Missing values", duplicates: "Duplicate rows", constant: "Constant columns", id: "Identifier columns" };
-  const penalties = Object.entries(components)
-    .map(([key, c]) => ({
-      label:   LABEL[key],
-      detail:  `${c.detail} · ${Math.round(c.weight * 100)}% of the quality score`,
-      penalty: Math.round(c.weight * (100 - c.score)),
-    }))
-    .filter(p => p.penalty > 0);
+  const deductions = Object.entries(components).map(([key, c]) => ({
+    label:   LABEL[key],
+    detail:  `${c.detail} · ${Math.round(c.weight * 100)}% of the quality score`,
+    penalty: Math.round(c.weight * (100 - c.score)),
+  }));
 
-  const score = Math.max(0, Math.round(
-    Object.values(components).reduce((sum, c) => sum + c.score * c.weight, 0),
-  ));
+  /* The score IS the sum of the deductions the report shows, not a separately
+     rounded figure that happens to land nearby. Rounding each component and the
+     weighted total independently lets the two disagree by a point, and the
+     Quality tab renders the deductions as a waterfall from 100 — a waterfall that
+     does not reach its own stated total is the same class of defect as the two
+     quality scores this file just absorbed, only smaller. */
+  const score = Math.max(0, 100 - deductions.reduce((sum, d) => sum + d.penalty, 0));
+
+  // Zero-point rows are noise in the waterfall; they are still in qualityComponents.
+  const penalties = deductions.filter(d => d.penalty > 0);
 
   return {
     missingCells,
