@@ -662,5 +662,45 @@ const catRows = mixRows.map((r, i) => ({ ...r, w: i % 2 ? "200+" : "100" }));
 check("a column that is not analysed as numeric raises no exclusion warning",
   !getQuality(catRows, ["w", "y"], [], []).columnsWithIssues.some(i => i.issue === "mixed_numeric"));
 
+/* ── Nothing leaves the target scan silently ───────────────────────────────
+   A column the scan cannot measure used to vanish: absent from
+   targetCorrelations, absent from excludedColumns, absent from every
+   observation. On smoking.csv that hid three PERFECT predictors — "type",
+   "amt_weekends" and "amt_weekdays" are missing on exactly the 1,270 rows where
+   smoke = "No", so their presence alone decides the target — while the report
+   announced "Weak feature-target associations. Strongest: age (0.22)". */
+console.log("\nUNSCORED COLUMNS — no column disappears without a reason\n");
+
+/* "amt" is present only on the rows where y = "yes": exactly the shape above. */
+const mnarRows = [];
+for (let i = 0; i < 200; i++) mnarRows.push({ amt: String(10 + (i % 7)), grp: `g${i % 3}`, y: "yes" });
+for (let i = 0; i < 200; i++) mnarRows.push({ amt: "", grp: `g${i % 3}`, y: "no" });
+
+const mnar = getRelationshipsV3(mnarRows, ["amt"], "y", new Set(), ["grp"]);
+const amtDrop = mnar.unscoredColumns.find(u => u.col === "amt");
+check("a column whose presence tracks the target is recorded, not dropped",
+  !!amtDrop && !("amt" in mnar.targetCorrelations));
+
+check("the reason points at the presence of the column as the finding",
+  /presence/i.test(amtDrop?.reason ?? ""));
+
+check("the observations name the columns that were left out",
+  mnar.observations.some(o => o.includes("left out of the target scan") && o.includes('"amt"')));
+
+/* The engine must not start inventing exclusions for columns it CAN measure. */
+const okRows = [];
+for (let i = 0; i < 200; i++) okRows.push({ n: String(i % 50), y: i % 2 ? "yes" : "no" });
+check("a measurable column is not reported as unscored",
+  getRelationshipsV3(okRows, ["n"], "y", new Set(), []).unscoredColumns.length === 0);
+
+/* A column that is 99.7% empty is not 100% empty, and a user who reads "100%"
+   and deletes it has been told something false. */
+const nearlyEmpty = [];
+for (let i = 0; i < 1000; i++) nearlyEmpty.push({ a: i < 3 ? "5" : "", b: String(i % 4), y: String(i % 2) });
+const nearlyEmptyLimit = analyzeDataset(nearlyEmpty, ["a", "b", "y"], "y").healthScore.limits
+  .find(l => l.reason.includes('"a"'));
+check("a column with a few real values is never called 100% empty",
+  !!nearlyEmptyLimit && !nearlyEmptyLimit.reason.includes("100%") && nearlyEmptyLimit.reason.includes("99.7%"));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
