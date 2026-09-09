@@ -137,12 +137,37 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         return;
       }
 
-      const colVals = getValues(data, col);
-      const colUnique = [...new Set(colVals.map(normalizeValue))].sort(byLevel);
-      const colNumericVals = colVals.filter(v => isNumeric(v));
-      const colIsNumeric = colNumericVals.length / colVals.length > 0.8;
-      const colIsBinary  = colUnique.length === 2;
-      const colIsCategorical = !colIsNumeric && !colIsBinary && colUnique.length > 1;
+      /* One pass, three allocations fewer. This was getValues() (an array of n),
+         .map(normalizeValue) (a second array of n) and .filter(isNumeric) (a
+         third), per column — 48 full-length arrays on a 386k-row, 16-column file,
+         to answer two questions: what share of the values are numbers, and are
+         there exactly two levels.
+
+         The level set stops at 3. No rule below distinguishes 5 levels from 500,
+         only "two" from "more than two", so the Set is O(1) rather than one entry
+         per distinct value. getValues()' own filter is inlined verbatim — it
+         keeps "NA" as a level, unlike isMissing, and that must not change here. */
+      let colTotal = 0, colNumericCount = 0, colOverflowed = false;
+      const colLevels = new Set();
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i][col];
+        if (v === "" || v == null) continue;
+        colTotal++;
+        if (isNumeric(v)) colNumericCount++;
+        if (!colOverflowed) {
+          colLevels.add(normalizeValue(v));
+          if (colLevels.size > 2) colOverflowed = true;
+        }
+      }
+      if (colTotal === 0) {
+        unscored(col, `"${col}" is empty — there is nothing to compare against "${target}".`);
+        return;
+      }
+
+      const colUnique = [...colLevels].sort(byLevel);
+      const colIsNumeric = colNumericCount / colTotal > 0.8;
+      const colIsBinary  = !colOverflowed && colLevels.size === 2;
+      const colIsCategorical = !colIsNumeric && !colIsBinary && (colOverflowed || colLevels.size > 1);
 
       if ((colIsNumeric || colIsBinary) && (isNumericTarget || isBinaryTarget)) {
         // Pearson / Point-Biserial: encode col as numbers
