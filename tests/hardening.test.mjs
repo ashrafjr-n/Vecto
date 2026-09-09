@@ -757,5 +757,70 @@ const deadDrop = getRelationshipsV3(deadRows, ["v"], "y", new Set(), [])
 check("a column whose presence carries nothing says so instead of recommending it",
   !!deadDrop && /no usable signal/i.test(deadDrop.reason) && !deadDrop.reason.includes("Build "));
 
+/* ── Leakage that is not a Pearson r ───────────────────────────────────────
+   Leakage detection was Pearson-only because an uncorrected Cramér's V climbed
+   toward 1.0 on cardinality alone. Bergsma and the empty-cell fix removed that,
+   so V = 1.0 now means a functional dependency — which is what leakage is.
+   Measured: meets.csv "MeetCountry" determines "MeetState" at 0.99 and was never
+   flagged; smoking.csv's "type" is filled in only for smokers, so whether it was
+   recorded at all IS the label. */
+console.log("\nLEAKAGE — not every leak is a correlation coefficient\n");
+
+/* A categorical feature that determines the target one-to-one. */
+const detRows = [];
+for (let lvl = 0; lvl < 6; lvl++) {
+  for (let i = 0; i < 200; i++) detRows.push({ code: `c${lvl}`, noise: `n${i % 4}`, y: `t${lvl}` });
+}
+const detLeak = getRelationshipsV3(detRows, [], "y", new Set(), ["code", "noise"]).leakageSuspects;
+check("a categorical column that determines the target is flagged as leakage",
+  detLeak.some(l => l.col === "code" && l.metric === "cramers_v"));
+
+check("an unrelated categorical column is not flagged",
+  !detLeak.some(l => l.col === "noise"));
+
+/* Missingness that restates the label: present for one class, empty for the
+   other. These columns have no targetCorrelations entry at all, so the loop over
+   it can never reach them. */
+const leakPresence = analyzeDataset(presRows, ["amt", "keep", "y"], "y").relationships.leakageSuspects;
+check("missingness that restates the label is flagged as leakage",
+  leakPresence.some(l => l.col === "amt" && l.metric === "presence"));
+
+/* Consumers must not re-compose the message assuming Pearson — that printed
+   "r = 0.99" for a Cramér's V, which is a different statistic. */
+const detInsights = analyzeDataset(detRows, ["code", "noise", "y"], "y");
+check("the leakage message is not relabelled as an r by the insight that renders it",
+  detInsights.insights.some(i => i.title.includes("Leakage") && i.text.includes("Cramér")
+                              && !/\br = /.test(i.text)));
+
+/* ── Coverage ──────────────────────────────────────────────────────────────
+   A coefficient is a claim about the rows it was computed on. openpowerlifting
+   reported "Strongest: Squat4Kg (0.16)" — 1,225 of 386,414 rows, 0.3% — while
+   Equipment scored 0.14 across 99.7% of them. */
+console.log("\nCOVERAGE — a number measured on a slice says so\n");
+
+/* The openpowerlifting shape: "narrow" scores higher but is present on 5% of
+   rows, while "broad" covers everything at a slightly lower score. */
+const covRows = [];
+for (let i = 0; i < 4000; i++) {
+  const y = i % 2;
+  covRows.push({
+    narrow: i < 200 ? String((i % 10) < 6 ? y : 1 - y) : "",   // r ~ 0.20 on 200 rows
+    broad:  String((i % 100) < 57 ? y : 1 - y),                // r ~ 0.14 on all 4000
+    y:      String(y),
+  });
+}
+const covObs = analyzeDataset(covRows, ["narrow", "broad", "y"], "y").relationships.observations
+  .find(o => o.startsWith("Weak feature-target associations"));
+
+// Guard the fixture itself: without this line the two checks below pass vacuously
+// if the observation ever stops being produced.
+check("the fixture reaches the weak-signal observation at all", !!covObs);
+
+check("the strongest-signal line names the share of rows behind a narrow measurement",
+  /"narrow"/.test(covObs ?? "") && /200 of 4000 rows/.test(covObs ?? "") && /5\.0% of the dataset/.test(covObs ?? ""));
+
+check("it names the best broadly-measured feature beside the narrow one",
+  /"broad"/.test(covObs ?? "") && /over 4000 rows/.test(covObs ?? ""));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
