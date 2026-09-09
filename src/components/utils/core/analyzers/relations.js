@@ -453,6 +453,10 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
   /* Both sides of a presence indicator need enough rows to mean anything, and a
      weak presence association is noise — every column with a single missing row
      would otherwise produce an entry. */
+  /* Below this share of the dataset a coefficient describes a slice, not the file,
+     and saying so is the difference between a number and a claim. */
+  const COVERAGE_MIN = 0.5;
+
   const MIN_PRESENCE_ROWS = 20;
   const PRESENCE_MIN_V    = 0.3;
 
@@ -601,10 +605,33 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     if (maxTargetR < 0.1) {
       observations.push(`No feature shows meaningful association with target (max = ${maxTargetR.toFixed(2)}). Consider feature engineering or non-linear models.`);
     } else if (maxTargetR >= 0.1 && maxTargetR < 0.3) {
-      // Find the strongest feature
       const strongestCol = Object.entries(targetCorrelations)
         .reduce((best, [col, entry]) => (entry?.absValue ?? 0) > (best[1]?.absValue ?? 0) ? [col, entry] : best, ["", { absValue: 0 }]);
-      const scVal = strongestCol[1]?.absValue ?? 0; observations.push(`Weak feature-target associations detected. Strongest: "${strongestCol[0]}" (${scVal.toFixed(2)}). Consider feature engineering.`);
+      const scVal = strongestCol[1]?.absValue ?? 0;
+
+      /* A coefficient is a claim about the rows it was computed on, and naming the
+         top one without saying how many rows that was makes a narrow measurement
+         sound like a property of the dataset. openpowerlifting.csv reported
+         "Strongest: Squat4Kg (0.16)" — a fourth-attempt column present on 1,225 of
+         386,414 rows, 0.3%, while Equipment scored 0.14 across 99.7% of them. The
+         value of n was in the payload all along; nothing said it out loud. */
+      const coverage = (entry) => (data.length > 0 ? (entry?.n ?? 0) / data.length : 0);
+      const topCoverage = coverage(strongestCol[1]);
+
+      let line = `Weak feature-target associations detected. Strongest: "${strongestCol[0]}" (${scVal.toFixed(2)}`;
+      if (topCoverage < COVERAGE_MIN) {
+        line += `, but measured on only ${strongestCol[1].n} of ${data.length} rows — ${(topCoverage * 100).toFixed(1)}% of the dataset`;
+
+        /* Name the best broadly-measured feature beside it, so the reader has
+           something to compare the narrow number against. */
+        const broad = Object.entries(targetCorrelations)
+          .filter(([, e]) => coverage(e) >= COVERAGE_MIN)
+          .reduce((best, [col, e]) => (e.absValue ?? 0) > (best[1]?.absValue ?? 0) ? [col, e] : best, ["", { absValue: 0 }]);
+        if (broad[0]) {
+          line += `). Across most of the data the strongest is "${broad[0]}" (${(broad[1].absValue ?? 0).toFixed(2)} over ${broad[1].n} rows`;
+        }
+      }
+      observations.push(`${line}). Consider feature engineering.`);
     }
   }
 
