@@ -206,7 +206,13 @@ function TargetSignalTab({ result }) {
     );
   }
 
-  if (!entries.length) {
+  const presence = relationships.presenceSignals ?? [];
+  const unscored = relationships.unscoredColumns ?? [];
+
+  /* Only a genuinely empty tab short-circuits. The old check returned here on an
+     empty targetCorrelations alone, which would now hide the presence signals and
+     the unscored list — the two things that explain WHY it is empty. */
+  if (!entries.length && !presence.length && !unscored.length) {
     return (
       <SectionCard>
         <div className="py-8 text-center text-[13px] text-ink-faint">
@@ -220,18 +226,43 @@ function TargetSignalTab({ result }) {
   const strongest = sorted[0];
   const anySignificant = sorted.some(([, e]) => e.pValue != null && e.pValue < 0.05);
 
+  /* A presence indicator is measured with Cramér's V, the same scale as the
+     categorical group, so it belongs in the same comparison — and on smoking.csv
+     it beats every value-based association 1.00 to 0.22. Announcing 0.22 as "the
+     strongest" while a stronger measured association sits in the card above is
+     the contradiction this tab existed to remove. */
+  const topPresence = presence[0] ?? null;
+  const presenceLeads = topPresence && topPresence.cramersV > (strongest?.[1]?.absValue ?? 0);
+
   return (
     <div className="space-y-4">
       <SectionCard
         title="Target signal"
         action={
-          anySignificant
+          /* Presence counts as signal. Without it the badge could read "No
+             detectable signal" directly above a presence indicator scoring 1.00. */
+          anySignificant || presence.length > 0
             ? <StatusBadge severity="success">Signal found</StatusBadge>
             : <StatusBadge severity="warning">No detectable signal</StatusBadge>
         }
       >
         <p className="text-[12.5px] leading-relaxed text-ink-soft">
-          {anySignificant ? (
+          {presenceLeads ? (
+            <>
+              The strongest association with{" "}
+              <span className="font-mono text-ink">{meta.target}</span> is not a column&apos;s
+              values but its <em>missingness</em>:{" "}
+              <span className="font-mono text-ink">{topPresence.col}_present</span> at{" "}
+              <span className="font-mono text-ink">{topPresence.cramersV.toFixed(2)}</span>
+              {strongest && (
+                <>
+                  , against{" "}
+                  <span className="font-mono text-ink">{strongest[1].value.toFixed(2)}</span> for the
+                  best value-based feature (<span className="font-mono text-ink">{strongest[0]}</span>)
+                </>
+              )}.
+            </>
+          ) : anySignificant ? (
             <>
               The strongest association with{" "}
               <span className="font-mono text-ink">{meta.target}</span> is{" "}
@@ -247,6 +278,15 @@ function TargetSignalTab({ result }) {
           )}{" "}
           Each metric below is grouped on its own because they are not directly comparable —
           they measure different kinds of association and are estimated differently.
+          {unscored.length > 0 && (
+            <>
+              {" "}
+              <span className="text-ink-faint">
+                {unscored.length} column{unscored.length > 1 ? "s were" : " was"} not measured at all —
+                listed at the bottom with the reason.
+              </span>
+            </>
+          )}
         </p>
       </SectionCard>
 
