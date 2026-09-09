@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { CircleCheckBig, CircleSlash, Layers, Minus } from "lucide-react";
+import { CircleCheckBig, CircleSlash, Hash, Layers, Minus } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
 import StatTile     from "../../shared/StatTile.jsx";
 
-const ISSUE_ICON = { high_cardinality: Layers, constant: Minus, mixed_numeric: CircleSlash };
+const ISSUE_ICON = { high_cardinality: Layers, constant: Minus, mixed_numeric: CircleSlash, possible_code: Hash };
 
 const parseCount = (detail) => {
   const cleaned = String(detail ?? "0").replace(/[^\d.]/g, "");
