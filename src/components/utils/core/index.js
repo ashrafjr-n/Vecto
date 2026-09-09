@@ -49,7 +49,7 @@ export function analyzeDataset(data, columns, target) {
   const targetIsIdentifier = !!target && isIdentifierCol(data, target);
 
   const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier);
-  const quality        = getQuality(data, columns, identifierCols, temporalCols);
+  const quality        = getQuality(data, columns, identifierCols, temporalCols, textCols);
   const statistics     = getStatistics(data, numericCols);
   const visualizations = getVisualizations(data, columns, numericCols, categoricalCols);
   const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation, categoricalCols);

@@ -5,7 +5,7 @@ import { isMissing, isNumeric } from "../helpers.js";
    value that is NOT a number is dropped from every statistic in the report. */
 const NUMERIC_SHARE = 0.8;
 
-export function getQuality(data, columns, identifierCols = [], temporalCols = []) {
+export function getQuality(data, columns, identifierCols = [], temporalCols = [], textCols = []) {
   let missingCells = 0;
   const columnsWithIssues = [];
 
@@ -63,6 +63,7 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
       } else if (
         !identifierCols.includes(col) &&
         !temporalCols.includes(col) &&        // dates are all-unique but not "likely an ID"
+        !textCols.includes(col) &&            // nor is a commentary field, for the same reason
         (unique.length / nonEmpty.length) > 0.95 &&
         nonEmpty.length > 10
       ) {
