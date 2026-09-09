@@ -17,7 +17,30 @@ import { ROLE } from "./roles.constants.js";
 export { detectColumnRoles }       from "./detectors/roles.js";
 export { detectTarget }            from "./detectors/target.js";
 
-export function analyzeDataset(data, columns, target) {
+/* The phases, in the order they run, with the label the UI shows. Exported so the
+   processing screen can say "3 of 6" without hardcoding a count that would go
+   stale the moment a phase is added. */
+export const ANALYSIS_PHASES = [
+  { id: "roles",           label: "Classifying columns" },
+  { id: "quality",         label: "Checking data quality" },
+  { id: "statistics",      label: "Computing statistics" },
+  { id: "visualizations",  label: "Building distributions" },
+  { id: "relationships",   label: "Measuring relationships" },
+  { id: "scoring",         label: "Scoring and writing recommendations" },
+];
+
+/* `onPhase` announces which phase is starting. It is optional and defaults to a
+   no-op, so the engine stays a pure function of its inputs — the result does not
+   depend on it and nothing here reads anything back.
+
+   It exists because the work is real: 386,414 rows x 17 columns is ~18 seconds,
+   and the processing screen was a bare spinner for all of it. frontend.md rules
+   out a fake percentage and fake-progress theatre, which this is not — every
+   label below is the phase actually executing when it is shown. */
+export function analyzeDataset(data, columns, target, onPhase = () => {}) {
+  const phase = (i) => onPhase({ ...ANALYSIS_PHASES[i], index: i, total: ANALYSIS_PHASES.length });
+
+  phase(0);
   const columnRoles     = detectColumnRoles(data, columns, target);
   const identifierCols  = columns.filter(c => columnRoles[c] === ROLE.IDENTIFIER);
   const temporalCols    = columns.filter(c => columnRoles[c] === ROLE.TEMPORAL);
@@ -49,14 +72,19 @@ export function analyzeDataset(data, columns, target) {
   const targetIsIdentifier = !!target && isIdentifierCol(data, target);
 
   const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier);
+  phase(1);
   const quality        = getQuality(data, columns, identifierCols, temporalCols, textCols);
+  phase(2);
   const statistics     = getStatistics(data, numericCols);
+  phase(3);
   // statistics first — getVisualizations reads its rows instead of recomputing them.
   const visualizations = getVisualizations(data, columns, numericCols, categoricalCols, statistics);
+  phase(4);
   const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation, categoricalCols);
   const classBalance   = getClassBalance(data, target);
   const snapshot       = getDatasetSnapshot(data, columns);
 
+  phase(5);
   // V3 systems
   const healthScore       = getHealthScore({ meta, quality, statistics, relationships, classBalance });
   const recommendations   = getRecommendations({ meta, quality, statistics, relationships, classBalance, visualizations });
