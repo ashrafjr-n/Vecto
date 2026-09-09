@@ -125,11 +125,28 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
      without claiming it is void. */
   const missingPctText = pct => (pct >= 99.95 && pct < 100 ? "99.9" : String(Math.floor(pct * 10) / 10));
 
+  /* The ceiling scales with how empty the worst column actually is, instead of
+     dropping to one of two fixed values.
+
+     A flat cap erases the difference it was meant to express. Measured: ginf.csv
+     (worst column 90.3% empty, weighted score 80.4) and openpowerlifting.csv
+     (99.7% empty, weighted score 64.1) both landed on exactly 55, so a file with
+     a nearly-void column scored the same as one that is merely bad — and
+     events.csv joined them on 55 as well. Three unlike datasets, one number.
+
+     Piecewise linear and continuous at 90%: 50% → 89, 90% → 60, 100% → 45. The
+     two segments meet at 60, so nothing jumps at the boundary. */
+  const missingCap = (pct) => (pct < 90
+    ? Math.round(89 - ((pct - 50) / 40) * 29)
+    : Math.round(60 - ((pct - 90) / 10) * 15));
+
   const worst = quality.worstMissingColumn;
   if (worst && worst.pct >= 90) {
-    caps.push({ max: 55, reason: `"${worst.col}" is ${missingPctText(worst.pct)}% empty — it carries almost no information.` });
+    const max = missingCap(worst.pct);
+    caps.push({ max, reason: `"${worst.col}" is ${missingPctText(worst.pct)}% empty — it carries almost no information, which holds the score to ${max}.` });
   } else if (worst && worst.pct >= 50) {
-    caps.push({ max: 89, reason: `"${worst.col}" is ${missingPctText(worst.pct)}% missing — that has to be dealt with before this dataset is "Excellent".` });
+    const max = missingCap(worst.pct);
+    caps.push({ max, reason: `"${worst.col}" is ${missingPctText(worst.pct)}% missing — that has to be dealt with before this dataset is "Excellent", so the score is held to ${max}.` });
   }
 
   const ceiling = caps.reduce((lowest, c) => Math.min(lowest, c.max), 100);
