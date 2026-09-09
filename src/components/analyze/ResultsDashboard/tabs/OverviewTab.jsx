@@ -121,12 +121,34 @@ function HealthScoreCard({ healthScore }) {
    COLUMN ROLES — grouped, same RolePill as TargetStep
 ───────────────────────────────────────────── */
 function ColumnRolesCard({ meta }) {
+  /* Grouped from meta.columnRoles, which is the engine's actual verdict per
+     column, rather than from meta.numericCols / meta.categoricalCols.
+
+     Those derived lists fold ROLE.BINARY into categoricalCols (index.js:28) —
+     correct for routing, since binary and categorical feed the same analyses —
+     but this card was reading them as if they were the roles themselves. The
+     result was two screens disagreeing about the same column: the target picker
+     calls detectColumnRoles directly and shows "Sex — binary", and this report
+     then called it "categorical". RolePill has always had a binary style that
+     could not render here.
+
+     The target keeps its own group and is excluded from the role groups, so it
+     is still named once. "target" is not a ROLE value (there is no ROLE.TARGET)
+     and is filtered out before it can reach RolePill — see the gotcha in
+     CLAUDE.md; that behaviour is unchanged. */
+  const byRole = {};
+  Object.entries(meta.columnRoles ?? {}).forEach(([col, role]) => {
+    if (col === meta.target) return;
+    (byRole[role] ??= []).push(col);
+  });
+
   const groups = [
     { role: "target",         label: "Target",      cols: meta.target ? [meta.target] : [] },
-    { role: ROLE.NUMERIC,     label: "Numeric",      cols: meta.numericCols },
-    { role: ROLE.CATEGORICAL, label: "Categorical",  cols: meta.categoricalCols },
-    { role: ROLE.IDENTIFIER,  label: "Identifier",   cols: meta.identifierCols },
-    { role: ROLE.TEMPORAL,    label: "Temporal",     cols: meta.temporalCols ?? [] },
+    { role: ROLE.NUMERIC,     label: "Numeric",     cols: byRole[ROLE.NUMERIC]     ?? [] },
+    { role: ROLE.BINARY,      label: "Binary",      cols: byRole[ROLE.BINARY]      ?? [] },
+    { role: ROLE.CATEGORICAL, label: "Categorical", cols: byRole[ROLE.CATEGORICAL] ?? [] },
+    { role: ROLE.IDENTIFIER,  label: "Identifier",  cols: byRole[ROLE.IDENTIFIER]  ?? [] },
+    { role: ROLE.TEMPORAL,    label: "Temporal",    cols: byRole[ROLE.TEMPORAL]    ?? [] },
   ].filter((g) => g.cols.length > 0);
 
   return (
