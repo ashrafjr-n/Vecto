@@ -169,10 +169,17 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
     caps.push({ max: 40, reason: `The target "${meta.target}" is unique per row — an identifier, not a label. There is nothing in it for a model to predict.` });
   }
 
+  /* Round DOWN, and never to 100. Math.round() called openpowerlifting.csv's
+     "Squat4Kg" 100% empty when it holds 1,243 real values out of 386,414 — and a
+     user who reads "100% empty" and deletes the column has been told something
+     that is not true. 99.7% says the same thing about the column's usefulness
+     without claiming it is void. */
+  const missingPctText = pct => (pct >= 99.95 && pct < 100 ? "99.9" : String(Math.floor(pct * 10) / 10));
+
   if (worstColMissingPct >= 90) {
-    caps.push({ max: 55, reason: `"${worstMissingCol}" is ${Math.round(worstColMissingPct)}% empty — it carries almost no information.` });
+    caps.push({ max: 55, reason: `"${worstMissingCol}" is ${missingPctText(worstColMissingPct)}% empty — it carries almost no information.` });
   } else if (worstColMissingPct >= 50) {
-    caps.push({ max: 89, reason: `"${worstMissingCol}" is ${Math.round(worstColMissingPct)}% missing — that has to be dealt with before this dataset is "Excellent".` });
+    caps.push({ max: 89, reason: `"${worstMissingCol}" is ${missingPctText(worstColMissingPct)}% missing — that has to be dealt with before this dataset is "Excellent".` });
   }
 
   const ceiling = caps.reduce((lowest, c) => Math.min(lowest, c.max), 100);
