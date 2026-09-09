@@ -334,12 +334,30 @@ export function cramersV(labelsA, labelsB) {
   const rCats = margA.size, cCats = margB.size;
   if (Math.min(rCats - 1, cCats - 1) <= 0) return null;
 
-  let chi2 = 0;
+  /* Chi-square over the WHOLE table, not just the cells that were observed.
+
+     A cell with obs = 0 and exp > 0 contributes (0 - exp)^2 / exp = exp exactly,
+     and `joint` holds only the cells that actually occurred — so summing over it
+     alone drops every empty cell of the table. That is not a rounding-level
+     detail: it understates chi-square most where the table is SPARSE, which is
+     precisely where the association is strongest. Measured on ginf.csv, whose
+     "league" and "country" are a perfect 1:1 map over 5x5 = 25 cells with only
+     5 of them occupied: true V = 1.0000, observed-cells-only V = 0.8946 — the
+     engine reported a deterministic relationship as merely strong.
+
+     The empty cells never have to be visited. Expectations sum to n over the
+     entire table (sum_r sum_c margA_r * margB_c / n = n * n / n = n), so the
+     whole empty region contributes exactly n - (expectations already counted).
+     That keeps this O(observed cells): iterating r x c would be 4.5 billion
+     cells on the events.csv "text" x "player" pair alone. */
+  let chi2 = 0, expSeen = 0;
   for (const [k, obs] of joint) {
     const sep = k.indexOf("|||");
     const exp = (margA.get(k.slice(0, sep)) * margB.get(k.slice(sep + 3))) / n;
-    if (exp > 0) chi2 += ((obs - exp) ** 2) / exp;
+    if (exp > 0) { chi2 += ((obs - exp) ** 2) / exp; expSeen += exp; }
   }
+  // Clamp: on a dense table expSeen sums to n and float error can make this < 0.
+  chi2 += Math.max(0, n - expSeen);
 
   // Bergsma (2013) — without it V climbs toward 1.0 on cardinality alone.
   const phi2Corr = Math.max(0, chi2 / n - ((rCats - 1) * (cCats - 1)) / (n - 1));
