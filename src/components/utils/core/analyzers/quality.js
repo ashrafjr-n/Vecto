@@ -1,9 +1,23 @@
-import { isMissing, isNumeric } from "../helpers.js";
+import { isMissing, isNumeric, toNumber } from "../helpers.js";
 
 /* The share of present values that must parse as numbers before a column is
    analysed as numeric — the same 0.8 relations.js gates on. Above it, every
    value that is NOT a number is dropped from every statistic in the report. */
 const NUMERIC_SHARE = 0.8;
+
+/* A column of small, gapless integers is either a set of codes or a count, and
+   the values alone cannot say which — see the ENCODED_CATEGORICAL_MAX note in
+   detectors/roles.js, which reviewed the question against a published data
+   dictionary and left the ceiling where it was. What the engine CAN do is say so.
+
+   Bounds chosen from the corpus: below 5 distinct the role detector already reads
+   the column as categorical, and above 25 a gapless run from 0 or 1 is far more
+   likely to be a genuine count or an index than a code list. The gapless-from-the-
+   origin test is what keeps the noise down — it drops smoking's `amt_weekends`
+   (24 levels scattered over 0-60) and ginf's `season` (2012-2017), while keeping
+   every coded column in events.csv. */
+const CODE_MIN_DISTINCT = 5;
+const CODE_MAX_DISTINCT = 25;
 
 export function getQuality(data, columns, identifierCols = [], temporalCols = [], textCols = []) {
   let missingCells = 0;
@@ -46,6 +60,31 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
           count:  nonNumeric.length,
           detail: `${nonNumeric.length} value${nonNumeric.length > 1 ? "s are" : " is"} not a number `
                 + `(e.g. ${examples.map(e => `"${e}"`).join(", ")}) — excluded from every statistic for this column`,
+        });
+      }
+    }
+
+    /* Integers that may be codes rather than measurements. Gated on the distinct
+       count that is already in hand, so the parsing pass below runs only for the
+       handful of columns with the right shape. */
+    if (unique.length >= CODE_MIN_DISTINCT && unique.length <= CODE_MAX_DISTINCT) {
+      let allInt = true, min = Infinity, max = -Infinity;
+      const ints = new Set();
+      for (const v of nonEmpty) {
+        const n = toNumber(v);
+        if (!Number.isInteger(n)) { allInt = false; break; }
+        ints.add(n);
+        if (n < min) min = n;
+        if (n > max) max = n;
+      }
+      // Gapless run from 0 or 1: every value between the ends is present.
+      if (allInt && (min === 0 || min === 1) && ints.size === max - min + 1) {
+        columnsWithIssues.push({
+          col,
+          issue:  "possible_code",
+          count:  ints.size,
+          detail: `${ints.size} integers from ${min} to ${max} with no gaps — if these are codes rather than a count, `
+                + `the mean, median and histogram reported for "${col}" describe nothing. The values alone cannot tell the two apart.`,
         });
       }
     }
