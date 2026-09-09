@@ -16,12 +16,12 @@ import { getStatistics, getVisualizations } from "../src/components/utils/core/a
 import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { getRelationshipsV3 } from "../src/components/utils/core/analyzers/relations.js";
 import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
-import { analyzeDataset } from "../src/components/utils/core/index.js";
+import { analyzeDataset, ANALYSIS_PHASES } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 import { validateFile, inspectParseResult, transformHeader, MAX_SIZE_B } from "../src/lib/csvIntake.js";
 import { runAnalysis, runAnalysisSync } from "../src/lib/runAnalysis.js";
-import { normalizeValue, valueFrequencies, cramersV, mutualInformation, toNumber,
+import { normalizeValue, valueFrequencies, cramersV, mutualInformation, toNumber, quantile, median,
          discretize, sampleIndices, pearson, spearman } from "../src/components/utils/core/helpers.js";
 
 let failures = 0;
@@ -949,6 +949,58 @@ check("a blank header is named at intake",
 
 check("a real header is left exactly as it is",
   transformHeader("Age", 2) === "Age");
+
+/* ── Performance work must not change a single number ──────────────────────
+   Four changes: one sort per column instead of four, visualizations read from
+   the statistics rows instead of recomputing them, each numeric column parsed
+   once instead of once per pair, and flat arrays instead of an array of pairs.
+   Measured on openpowerlifting.csv (386,414 x 17): 34.9s → 18.1s. Every one of
+   them is an identity — so the thing worth locking is that the output did not
+   move, and that the two tabs that describe the same column still agree. */
+console.log("\nPERFORMANCE — same numbers, less work\n");
+
+const perfRows = [];
+for (let i = 0; i < 3000; i++) {
+  perfRows.push({
+    a: String((i * 37) % 500 + (i % 3) / 3),
+    b: String(Math.round(Math.sin(i) * 1000) / 10),
+    c: `g${i % 9}`,
+    y: String(i % 2),
+  });
+}
+const perf = analyzeDataset(perfRows, ["a", "b", "c", "y"], "y");
+const statA = perf.statistics.find(s => s.col === "a");
+const vizA  = perf.visualizations.find(v => v.col === "a");
+
+check("the boxplot and the statistics row report the same quartiles",
+  vizA.boxplot.q1 === statA.q1 && vizA.boxplot.q3 === statA.q3
+  && vizA.boxplot.median === statA.median && vizA.boxplot.min === statA.min
+  && vizA.boxplot.max === statA.max);
+
+check("the two tabs report the same outlier count and histogram",
+  vizA.boxplot.outlierCount === statA.outlierCount
+  && JSON.stringify(vizA.histogram) === JSON.stringify(statA.histogram));
+
+/* The skew LABEL was computed from a rounded value in one place and an unrounded
+   one in the other, so the two tabs could describe the same column differently. */
+check("the distribution wording agrees with the statistics label",
+  (statA.skewnessLabel === "Symmetric") === /approximately symmetric/.test(vizA.insight));
+
+/* quantile()/median() keep working on an unsorted array — the sorted forms are
+   an addition, not a replacement, and outside callers still pass raw values. */
+check("quantile() and median() still sort for callers that hand them raw values",
+  quantile([9, 1, 5, 3, 7], 0.5) === 5 && median([9, 1, 5, 3, 7]) === 5);
+
+/* The phase callback is optional and cannot change the result — the engine has
+   to stay a pure function of its inputs. */
+const seen = [];
+const withPhases = analyzeDataset(perfRows, ["a", "b", "c", "y"], "y", p => seen.push(p.id));
+check("the phase callback reports every phase, in order",
+  seen.length === ANALYSIS_PHASES.length
+  && seen.every((id, i) => id === ANALYSIS_PHASES[i].id));
+
+check("and announcing the phases does not change the result",
+  JSON.stringify(withPhases) === JSON.stringify(perf));
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
