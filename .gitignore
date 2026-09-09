@@ -14,3 +14,7 @@ datassert-docs.md
 # Vite dep pre-bundle cache — generated on every dev run, 12MB, never shipped
 # (dist/ is the deployed build and stays tracked on purpose).
 .vite/
+
+# Dataset test reports written by tools/report.mjs — local test artifacts, not build output
+reports/
+titanic-train.csv
