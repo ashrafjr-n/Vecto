@@ -20,10 +20,19 @@ import { ROLE } from "../roles.constants.js";
    Separating them needs a signal this function does not have. */
 const ENCODED_CATEGORICAL_MAX = 4;
 
-/* Distinct-value counting stops here — no rule below cares about an exact count
-   above ENCODED_CATEGORICAL_MAX, so the Set stays O(1) instead of growing to one
-   entry per row on a high-cardinality column. */
-const CARD_CAP = ENCODED_CATEGORICAL_MAX;
+/* Distinct-value counting stops here. It used to be ENCODED_CATEGORICAL_MAX (4),
+   because no rule cared about an exact count above that. Two rules now do — free
+   text and string identifiers both turn on how much of the column is distinct —
+   so the ceiling is raised to a bounded number rather than removed.
+
+   Above the cap the count is reported as Infinity and those two rules decline to
+   fire rather than guess: a column with more than CARD_CAP distinct values on a
+   dataset larger than CARD_CAP/0.95 rows could be at any uniqueness ratio, and
+   estimating a distinct count from a sample is the exact defect stage 3 removed.
+   In practice the ceiling is only reached by very large files, where the free-text
+   rule (which does not need the count) already catches the case that matters. */
+const CARD_CAP = 20000;
+
 
 /* One full-column pass: cardinality, numeric share, and integrality.
 
@@ -43,6 +52,8 @@ function profileColumn(data, col) {
   let nonMissing   = 0;
   let numericCount = 0;
   let allIntegers  = true;
+  let totalLength  = 0;
+  let withSpace    = 0;
 
   for (let i = 0; i < data.length; i++) {
     const raw = data[i][col];
@@ -55,6 +66,12 @@ function profileColumn(data, col) {
       if (allIntegers && !Number.isInteger(parseFloat(raw))) allIntegers = false;
     }
 
+    /* Shape of the text itself, for the free-text rule. Both are running totals
+       over the pass already being made — no second walk of the column. */
+    const str = String(raw);
+    totalLength += str.length;
+    if (str.includes(" ")) withSpace++;
+
     if (!overflowed) {
       distinct.add(normalizeValue(raw));
       if (distinct.size > CARD_CAP) overflowed = true;
@@ -65,7 +82,10 @@ function profileColumn(data, col) {
     nonMissing,
     numericCount,
     allIntegers,
-    // Infinity = "more than CARD_CAP"; the exact figure is never needed.
+    avgLength:  nonMissing > 0 ? totalLength / nonMissing : 0,
+    spaceShare: nonMissing > 0 ? withSpace / nonMissing : 0,
+    // Infinity = "more than CARD_CAP". Rules that need an exact ratio decline
+    // rather than guess when they see it.
     distinct: overflowed ? Infinity : distinct.size,
   };
 }
