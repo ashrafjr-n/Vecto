@@ -336,6 +336,18 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
      pair, above. */
   const columnRanks = new Map(cols.map(c => [c, rankColumn(data, c)]));
 
+  /* Parsed ONCE PER COLUMN, for the same reason the ranks are. The pair loop read
+     the raw cell and called toNumber() on it for every row of every pair — at 12
+     numeric columns that is 66 pairs x 386,414 rows x 2 columns = 51 million
+     parses of values that never change, when 12 passes produce every number the
+     loop will ever need. Float64Array because the parse result is a number and
+     NaN already means "not a usable value" to every consumer below. */
+  const columnValues = new Map(cols.map(c => {
+    const arr = new Float64Array(data.length);
+    for (let k = 0; k < data.length; k++) arr[k] = toNumber(data[k][c]);
+    return [c, arr];
+  }));
+
   for (let i = 0; i < cols.length; i++) {
     for (let j = i; j < cols.length; j++) {
       const a   = cols[i];
@@ -346,10 +358,11 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
 
       // One pass collects the value pairs AND the rank pairs (pairwise-complete).
       const ra = columnRanks.get(a), rb = columnRanks.get(b);
+      const va_ = columnValues.get(a), vb_ = columnValues.get(b);
       const xs = [], ys = [], rxs = [], rys = [];
       for (let k = 0; k < data.length; k++) {
-        const va = toNumber(data[k][a]);
-        const vb = toNumber(data[k][b]);
+        const va = va_[k];
+        const vb = vb_[k];
         if (isNaN(va) || isNaN(vb)) continue;
         xs.push(va); ys.push(vb); rxs.push(ra[k]); rys.push(rb[k]);
       }
