@@ -1,8 +1,8 @@
 import {
   getNumericValues,
-  mean, median, stdDev, quantile,
+  mean, medianSorted, stdDev, quantileSorted,
   skewness as computeSkewness, kurtosis as computeKurtosis,
-  buildHistogram, minMax, valueFrequencies,
+  buildHistogram, valueFrequencies,
 } from "../helpers.js";
 
 export function getStatistics(data, numericCols) {
@@ -10,12 +10,13 @@ export function getStatistics(data, numericCols) {
     const vals = getNumericValues(data, col);
     if (!vals.length) return { col, empty: true };
 
+    // Sorted ONCE. q1, q3, the median, the min and the max all read from it.
     const sorted = [...vals].sort((a, b) => a - b);
-    const q1     = quantile(vals, 0.25);
-    const q3     = quantile(vals, 0.75);
+    const q1     = quantileSorted(sorted, 0.25);
+    const q3     = quantileSorted(sorted, 0.75);
     const iqr    = q3 - q1;
     const m      = mean(vals);
-    const med    = median(vals);
+    const med    = medianSorted(sorted);
     const std    = stdDev(vals);
 
     // FIX #2: real bias-corrected moment skewness + excess kurtosis (scipy-matching)
@@ -71,56 +72,47 @@ export function getStatistics(data, numericCols) {
    VISUALIZATIONS
    FIX #5: Same constant column guard
 ══════════════════════════════════════════ */
-export function getVisualizations(data, columns, numericCols, categoricalCols) {
+export function getVisualizations(data, columns, numericCols, categoricalCols, statistics = []) {
   const result = [];
 
+  /* The numeric branch used to recompute, field for field, everything
+     getStatistics had just produced for the same columns: another
+     getNumericValues() array, another three sorts through quantile()/median(),
+     another buildHistogram(), another Set of the values, another skewness pass.
+     Two implementations of one calculation, 5.2s of the 35s on a 386k-row file,
+     and free to disagree — getStatistics labelled skew from a rounded value while
+     this branch labelled it from an unrounded one, so the Statistics tab and the
+     Visualizations tab could describe the same column differently.
+
+     It reads the statistics rows now. Nothing here is measured twice. */
+  const statByCol = new Map(statistics.map(s => [s.col, s]));
+
   numericCols.forEach(col => {
-    const vals = getNumericValues(data, col);
-    if (!vals.length) return;
-
-    // minMax(), never Math.min(...vals) — see helpers.js for why the spread breaks
-    const { min, max } = minMax(vals);
-
-    // FIX P7: use shared buildHistogram helper
-    const bins = buildHistogram(vals);
-
-    const q1         = quantile(vals, 0.25);
-    const q3         = quantile(vals, 0.75);
-    const iqr        = q3 - q1;
-    const med        = median(vals);
-    const lowerFence  = q1 - 1.5 * iqr;
-    const upperFence  = q3 + 1.5 * iqr;
-    // FIX #4: same discrete guard as getStatistics
-    const uniqueVals2 = [...new Set(vals)];
-    const isDiscrete2 = uniqueVals2.length <= 10;
-    const outliers    = isDiscrete2
-      ? []
-      : vals.filter(v => v < lowerFence || v > upperFence);
-    // FIX #2: display-only skew hint now uses the real moment skewness helper
-    const skewness   = computeSkewness(vals);
+    const stat = statByCol.get(col);
+    if (!stat || stat.empty) return;
 
     const skewLabel =
-      min === max                ? "constant — all values are identical" :
-      skewness >  0.5            ? "right-skewed (tail toward higher values)" :
-      skewness < -0.5            ? "left-skewed (tail toward lower values)" :
-                                   "approximately symmetric";
+      stat.isConstant       ? "constant — all values are identical" :
+      stat.skewness >  0.5  ? "right-skewed (tail toward higher values)" :
+      stat.skewness < -0.5  ? "left-skewed (tail toward lower values)" :
+                              "approximately symmetric";
 
     result.push({
       col,
-      type:      "numeric",
-      histogram: bins,
-      isConstant: min === max,
+      type:       "numeric",
+      histogram:  stat.histogram,
+      isConstant: stat.isConstant,
       boxplot: {
-        min:          Math.round(min * 100) / 100,
-        max:          Math.round(max * 100) / 100,
-        q1:           Math.round(q1 * 100) / 100,
-        q3:           Math.round(q3 * 100) / 100,
-        median:       Math.round(med * 100) / 100,
-        lowerFence:   Math.round(lowerFence * 100) / 100,
-        upperFence:   Math.round(upperFence * 100) / 100,
-        outlierCount: outliers.length,
+        min:          stat.min,
+        max:          stat.max,
+        q1:           stat.q1,
+        q3:           stat.q3,
+        median:       stat.median,
+        lowerFence:   stat.lowerFence,
+        upperFence:   stat.upperFence,
+        outlierCount: stat.outlierCount,
       },
-      insight: `Distribution is ${skewLabel}.${outliers.length > 0 ? ` ${outliers.length} outlier${outliers.length > 1 ? "s" : ""} detected.` : " No outliers detected."}`,
+      insight: `Distribution is ${skewLabel}.${stat.outlierCount > 0 ? ` ${stat.outlierCount} outlier${stat.outlierCount > 1 ? "s" : ""} detected.` : " No outliers detected."}`,
     });
   });
 

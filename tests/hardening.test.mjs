@@ -74,7 +74,8 @@ check(`getStatistics() handles ${BIG.toLocaleString()} rows`,
                    if (s[0].count !== BIG) throw new Error("wrong count"); }));
 
 check(`getVisualizations() handles ${BIG.toLocaleString()} rows`,
-  survives(() => getVisualizations(bigRows, bigCols, ["measure"], ["flag"])));
+  survives(() => getVisualizations(bigRows, bigCols, ["measure"], ["flag"],
+                                   getStatistics(bigRows, ["measure"]))));
 
 check(`analyzeDataset() completes end-to-end on ${BIG.toLocaleString()} rows`,
   survives(() => { const r = analyzeDataset(bigRows, bigCols, "flag");

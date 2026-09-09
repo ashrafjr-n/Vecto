@@ -51,7 +51,8 @@ export function analyzeDataset(data, columns, target) {
   const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier);
   const quality        = getQuality(data, columns, identifierCols, temporalCols, textCols);
   const statistics     = getStatistics(data, numericCols);
-  const visualizations = getVisualizations(data, columns, numericCols, categoricalCols);
+  // statistics first — getVisualizations reads its rows instead of recomputing them.
+  const visualizations = getVisualizations(data, columns, numericCols, categoricalCols, statistics);
   const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation, categoricalCols);
   const classBalance   = getClassBalance(data, target);
   const snapshot       = getDatasetSnapshot(data, columns);
