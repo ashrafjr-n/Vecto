@@ -144,7 +144,12 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           pairs.push([a, b]);
         });
 
-        if (pairs.length >= 3) {
+        if (pairs.length < 3) {
+          unscored(col, `only ${pairs.length} row${pairs.length === 1 ? "" : "s"} have both a numeric "${col}" and a usable "${target}" — too few to correlate.`);
+          return;
+        }
+
+        {
           const mx = mean(pairs.map(p => p[0]));
           const my = mean(pairs.map(p => p[1]));
           let num = 0, dx2 = 0, dy2 = 0;
@@ -152,8 +157,24 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
             const dx = a - mx; const dy = b - my;
             num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
           }
+
+          /* Zero variance on either side is not a correlation of zero — it is the
+             absence of anything to correlate. Reporting r = 0 here said "measured,
+             and there is no relationship" about a pair that was never measurable,
+             and it did so for exactly the case worth knowing about: a column whose
+             missing rows are the target's other class, so the surviving rows all
+             carry one target value. */
+          if (dy2 === 0) {
+            unscored(col, `"${target}" holds a single value across all ${pairs.length} rows where "${col}" is a number, so there is no variation to correlate against — the PRESENCE of "${col}" may itself predict the target. Worth testing as a yes/no indicator.`);
+            return;
+          }
+          if (dx2 === 0) {
+            unscored(col, `"${col}" is constant across the rows shared with "${target}" — a constant carries no signal.`);
+            return;
+          }
+
           const denom = Math.sqrt(dx2 * dy2);
-          const r = denom === 0 ? 0 : num / denom;
+          const r = num / denom;
 
           /* Pearson answers "is it LINEAR?". On a skewed column that is the wrong
              question, and answering it alone let the engine report "no meaningful
