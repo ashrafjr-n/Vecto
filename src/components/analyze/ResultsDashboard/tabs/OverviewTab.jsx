@@ -45,9 +45,41 @@ function RadialGauge({ score }) {
 
 const DIM_LABEL = { quality: "Quality", structure: "Structure", relationships: "Relationships", targetReadiness: "Target readiness" };
 
+/* Why the score is lower than the weighted dimensions would suggest.
+
+   Stage 5 added a cap layer: the score may not claim more than the evidence
+   supports, and each cap carries its reason. Until now only the smaller NUMBER
+   reached the user — titanic reads 89 instead of 93 with nothing on screen
+   explaining it, which is precisely the "confident number, no reasoning" failure
+   the caps were added to prevent. `limits` is [] on an uncapped run, so this
+   renders nothing in the ordinary case. */
+function ScoreLimits({ limits }) {
+  if (!limits?.length) return null;
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <div className="mb-2 flex items-center gap-2">
+        <StatusBadge severity="warning">Score capped</StatusBadge>
+        <span className="text-[11.5px] text-ink-faint">
+          {limits.length === 1 ? "One limit applied" : `${limits.length} limits applied`} — the lowest one holds
+        </span>
+      </div>
+      <ul className="space-y-1.5">
+        {limits.map((cap, i) => (
+          <li key={i} className="flex items-start gap-2 text-[12px] leading-relaxed text-ink-soft">
+            <span className="mt-px shrink-0 rounded bg-paper-sunken px-1.5 py-0.5 font-mono text-[10.5px] text-ink-faint">
+              max {cap.max}
+            </span>
+            <span>{cap.reason}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function HealthScoreCard({ healthScore }) {
   if (!healthScore) return null;
-  const { score, grade, breakdown, hasTarget } = healthScore;
+  const { score, grade, breakdown, hasTarget, limits } = healthScore;
   const dims = Object.entries(breakdown).filter(([k]) => hasTarget || k !== "targetReadiness");
 
   return (
@@ -80,6 +112,7 @@ function HealthScoreCard({ healthScore }) {
           })}
         </div>
       </div>
+      <ScoreLimits limits={limits} />
     </SectionCard>
   );
 }
