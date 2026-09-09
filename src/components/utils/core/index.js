@@ -21,6 +21,7 @@ export function analyzeDataset(data, columns, target) {
   const columnRoles     = detectColumnRoles(data, columns, target);
   const identifierCols  = columns.filter(c => columnRoles[c] === ROLE.IDENTIFIER);
   const temporalCols    = columns.filter(c => columnRoles[c] === ROLE.TEMPORAL);
+  const textCols        = columns.filter(c => columnRoles[c] === ROLE.TEXT);
   // Exclude target from feature lists — it's tracked separately via meta.target
   const numericCols     = columns.filter(c => columnRoles[c] === ROLE.NUMERIC
                             && c !== target);
@@ -31,7 +32,7 @@ export function analyzeDataset(data, columns, target) {
   // Non-feature columns skipped by the target-correlation scan (relations.js re-derives
   // types from raw values, ignoring roles — so identifiers AND temporals must be named
   // explicitly there or they leak back in as spurious predictors).
-  const skipFromCorrelation = new Set([...identifierCols, ...temporalCols]);
+  const skipFromCorrelation = new Set([...identifierCols, ...temporalCols, ...textCols]);
 
   /* detectColumnRoles deliberately skips the identifier check for the target, so
      the target's identifier-ness is not recoverable from columnRoles or from
@@ -40,7 +41,7 @@ export function analyzeDataset(data, columns, target) {
      column is ALSO one distinct value per row) and scored 88 "Good". */
   const targetIsIdentifier = !!target && isIdentifierCol(data, target);
 
-  const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, columnRoles, targetIsIdentifier);
+  const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier);
   const quality        = getQuality(data, columns, identifierCols, temporalCols);
   const statistics     = getStatistics(data, numericCols);
   const visualizations = getVisualizations(data, columns, numericCols, categoricalCols);
@@ -61,7 +62,7 @@ export function analyzeDataset(data, columns, target) {
 }
 
 
-function getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, columnRoles, targetIsIdentifier) {
+function getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier) {
   let datasetType = "Unknown";
 
   if (target) {
@@ -97,6 +98,7 @@ function getMeta(data, columns, target, numericCols, categoricalCols, identifier
     categoricalCols,
     identifierCols,
     temporalCols,
+    textCols,
     columnRoles,
     target,
     targetIsIdentifier,

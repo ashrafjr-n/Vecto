@@ -34,6 +34,23 @@ const ENCODED_CATEGORICAL_MAX = 4;
 const CARD_CAP = 20000;
 
 
+/* A free-text column — a commentary field, a description, a review — is not a
+   categorical variable: its "levels" are sentences, one or two rows each. Read as
+   categorical, events.csv's `text` (941,009 rows, ~900,000 distinct) became the
+   single strongest reported association with the target at V = 0.78, which is
+   both true and useless: the commentary describes the event, so it restates the
+   label in prose.
+
+   Measured across the audit files, length and spacing separate it cleanly and
+   nothing else comes close: `text` averages 73.8 characters with a space in 100%
+   of values, while ginf's `link_odsp` (a URL) averages 62.4 characters with a
+   space in 0%, and meets' `MeetName` averages 22.9. Both thresholds have to hold,
+   plus more distinct values than any real category list. */
+const TEXT_MIN_AVG_LENGTH = 40;
+const TEXT_MIN_SPACE_SHARE = 0.5;
+const TEXT_MIN_DISTINCT = 50;
+
+
 /* One full-column pass: cardinality, numeric share, and integrality.
 
    Cardinality is measured over the WHOLE column, never a head sample. That was
@@ -130,6 +147,17 @@ export function detectColumnRoles(data, columns, target) {
     if (profile.numericCount / profile.nonMissing >= 0.8) {
       const isEncoded = profile.allIntegers && profile.distinct <= ENCODED_CATEGORICAL_MAX;
       roles[col] = isEncoded ? ROLE.CATEGORICAL : ROLE.NUMERIC;
+      return;
+    }
+
+    /* Cascade position 5: free text, below numeric so a long numeric string can
+       never reach it, and above plain categorical because that is the role it was
+       being swept into. All three conditions must hold — length alone calls a URL
+       free text, and spacing alone calls a person's name free text. */
+    if (profile.avgLength >= TEXT_MIN_AVG_LENGTH
+        && profile.spaceShare >= TEXT_MIN_SPACE_SHARE
+        && profile.distinct > TEXT_MIN_DISTINCT) {
+      roles[col] = ROLE.TEXT;
       return;
     }
 
