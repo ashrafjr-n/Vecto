@@ -52,7 +52,13 @@ function significanceOf(entry) {
     : { text: `not distinguishable from chance (${shown}, n = ${n})`, strong: false };
 }
 
-function SignalRow({ col, entry, index }) {
+/* Below this share of the dataset the coefficient describes a slice, not the
+   file. openpowerlifting.csv's top row is a fourth-attempt column measured on
+   1,225 of 386,414 rows — the n was already printed, but next to five rows that
+   cover everything it does not read as the qualification it is. */
+const COVERAGE_MIN = 0.5;
+
+function SignalRow({ col, entry, index, rows }) {
   const abs  = Math.min(1, Math.abs(entry.absValue ?? 0));
   const sig  = significanceOf(entry);
   /* The bar is a magnitude, so an unsigned metric must not borrow the diverging
@@ -61,6 +67,9 @@ function SignalRow({ col, entry, index }) {
 
   const divergence = entry.spearman != null
     && Math.abs(entry.spearman) - Math.abs(entry.value) > 0.1;
+
+  const coverage = rows > 0 ? (entry.n ?? 0) / rows : 1;
+  const narrow   = coverage < COVERAGE_MIN;
 
   return (
     <div className="py-3 first:pt-0 last:pb-0">
@@ -86,6 +95,12 @@ function SignalRow({ col, entry, index }) {
         {divergence && (
           <span className="rounded bg-gold-tint px-1.5 py-0.5 text-[11px] text-gold-ink">
             Spearman {entry.spearman.toFixed(2)} — monotonic, not linear
+          </span>
+        )}
+
+        {narrow && (
+          <span className="rounded bg-warning-tint px-1.5 py-0.5 text-[11px] text-warning">
+            measured on {(coverage * 100).toFixed(1)}% of rows — a slice, not the dataset
           </span>
         )}
 
@@ -146,7 +161,7 @@ function PresenceSignals({ signals, target }) {
   );
 }
 
-function MetricGroup({ group, entries }) {
+function MetricGroup({ group, entries, rows }) {
   if (!entries.length) return null;
   return (
     <SectionCard
@@ -156,7 +171,7 @@ function MetricGroup({ group, entries }) {
       <p className="-mt-2 mb-3 text-[12px] leading-relaxed text-ink-faint">{group.sub}</p>
       <div className="divide-y divide-line">
         {entries.map(([col, entry], i) => (
-          <SignalRow key={col} col={col} entry={entry} index={i} />
+          <SignalRow key={col} col={col} entry={entry} index={i} rows={rows} />
         ))}
       </div>
     </SectionCard>
@@ -296,7 +311,7 @@ function TargetSignalTab({ result }) {
       <PresenceSignals signals={relationships.presenceSignals ?? []} target={meta.target} />
 
       {METRIC_GROUPS.map((g) => (
-        <MetricGroup key={g.key} group={g} entries={sorted.filter(([, e]) => e.metric === g.key)} />
+        <MetricGroup key={g.key} group={g} rows={meta.rows} entries={sorted.filter(([, e]) => e.metric === g.key)} />
       ))}
 
       <UnscoredColumns columns={relationships.unscoredColumns ?? []} target={meta.target} />
