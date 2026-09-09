@@ -32,7 +32,14 @@ export function analyzeDataset(data, columns, target) {
   // Non-feature columns skipped by the target-correlation scan (relations.js re-derives
   // types from raw values, ignoring roles — so identifiers AND temporals must be named
   // explicitly there or they leak back in as spurious predictors).
-  const skipFromCorrelation = new Set([...identifierCols, ...temporalCols, ...textCols]);
+  /* A Map, not a Set, so the scan can say WHY a column was left out instead of
+     just leaving it out. Map answers .has() exactly as the Set did, so callers
+     that only ask membership are unaffected. */
+  const skipFromCorrelation = new Map([
+    ...identifierCols.map(c => [c, `"${c}" is an identifier — one value per row identifies the row, not a property of it, so any association with the target would be memorisation.`]),
+    ...temporalCols.map(c => [c, `"${c}" is a date. Correlating a raw timestamp against the target measures drift over the collection period, not a feature; derive a part of it (month, weekday, age-at-event) and scan that instead.`]),
+    ...textCols.map(c => [c, `"${c}" is free text, not a category. Its values are sentences, so an association measure over them describes the wording rather than a variable; extract features from it (length, keywords, embeddings) and scan those.`]),
+  ]);
 
   /* detectColumnRoles deliberately skips the identifier check for the target, so
      the target's identifier-ness is not recoverable from columnRoles or from
