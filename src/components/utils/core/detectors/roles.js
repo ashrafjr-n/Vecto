@@ -51,6 +51,12 @@ const TEXT_MIN_SPACE_SHARE = 0.5;
 const TEXT_MIN_DISTINCT = 50;
 
 
+/* Share of distinct values above which a non-numeric column is an identifier.
+   Measured: meets' MeetPath and ginf's id_odsp/link_odsp all sit at exactly 1.000,
+   while the highest non-identifier is MeetName at 0.615 — nothing in the corpus
+   falls between 0.62 and 1.00, so the threshold is not near anything real. */
+const IDENTIFIER_MIN_DISTINCT_SHARE = 0.95;
+
 /* One full-column pass: cardinality, numeric share, and integrality.
 
    Cardinality is measured over the WHOLE column, never a head sample. That was
@@ -158,6 +164,29 @@ export function detectColumnRoles(data, columns, target) {
         && profile.spaceShare >= TEXT_MIN_SPACE_SHARE
         && profile.distinct > TEXT_MIN_DISTINCT) {
       roles[col] = ROLE.TEXT;
+      return;
+    }
+
+    /* Cascade position 6: a column that is almost entirely distinct is an
+       identifier, whatever its values look like.
+
+       isIdentifierCol above catches identifiers by NAME (id/uuid/key/index/ref)
+       and by a numeric sequence, and it reads the first 200 rows to do it — so a
+       string key with no telltale name never matched. meets.csv's "MeetPath" and
+       ginf.csv's "link_odsp" are one distinct value per row and came back
+       CATEGORICAL, while quality.js independently labelled them "High uniqueness
+       — likely an ID column". Two detectors, two answers, on the same column.
+
+       This runs BELOW the free-text rule on purpose: at full size events.csv's
+       `text` is 96% distinct and would be called an identifier by this rule alone.
+
+       Declines when the distinct count overflowed CARD_CAP — a ratio cannot be
+       estimated from a truncated count, and guessing here is the stage-3 defect. */
+    if (col !== target
+        && Number.isFinite(profile.distinct)
+        && profile.nonMissing > 10
+        && profile.distinct / profile.nonMissing > IDENTIFIER_MIN_DISTINCT_SHARE) {
+      roles[col] = ROLE.IDENTIFIER;
       return;
     }
 
