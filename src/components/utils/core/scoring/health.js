@@ -2,64 +2,13 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
 
   const hasTarget = !!meta.target;
 
-  /* ── Dimension 1: Data Quality (weight varies) ── */
-  // FIX #1a: Base missing score from overall pct
-  const missingScore   = Math.max(0, 100 - quality.missingPct * 2);
-
-  // FIX #1b: Additional per-column severity penalty.
-  // A single column with 77% missing is a serious structural problem
-  // even if the overall dataset missing% looks small.
-  let worstColMissingPct = 0;
-  let worstMissingCol    = null;
-  quality.columnsWithIssues
-    .filter(c => c.issue === "missing")
-    .forEach(c => {
-      const pct = ((c.count ?? parseInt(c.detail)) / meta.rows) * 100;
-      if (pct > worstColMissingPct) { worstColMissingPct = pct; worstMissingCol = c.col; }
-    });
-
-  // Penalty: 0 if worst col < 20%, scales to -30 at 100%
-  const worstColPenalty = worstColMissingPct > 20
-    ? Math.round(((worstColMissingPct - 20) / 80) * 30)
-    : 0;
-
-  // Count of columns with > 20% missing
-  const highMissingCols = quality.columnsWithIssues
-    .filter(c => c.issue === "missing" && ((c.count ?? parseInt(c.detail)) / meta.rows) * 100 > 20)
-    .length;
-
-  const adjustedMissingScore = Math.max(0, missingScore - worstColPenalty - highMissingCols * 5);
-
-  const constantCount  = quality.columnsWithIssues.filter(c => c.issue === "constant").length;
-  const constantScore  = Math.max(0, 100 - constantCount * 15);
-
-  // FIX: ID columns are expected in real datasets — small penalty only
-  const idCount        = meta.identifierCols.length;
-  const idScore        = Math.max(0, 100 - idCount * 3);
-
-  // FIX #4: the duplicates term only participates when duplicates were actually
-  // computed. Branch on the flag BEFORE any division so null never enters the
-  // math (no NaN). When skipped, drop duplicates and renormalize the remaining
-  // weights {0.45, 0.15, 0.15} → {0.60, 0.20, 0.20} (sum 1.0).
-  let qualityComponents;
-  if (quality.duplicatesComputed) {
-    const dupPct   = (quality.duplicateRows / meta.rows) * 100;
-    const dupScore = Math.max(0, 100 - dupPct * 50);
-    qualityComponents = {
-      missing:    { score: adjustedMissingScore, weight: 0.45 },
-      duplicates: { score: dupScore,             weight: 0.25 },
-      constant:   { score: constantScore,        weight: 0.15 },
-      id:         { score: idScore,              weight: 0.15 },
-    };
-  } else {
-    qualityComponents = {
-      missing:  { score: adjustedMissingScore, weight: 0.60 },
-      constant: { score: constantScore,        weight: 0.20 },
-      id:       { score: idScore,              weight: 0.20 },
-    };
-  }
-  const qualityDim = Object.values(qualityComponents)
-    .reduce((sum, c) => sum + c.score * c.weight, 0);
+  /* ── Dimension 1: Data Quality ──
+     Read, not recomputed. This block used to hold a second, independently written
+     quality model working from the same `quality.*` outputs, and the two numbers
+     it produced against quality.js's own score were openly different (11 vs 40 on
+     openpowerlifting.csv). The weighted model moved into quality.js, which owns
+     the inputs; here it is simply the score that file already published. */
+  const qualityDim = quality.qualityScore;
 
   /* ── Dimension 2: Dataset Structure ── */
   const rowScore =
@@ -176,10 +125,11 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
      without claiming it is void. */
   const missingPctText = pct => (pct >= 99.95 && pct < 100 ? "99.9" : String(Math.floor(pct * 10) / 10));
 
-  if (worstColMissingPct >= 90) {
-    caps.push({ max: 55, reason: `"${worstMissingCol}" is ${missingPctText(worstColMissingPct)}% empty — it carries almost no information.` });
-  } else if (worstColMissingPct >= 50) {
-    caps.push({ max: 89, reason: `"${worstMissingCol}" is ${missingPctText(worstColMissingPct)}% missing — that has to be dealt with before this dataset is "Excellent".` });
+  const worst = quality.worstMissingColumn;
+  if (worst && worst.pct >= 90) {
+    caps.push({ max: 55, reason: `"${worst.col}" is ${missingPctText(worst.pct)}% empty — it carries almost no information.` });
+  } else if (worst && worst.pct >= 50) {
+    caps.push({ max: 89, reason: `"${worst.col}" is ${missingPctText(worst.pct)}% missing — that has to be dealt with before this dataset is "Excellent".` });
   }
 
   const ceiling = caps.reduce((lowest, c) => Math.min(lowest, c.max), 100);
@@ -210,15 +160,9 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
       relationships:  Math.round(relDim),
       targetReadiness: Math.round(targetDim),
     },
-    // FIX #4: auditable quality sub-components + the exact weights applied
-    // (duplicates absent, weights renormalized, when the check was skipped).
-    qualityBreakdown: {
-      duplicatesComputed: quality.duplicatesComputed,
-      components:         qualityComponents,
-    },
-    // Every cap that applied, with its reason. Empty when the score is the
-    // weighted figure in full — so a capped score can always explain itself
-    // rather than just being mysteriously lower.
+    /* `qualityBreakdown` used to be re-exported here — the same component list
+       quality.qualityComponents now carries, rendered by nothing. Removed rather
+       than kept in sync: a second copy of a number is how the first one drifts. */
     limits: caps,
     hasTarget,
   };

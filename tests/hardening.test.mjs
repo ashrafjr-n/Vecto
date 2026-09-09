@@ -162,7 +162,9 @@ const scoringMeta = {
   target: "y", rows: 1000, columns: 6,
   numericCols: ["f1", "f2"], categoricalCols: ["c1"], identifierCols: [], temporalCols: [],
 };
-const scoringQuality  = { missingPct: 0, columnsWithIssues: [], duplicatesComputed: true, duplicateRows: 0 };
+// qualityScore is READ by health.js now, not recomputed from these fields.
+const scoringQuality  = { missingPct: 0, columnsWithIssues: [], duplicatesComputed: true, duplicateRows: 0,
+                          qualityScore: 100, worstMissingColumn: null };
 const balanced        = { classes: [{ value: "a", pct: 50 }, { value: "b", pct: 50 }], isImbalanced: false };
 const relWith = absValue => ({
   multicollinearPairs: [], leakageSuspects: [],
