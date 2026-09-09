@@ -19,7 +19,7 @@ import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
-import { validateFile, inspectParseResult, MAX_SIZE_B } from "../src/lib/csvIntake.js";
+import { validateFile, inspectParseResult, transformHeader, MAX_SIZE_B } from "../src/lib/csvIntake.js";
 import { runAnalysis, runAnalysisSync } from "../src/lib/runAnalysis.js";
 import { normalizeValue, valueFrequencies, cramersV, mutualInformation, toNumber,
          discretize, sampleIndices, pearson, spearman } from "../src/components/utils/core/helpers.js";
@@ -898,6 +898,56 @@ check("a column with gaps is not reported as coded",
    so it keeps the mean/std/outliers a genuine count needs. */
 check("the encoded-categorical ceiling did not move",
   detectColumnRoles(codeRows, ["code", "spread", "y"], "y").code === ROLE.NUMERIC);
+
+/* ── One quality number, and caps that still distinguish ───────────────────
+   Two quality models existed — a flat "100 minus penalties" in quality.js and a
+   weighted average in health.js, from the same inputs. They disagreed openly:
+   11 vs 40 on openpowerlifting.csv, 7 vs 39 on events.csv. */
+console.log("\nONE QUALITY NUMBER — and a cap that does not flatten\n");
+
+const qRows = [];
+for (let i = 0; i < 400; i++) qRows.push({ a: i < 300 ? "" : String(i), b: `g${i % 6}`, y: String(i % 2) });
+const qResult = analyzeDataset(qRows, ["a", "b", "y"], "y");
+
+check("the health quality dimension is the published quality score, not a second one",
+  qResult.healthScore.breakdown.quality === qResult.quality.qualityScore);
+
+check("the waterfall the report shows adds up to the score it states",
+  qResult.quality.qualityScore
+    === 100 - qResult.quality.scorePenalties.reduce((s, p) => s + p.penalty, 0));
+
+check("the removed duplicate breakdown is gone from healthScore",
+  !("qualityBreakdown" in qResult.healthScore));
+
+/* A flat cap erased the difference it existed to express: ginf (worst column
+   90.3% empty, weighted 80.4) and openpowerlifting (99.7% empty, weighted 64.1)
+   both landed on exactly 55 — the worse file scoring the same as the better one. */
+const capAt = (emptyPct) => {
+  const rows = [];
+  const empties = Math.round(400 * emptyPct);
+  for (let i = 0; i < 400; i++) {
+    rows.push({ sparse: i < empties ? "" : String(i % 40), b: `g${i % 6}`, c: String(i % 31), y: String(i % 2) });
+  }
+  return analyzeDataset(rows, ["sparse", "b", "c", "y"], "y").healthScore;
+};
+const bad   = capAt(0.90);
+const worse = capAt(0.99);
+check("a worse worst-column produces a strictly lower ceiling",
+  worse.limits[0].max < bad.limits[0].max);
+
+check("and a strictly lower score, instead of both landing on the same number",
+  worse.score < bad.score);
+
+check("the cap states the number it holds the score to",
+  bad.limits[0].reason.includes(String(bad.limits[0].max)));
+
+/* An unnamed header — a pandas/R index column — used to reach the reader as
+   `Drop "" before training`. Renamed at intake, before rows are keyed. */
+check("a blank header is named at intake",
+  transformHeader("", 0) === "column_1" && transformHeader("  ", 4) === "column_5");
+
+check("a real header is left exactly as it is",
+  transformHeader("Age", 2) === "Age");
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
