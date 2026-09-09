@@ -510,7 +510,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     observations.unshift(
       `${unscoredColumns.length} column${unscoredColumns.length > 1 ? "s were" : " was"} left out of the target scan ` +
       `(${shown}${more}) — ${unscoredColumns.length > 1 ? "they were" : "it was"} not measured, which is not the same as ` +
-      `${unscoredColumns.length > 1 ? "showing" : "showing"} no signal. See the reason on each.`
+      `showing no signal. See the reason on each.`
     );
   }
 
