@@ -123,10 +123,19 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     const allCols = Object.keys(data[0] || {});
     allCols.forEach(col => {
       if (col === target) return;
-      // Skip non-feature columns (identifiers ∪ temporals). This loop re-derives types
-      // from raw values ignoring roles, so without this an ID or date column leaks back
-      // in as a spurious Pearson/Cramér's-V predictor against the target.
-      if (skipCols.has(col)) return;
+      /* Skip non-feature columns (identifiers ∪ temporals ∪ free text). This loop
+         re-derives types from raw values ignoring roles, so without this an ID, a
+         date or a commentary field leaks back in as a spurious predictor.
+
+         Recorded rather than dropped: these were leaving the report with no trace
+         at all, the same silence unscoredColumns was built to end. ginf.csv's
+         "id_odsp" and "date" simply were not in the Target Signal tab, and a
+         reader had no way to tell a skipped column from an absent one.
+         `skipCols` is a Map from index.js; the ?. covers a plain Set caller. */
+      if (skipCols.has(col)) {
+        unscored(col, skipCols.get?.(col) ?? `"${col}" is not a feature column and was left out of the scan.`);
+        return;
+      }
 
       const colVals = getValues(data, col);
       const colUnique = [...new Set(colVals.map(normalizeValue))].sort(byLevel);
