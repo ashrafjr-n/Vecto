@@ -163,6 +163,35 @@ function MetricGroup({ group, entries }) {
   );
 }
 
+/* ── What was NOT measured ──────────────────────────────────────────────────
+   Every column here used to be absent from this tab entirely: no row, no note,
+   nothing. A reader had no way to tell "scored low" from "never scored", so the
+   tab's own summary line ("the strongest association is 0.22") read as a verdict
+   on the whole dataset when it was a verdict on part of it. */
+function UnscoredColumns({ columns, target }) {
+  if (!columns.length) return null;
+  return (
+    <SectionCard
+      title="Not measured against the target"
+      action={<StatusBadge severity="info">{columns.length} column{columns.length > 1 ? "s" : ""}</StatusBadge>}
+    >
+      <p className="-mt-2 mb-3 text-[12px] leading-relaxed text-ink-faint">
+        These were left out of the scan above. Not measured is not the same as no
+        signal — the reason each one could not be compared to{" "}
+        <span className="font-mono text-ink-soft">{target}</span> is given below.
+      </p>
+      <div className="divide-y divide-line">
+        {columns.map((u) => (
+          <div key={u.col} className="py-2.5 first:pt-0 last:pb-0">
+            <div className="font-mono text-[12.5px] text-ink">{u.col}</div>
+            <div className="mt-0.5 text-[12px] leading-relaxed text-ink-soft">{u.reason}</div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 function TargetSignalTab({ result }) {
   const { meta, relationships } = result;
   const entries = Object.entries(relationships.targetCorrelations ?? {});
@@ -226,6 +255,8 @@ function TargetSignalTab({ result }) {
       {METRIC_GROUPS.map((g) => (
         <MetricGroup key={g.key} group={g} entries={sorted.filter(([, e]) => e.metric === g.key)} />
       ))}
+
+      <UnscoredColumns columns={relationships.unscoredColumns ?? []} target={meta.target} />
     </div>
   );
 }
