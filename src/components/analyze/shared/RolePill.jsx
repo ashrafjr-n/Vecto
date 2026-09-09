@@ -11,6 +11,10 @@ const PILL_STYLE = {
   [ROLE.BINARY]:      "bg-success-tint text-success",
   [ROLE.IDENTIFIER]:  "bg-warning-tint text-warning",
   [ROLE.TEMPORAL]:    "bg-gold-tint text-gold-ink",
+  /* Free text sits with categorical in weight — it is not a problem role like
+     identifier — but must be distinguishable from it, since telling the two apart
+     is the entire point of adding the role. */
+  [ROLE.TEXT]:        "bg-paper-sunken text-ink-soft border border-line-strong",
 };
 const FALLBACK_PILL = PILL_STYLE[ROLE.CATEGORICAL];
 
