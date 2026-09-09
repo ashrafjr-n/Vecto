@@ -13,6 +13,7 @@
 
 import { buildHistogram, minMax } from "../src/components/utils/core/helpers.js";
 import { getStatistics, getVisualizations } from "../src/components/utils/core/analyzers/stats.js";
+import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { getRelationshipsV3 } from "../src/components/utils/core/analyzers/relations.js";
 import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
@@ -20,7 +21,7 @@ import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 import { validateFile, inspectParseResult, MAX_SIZE_B } from "../src/lib/csvIntake.js";
 import { runAnalysis, runAnalysisSync } from "../src/lib/runAnalysis.js";
-import { normalizeValue, valueFrequencies, cramersV, mutualInformation,
+import { normalizeValue, valueFrequencies, cramersV, mutualInformation, toNumber,
          discretize, sampleIndices, pearson, spearman } from "../src/components/utils/core/helpers.js";
 
 let failures = 0;
@@ -626,6 +627,40 @@ for (let lvl = 0; lvl < 4; lvl++) {
 const cvRel = getRelationshipsV3(cvRows, [], "t", new Set(), ["f"]);
 check("the target branch reports the same V as the shared estimator",
   cvRel.targetCorrelations.f?.metric === "cramers_v" && cvRel.targetCorrelations.f.value === 1);
+
+/* ── One string-to-number policy ───────────────────────────────────────────
+   isNumeric() rejects "125+"; parseFloat() turns it into 125. The engine gated
+   on the first and measured with the second, so a super-heavyweight weight class
+   was silently rewritten to its own lower bound and averaged in. Measured on
+   openpowerlifting.csv: 25,813 of 382,602 values, mean 88.53 where the numbers
+   alone give 86.78. */
+console.log("\nNUMERIC POLICY — no silent coercion of a numeric prefix\n");
+
+check('toNumber() refuses a numeric prefix that isNumeric() refuses',
+  Number.isNaN(toNumber("125+")) && Number.isNaN(toNumber("12kg")) && Number.isNaN(toNumber("1,234")));
+
+check("toNumber() still reads the numbers isNumeric() accepts",
+  toNumber("125") === 125 && toNumber(" 1.5 ") === 1.5 && toNumber("1e3") === 1000);
+
+/* 90% clean, 10% written with a "+" suffix. The column is still analysed as
+   numeric — that is deliberate — but the suffixed values must not be counted. */
+const mixRows = [];
+for (let i = 0; i < 90; i++) mixRows.push({ w: "100", y: String(i % 2) });
+for (let i = 0; i < 10; i++) mixRows.push({ w: "200+", y: String(i % 2) });
+const mixStats = getStatistics(mixRows, ["w"])[0];
+check("a suffixed value is excluded from the statistics, not truncated",
+  mixStats.count === 90 && mixStats.mean === 100 && mixStats.max === 100);
+
+const mixQuality = getQuality(mixRows, ["w", "y"], [], []);
+const mixIssue = mixQuality.columnsWithIssues.find(i => i.issue === "mixed_numeric");
+check("the excluded values are REPORTED, with their count and an example",
+  mixIssue?.col === "w" && mixIssue.count === 10 && mixIssue.detail.includes('"200+"'));
+
+/* Below the numeric share the column is analysed as categorical instead, so
+   nothing is discarded and there is nothing to warn about. */
+const catRows = mixRows.map((r, i) => ({ ...r, w: i % 2 ? "200+" : "100" }));
+check("a column that is not analysed as numeric raises no exclusion warning",
+  !getQuality(catRows, ["w", "y"], [], []).columnsWithIssues.some(i => i.issue === "mixed_numeric"));
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
