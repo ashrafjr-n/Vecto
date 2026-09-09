@@ -681,8 +681,14 @@ const amtDrop = mnar.unscoredColumns.find(u => u.col === "amt");
 check("a column whose presence tracks the target is recorded, not dropped",
   !!amtDrop && !("amt" in mnar.targetCorrelations));
 
-check("the reason points at the presence of the column as the finding",
-  /presence/i.test(amtDrop?.reason ?? ""));
+/* The reason must end with the MEASURED verdict, not a suggestion to go and test
+   something the engine tests itself two blocks later. On events.csv the old
+   wording told the reader to try "player_in_present" while the measurement
+   already in hand said that indicator scores 0.03. */
+check("the reason ends with the measured presence verdict, not a suggestion to test it",
+  /recorded at all/i.test(amtDrop?.reason ?? "")
+  && amtDrop.reason.includes("1.00")
+  && !/worth testing/i.test(amtDrop.reason));
 
 check("the observations name the columns that were left out",
   mnar.observations.some(o => o.includes("left out of the target scan") && o.includes('"amt"')));
@@ -736,6 +742,20 @@ const noiseRows = [];
 for (let i = 0; i < 600; i++) noiseRows.push({ amt: i % 3 === 0 ? "" : String(i % 11), y: i % 2 ? "yes" : "no" });
 check("missingness unrelated to the target reports no presence signal",
   analyzeDataset(noiseRows, ["amt", "y"], "y").relationships.presenceSignals.length === 0);
+
+/* A column dropped for a constant target whose indicator ALSO carries nothing has
+   to say so. Reporting only the half that found something is how the report came
+   to recommend an indicator its own measurement had already ruled out. */
+/* The events.csv shape: "v" is present on a slice whose target is constant, but
+   the target is overwhelmingly that same value everywhere, so knowing the value
+   was recorded adds nothing over the base rate. */
+const deadRows = [];
+for (let i = 0; i < 100; i++) deadRows.push({ v: String(i % 5), y: "a" });
+for (let i = 0; i < 900; i++) deadRows.push({ v: "", y: i < 8 ? "b" : "a" });
+const deadDrop = getRelationshipsV3(deadRows, ["v"], "y", new Set(), [])
+  .unscoredColumns.find(u => u.col === "v");
+check("a column whose presence carries nothing says so instead of recommending it",
+  !!deadDrop && /no usable signal/i.test(deadDrop.reason) && !deadDrop.reason.includes("Build "));
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
