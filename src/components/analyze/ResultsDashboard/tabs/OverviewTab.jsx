@@ -149,6 +149,7 @@ function ColumnRolesCard({ meta }) {
     { role: ROLE.CATEGORICAL, label: "Categorical", cols: byRole[ROLE.CATEGORICAL] ?? [] },
     { role: ROLE.IDENTIFIER,  label: "Identifier",  cols: byRole[ROLE.IDENTIFIER]  ?? [] },
     { role: ROLE.TEMPORAL,    label: "Temporal",    cols: byRole[ROLE.TEMPORAL]    ?? [] },
+    { role: ROLE.TEXT,        label: "Free text",   cols: byRole[ROLE.TEXT]        ?? [] },
   ].filter((g) => g.cols.length > 0);
 
   return (
