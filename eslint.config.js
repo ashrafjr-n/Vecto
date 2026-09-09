@@ -23,10 +23,11 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
-  // The suite runs in plain Node (process.exit, console) — browser globals alone
-  // would flag every one of those as undefined.
+  // The suite and the report CLI run in plain Node (process.exit, console) — browser
+  // globals alone would flag every one of those as undefined. Scoped to these two
+  // directories only; src/ is browser-only and must not get Node globals.
   {
-    files: ['tests/**/*.mjs'],
+    files: ['tests/**/*.mjs', 'tools/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
 ])
