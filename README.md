@@ -18,6 +18,11 @@ never leaves your machine.
   identifier, and temporal, with identifier-vs-numeric and date-detection heuristics
 - **Relationships** — Pearson correlation matrix, Cramér's V for categorical pairs,
   correlation ratio (η), multicollinearity and target-leakage warnings, feature clusters
+- **Missingness as signal** — whether a column was recorded at all is measured against
+  the target, so a mostly-empty column whose absence tracks the label is reported rather
+  than discarded
+- **Nothing dropped silently** — any column the target scan cannot score is listed with
+  the reason, and values excluded to keep a column numeric are counted and shown
 - **Class balance** — class distribution for a classification target, including an explicit
   missing-value bucket and minority-class sizing
 - **Health score** — a weighted 0–100 score across quality, structure, relationships, and
