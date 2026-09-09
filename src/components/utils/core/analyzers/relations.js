@@ -501,6 +501,19 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     );
   }
 
+  /* Named BEFORE the "weak signal" verdict below, because it qualifies it: a
+     report cannot honestly call the strongest association 0.22 while three
+     columns it could not measure sit unmentioned. */
+  if (unscoredColumns.length > 0) {
+    const shown = unscoredColumns.slice(0, 3).map(u => `"${u.col}"`).join(", ");
+    const more  = unscoredColumns.length > 3 ? `, +${unscoredColumns.length - 3} more` : "";
+    observations.unshift(
+      `${unscoredColumns.length} column${unscoredColumns.length > 1 ? "s were" : " was"} left out of the target scan ` +
+      `(${shown}${more}) — ${unscoredColumns.length > 1 ? "they were" : "it was"} not measured, which is not the same as ` +
+      `${unscoredColumns.length > 1 ? "showing" : "showing"} no signal. See the reason on each.`
+    );
+  }
+
   if (categoricalAssociations.length > 0) {
     observations.push(
       `${categoricalAssociations.length} categorical feature pair${categoricalAssociations.length > 1 ? "s are" : " is"} ` +
