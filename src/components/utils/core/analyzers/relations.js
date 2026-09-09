@@ -176,27 +176,35 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           colMap = { [colUnique[0]]: 0, [colUnique[1]]: 1 };
         }
 
-        const pairs = [];
-        data.forEach(row => {
+        /* Two flat arrays, not an array of two-element arrays. `pairs.push([a, b])`
+           allocated one small array PER ROW — 386,414 of them per numeric column —
+           and every consumer below then rebuilt it: mean(pairs.map(p => p[0])),
+           mean(pairs.map(p => p[1])), and two more maps for the Spearman. Five
+           full-length allocations per column on top of the per-row ones, to carry
+           numbers that two parallel arrays hold directly. */
+        const xs = [], ys = [];
+        for (let i = 0; i < data.length; i++) {
+          const row = data[i];
           const a = colIsNumeric ? toNumber(row[col]) : (colMap ? colMap[normalizeValue(row[col])] : null);
           const bRaw = row[target];
           const bIdx = isBinaryTarget ? targetUnique.indexOf(normalizeValue(bRaw)) : -1;
           const b = isNumericTarget ? toNumber(bRaw) : (bIdx >= 0 ? bIdx : null);
 
-          if (a == null || b == null || isNaN(a) || isNaN(b)) return;
-          pairs.push([a, b]);
-        });
+          if (a == null || b == null || isNaN(a) || isNaN(b)) continue;
+          xs.push(a); ys.push(b);
+        }
+        const pairCount = xs.length;
 
-        if (pairs.length < 3) {
-          unscored(col, `only ${pairs.length} row${pairs.length === 1 ? "" : "s"} have both a numeric "${col}" and a usable "${target}" — too few to correlate.`);
+        if (pairCount < 3) {
+          unscored(col, `only ${pairCount} row${pairCount === 1 ? "" : "s"} have both a numeric "${col}" and a usable "${target}" — too few to correlate.`);
           return;
         }
 
-        const mx = mean(pairs.map(p => p[0]));
-        const my = mean(pairs.map(p => p[1]));
+        const mx = mean(xs);
+        const my = mean(ys);
         let num = 0, dx2 = 0, dy2 = 0;
-        for (const [a, b] of pairs) {
-          const dx = a - mx; const dy = b - my;
+        for (let i = 0; i < pairCount; i++) {
+          const dx = xs[i] - mx; const dy = ys[i] - my;
           num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
         }
 
@@ -208,7 +216,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
            carry one target value. */
         if (dy2 === 0) {
           presenceCandidates.add(col);
-          unscored(col, `"${target}" holds a single value across all ${pairs.length} rows where "${col}" is a number, so there is nothing varying to correlate against.`);
+          unscored(col, `"${target}" holds a single value across all ${pairCount} rows where "${col}" is a number, so there is nothing varying to correlate against.`);
           return;
         }
         if (dx2 === 0) {
@@ -224,8 +232,8 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
            association" when it meant "no linear association" — titanic Fare has
            skew 4.79. Spearman is computed on the same pairs and reported beside
            it; where the two disagree, the disagreement is the finding. */
-        const rho = spearmanOf(pairs.map(q => q[0]), pairs.map(q => q[1]));
-        const p   = correlationPValue(r, pairs.length);
+        const rho = spearmanOf(xs, ys);
+        const p   = correlationPValue(r, pairCount);
 
         // FIX #4: store metric type alongside value
         const weak = Math.abs(r) < 0.3 && Math.abs(rho) < 0.3;
@@ -239,7 +247,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           absValue: Math.abs(r2(r)),
           spearman: r2(rho),
           pValue:   p,
-          n:        pairs.length,
+          n:        pairCount,
           // Non-null only where both correlations were weak — see above.
           mi:       mi ? r2(mi.normalized) : null,
         };
