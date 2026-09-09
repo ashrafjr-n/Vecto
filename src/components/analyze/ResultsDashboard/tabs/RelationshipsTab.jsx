@@ -121,7 +121,7 @@ function CorrelationRanking({ strongRelationships }) {
 
    This lives here rather than in Target Signal because it is a feature-to-feature
    relationship — redundancy between columns, not evidence about the target. */
-function CategoricalAssociations({ associations }) {
+function CategoricalAssociations({ associations, hasHeatmap }) {
   if (!associations?.length) return null;
 
   return (
@@ -130,9 +130,9 @@ function CategoricalAssociations({ associations }) {
       action={<span className="font-mono text-[11px] text-ink-faint">Cramér's V · 0 to 1</span>}
     >
       <p className="-mt-2 mb-3 text-[12px] leading-relaxed text-ink-faint">
-        The heatmap below covers numeric columns only. These are pairs of categorical
-        columns that carry overlapping information — encoding both costs feature space
-        without adding signal.
+        {hasHeatmap ? "The heatmap below covers numeric columns only. These are pairs of" : "These are pairs of"}{" "}
+        categorical columns that carry overlapping information — encoding both costs
+        feature space without adding signal.
       </p>
       <div className="divide-y divide-line">
         {associations.map((a, i) => (
@@ -251,7 +251,16 @@ function RelationshipsTab({ result }) {
   const { relationships } = result;
   const { cols } = relationships;
 
-  if (!cols.length) {
+  /* `cols` is the NUMERIC correlation matrix, and it being empty used to blank the
+     whole tab — hiding the leakage warnings, the categorical associations and the
+     observations, none of which need a numeric column to exist. meets.csv has no
+     numeric feature at all and a categorical column that determines the target at
+     V = 0.99: the engine found it and this early return threw it away. */
+  const hasNonNumericFindings = (relationships.leakageSuspects?.length ?? 0) > 0
+    || (relationships.categoricalAssociations?.length ?? 0) > 0
+    || (relationships.observations?.length ?? 0) > 0;
+
+  if (!cols.length && !hasNonNumericFindings) {
     return (
       <SectionCard>
         <div className="py-8 text-center text-[13px] text-ink-faint">Not enough numeric columns for relationship analysis.</div>
@@ -263,9 +272,24 @@ function RelationshipsTab({ result }) {
     <div className="space-y-4">
       <LeakageWarnings suspects={relationships.leakageSuspects} />
       <Observations observations={relationships.observations} />
-      <CorrelationRanking strongRelationships={relationships.strongRelationships} />
-      <CategoricalAssociations associations={relationships.categoricalAssociations} />
-      <CorrelationHeatmap relationships={relationships} />
+      <CategoricalAssociations associations={relationships.categoricalAssociations} hasHeatmap={cols.length > 0} />
+
+      {/* Numeric-only sections. Rendering them with no numeric column produced an
+          empty heatmap and a "no strong correlations found (|r| > 0.4)" line, which
+          reads as "we looked and found nothing" about a scan that never ran. */}
+      {cols.length > 0 ? (
+        <>
+          <CorrelationRanking strongRelationships={relationships.strongRelationships} />
+          <CorrelationHeatmap relationships={relationships} />
+        </>
+      ) : (
+        <SectionCard>
+          <div className="py-4 text-center text-[12.5px] text-ink-faint">
+            No numeric feature columns, so there is no correlation matrix or heatmap.
+            The findings above are measured on the categorical columns.
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 }
