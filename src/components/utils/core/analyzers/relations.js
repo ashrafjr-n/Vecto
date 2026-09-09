@@ -1,6 +1,6 @@
 import {
   getValues, getNumericValues,
-  mean, isNumeric, isMissing, etaCorrelation, normalizeValue,
+  mean, isNumeric, isMissing, etaCorrelation, normalizeValue, toNumber,
   spearmanOf, correlationPValue, etaPValue,
   cramersV, mutualInformation, discretize, sampleIndices, rankColumn, pearsonOf,
 } from "../helpers.js";
@@ -118,10 +118,10 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
 
         const pairs = [];
         data.forEach(row => {
-          const a = colIsNumeric ? parseFloat(row[col]) : (colMap ? colMap[normalizeValue(row[col])] : null);
+          const a = colIsNumeric ? toNumber(row[col]) : (colMap ? colMap[normalizeValue(row[col])] : null);
           const bRaw = row[target];
           const bIdx = isBinaryTarget ? targetUnique.indexOf(normalizeValue(bRaw)) : -1;
-          const b = isNumericTarget ? parseFloat(bRaw) : (bIdx >= 0 ? bIdx : null);
+          const b = isNumericTarget ? toNumber(bRaw) : (bIdx >= 0 ? bIdx : null);
 
           if (a == null || b == null || isNaN(a) || isNaN(b)) return;
           pairs.push([a, b]);
@@ -208,7 +208,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           const rawV = row[col];
           const rawL = row[target];
           if (isMissing(rawV) || isMissing(rawL)) return;   // exclude missing on both sides
-          const v = parseFloat(rawV);
+          const v = toNumber(rawV);
           if (isNaN(v)) return;
           values.push(v);
           labels.push(normalizeValue(rawL));                // same key as targetUnique
@@ -255,8 +255,8 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       const ra = columnRanks.get(a), rb = columnRanks.get(b);
       const xs = [], ys = [], rxs = [], rys = [];
       for (let k = 0; k < data.length; k++) {
-        const va = parseFloat(data[k][a]);
-        const vb = parseFloat(data[k][b]);
+        const va = toNumber(data[k][a]);
+        const vb = toNumber(data[k][b]);
         if (isNaN(va) || isNaN(vb)) continue;
         xs.push(va); ys.push(vb); rxs.push(ra[k]); rys.push(rb[k]);
       }
