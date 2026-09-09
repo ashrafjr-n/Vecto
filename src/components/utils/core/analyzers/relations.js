@@ -57,6 +57,23 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
   // - Categorical cols → Cramér's V (chi-square based, range 0-1)
   const targetCorrelations = {};
 
+  /* Columns the target scan could not score, and why.
+
+     Every drop below used to be a bare `return`. The column then appeared in no
+     part of the Target Signal report, in no exclusion list, and in no
+     observation — it simply was not there, and nothing said so. That is the
+     worst outcome of the three, because a wrong number gets argued with and a
+     missing one does not get noticed.
+
+     It also hid the single most valuable finding in the report. On smoking.csv,
+     "amt_weekends", "amt_weekdays" and "type" are each missing on exactly the
+     1,270 rows where smoke = "No": their PRESENCE is a perfect predictor of the
+     target. Scoring them on complete rows leaves one target class, so all three
+     were dropped — while the report announced "Weak feature-target associations.
+     Strongest: age (0.22)". Three perfect predictors, invisible. */
+  const unscoredColumns = [];
+  const unscored = (col, reason) => unscoredColumns.push({ col, reason });
+
   if (target) {
     // Determine target type — guard against empty target column
     const targetVals = getValues(data, target);
@@ -65,7 +82,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       return { cols: [], correlationMatrix: {}, strongRelationships: [],
                multicollinearPairs: [], clusterDetected: false, clusterCols: [],
                leakageSuspects: [], targetCorrelations: {}, observations: [],
-               excludedColumns: [] };
+               excludedColumns: [], unscoredColumns: [] };
     }
 
     /* Deterministic level ordering. [...new Set()] is INSERTION-ordered, so which
@@ -179,10 +196,22 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           lb.push(normalizeValue(row[target]));
         }
 
-        // null = too few rows, or only one level left on a side: no association is
-        // measurable there, which is not the same as an association of zero.
+        /* null = too few rows, or only one level left on a side. No association is
+           measurable there, which is not the same as an association of zero — so
+           the column is recorded with the reason rather than dropped. The
+           diagnosis costs two Sets and runs only on the cold path. */
         const cv = cramersV(la, lb);
-        if (!cv) return;
+        if (!cv) {
+          const targetLevelsLeft = new Set(lb).size;
+          if (la.length < 5) {
+            unscored(col, `only ${la.length} row${la.length === 1 ? "" : "s"} have both this column and "${target}" — too few to measure against.`);
+          } else if (targetLevelsLeft < 2) {
+            unscored(col, `every row where "${col}" is present has the same "${target}" value, so nothing varies to correlate against — which means the PRESENCE of this column may itself predict the target. Worth testing as a yes/no indicator.`);
+          } else {
+            unscored(col, `"${col}" has a single value on the rows where "${target}" is also present — a constant cannot be correlated.`);
+          }
+          return;
+        }
 
         // FIX #4: store metric type — Cramér's V is not comparable to Pearson
         targetCorrelations[col] = {
@@ -485,5 +514,6 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     categoricalAssociations,
     observations,
     excludedColumns,
+    unscoredColumns,
   };
 }

@@ -107,8 +107,10 @@ if (categoricalViz) {
 assertKeysExact(withTarget.relationships, [
   "cols", "correlationMatrix", "strongRelationships", "multicollinearPairs",
   "clusterDetected", "clusterCols", "leakageSuspects", "targetCorrelations",
-  "categoricalAssociations", "observations", "excludedColumns",
+  "categoricalAssociations", "observations", "excludedColumns", "unscoredColumns",
 ], "relationships");
+assertType(withTarget.relationships.unscoredColumns, "array",
+  "relationships.unscoredColumns (always an array; every column the target scan could not score, with its reason)");
 assertType(withTarget.relationships.categoricalAssociations, "array",
   "relationships.categoricalAssociations (always an array, [] when nothing qualifies)");
 
