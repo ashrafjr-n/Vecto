@@ -257,7 +257,10 @@ function TargetSignalTab({ result }) {
               {strongest && (
                 <>
                   , against{" "}
-                  <span className="font-mono text-ink">{strongest[1].value.toFixed(2)}</span> for the
+                  {/* Magnitude, not the signed value: this sentence compares 1.00 to
+                      0.22, and printing "-0.22" beside it invites the reading that one
+                      is below the other on a shared signed scale. */}
+                  <span className="font-mono text-ink">{(strongest[1].absValue ?? 0).toFixed(2)}</span> for the
                   best value-based feature (<span className="font-mono text-ink">{strongest[0]}</span>)
                 </>
               )}.
