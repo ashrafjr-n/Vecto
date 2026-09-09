@@ -410,21 +410,37 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     ? `Feature cluster detected: ${clusterCols.join(", ")} are heavily intercorrelated. Consider dimensionality reduction within this group.`
     : null;
 
-  /* ── Target leakage detection ── */
+  /* ── Target leakage detection ──────────────────────────────────────────────
+     Was Pearson-only, on the grounds that "Cramér's V near 1.0 is less reliable
+     for leakage" — which was true of the V this engine used to compute. An
+     uncorrected V climbed toward 1.0 on cardinality alone, so a near-1.0 score
+     said more about the number of levels than about the relationship. Two fixes
+     have since removed exactly that: the Bergsma correction sends per-row-unique
+     columns to 0, and counting the empty contingency cells stopped understating
+     the sparse tables where a deterministic mapping actually lives. V = 1.0 now
+     means a functional dependency, which is what leakage IS.
+
+     Measured on the audit files: meets.csv "MeetCountry" against "MeetState"
+     scores 0.99 — a state determines its country, so the feature restates the
+     label. It went unflagged before, and 0.94 under the old chi-square.
+
+     η stays excluded, with its original reasoning intact: η ≈ 1.0 also occurs
+     for genuinely strong categorical predictors, and nothing has changed that.
+
+     Both thresholds are 0.95 on purpose — after the corrections above the two
+     metrics mean the same thing at the top of their range: near-determinism. */
+  const LEAKAGE_MIN = 0.95;
+
   const leakageSuspects = Object.entries(targetCorrelations)
-    .filter(([, entry]) => {
-      const abs = entry?.absValue ?? 0;
-      // Only flag Pearson — Cramér's V near 1.0 is less reliable for leakage.
-      // FIX #5a: η is intentionally EXCLUDED here too. η≈1.0 can indicate leakage
-      // (a numeric feature perfectly separated by target classes), but it also
-      // occurs for genuinely strong categorical predictors → high false-positive
-      // risk. η-based leakage detection is a DEFERRED decision (not part of 5a).
-      return entry?.metric === "pearson" && abs > 0.95;
-    })
+    .filter(([, e]) => (e?.metric === "pearson" || e?.metric === "cramers_v")
+                    && (e?.absValue ?? 0) >= LEAKAGE_MIN)
     .map(([col, entry]) => ({
       col,
       correlation: entry.value,
-      warning: `"${col}" has near-perfect correlation with target (r = ${entry.value.toFixed(2)}). Possible target leakage — verify this column is not derived from the target.`,
+      metric: entry.metric,
+      warning: entry.metric === "pearson"
+        ? `"${col}" has near-perfect correlation with target (r = ${entry.value.toFixed(2)}, n = ${entry.n}). Possible target leakage — verify this column is not derived from the target.`
+        : `"${col}" almost completely determines "${target}" (Cramér's V ${entry.value.toFixed(2)}, n = ${entry.n}) — knowing one gives you the other. Possible target leakage: verify this column is not the label under another name.`,
     }));
 
   /* ── Categorical <-> categorical associations among features ──
