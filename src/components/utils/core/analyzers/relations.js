@@ -82,7 +82,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       return { cols: [], correlationMatrix: {}, strongRelationships: [],
                multicollinearPairs: [], clusterDetected: false, clusterCols: [],
                leakageSuspects: [], targetCorrelations: {}, observations: [],
-               excludedColumns: [], unscoredColumns: [] };
+               excludedColumns: [], unscoredColumns: [], presenceSignals: [] };
     }
 
     /* Deterministic level ordering. [...new Set()] is INSERTION-ordered, so which
@@ -423,6 +423,12 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
      encode the same thing. Same Bergsma-corrected estimator used against the
      target, so the two can be read on one scale. Capped like the numeric scan,
      which is O(k^2) in columns for the same reason. */
+  /* Both sides of a presence indicator need enough rows to mean anything, and a
+     weak presence association is noise — every column with a single missing row
+     would otherwise produce an entry. */
+  const MIN_PRESENCE_ROWS = 20;
+  const PRESENCE_MIN_V    = 0.3;
+
   const CATEGORICAL_PAIR_LIMIT = 25;
   const catCols = categoricalCols.filter(c => c !== target && !skipCols.has(c))
                                  .slice(0, CATEGORICAL_PAIR_LIMIT);
@@ -452,6 +458,64 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     }
   }
   categoricalAssociations.sort((x, y) => y.cramersV - x.cramersV);
+
+  /* ── Does the PRESENCE of a value predict the target? ─────────────────────
+     For a column with missing rows, "was this recorded at all" is a second,
+     separate variable, and it is often the one that carries the signal: the
+     value is missing BECAUSE of what the row is. The engine already advised
+     building a "<col>_present" indicator for mostly-empty columns, and told the
+     user it "often correlates with something meaningful" — without ever
+     computing it, though the answer is one contingency table away.
+
+     On smoking.csv the answer is total: "amt_weekends", "amt_weekdays" and
+     "type" are missing on exactly the 1,270 rows where smoke = "No", so the
+     indicator alone separates the classes perfectly (V = 1.00) while the report
+     called the dataset's strongest association 0.22.
+
+     Only the indicator is measured here, never the value — a column can be
+     unmeasurable on its complete rows (that is what unscoredColumns records) and
+     still be decisive through its presence. */
+  const presenceSignals = [];
+  if (target) {
+    const targetKeys = data.map(r => (isMissing(r[target]) ? null : normalizeValue(r[target])));
+
+    for (const col of Object.keys(data[0] || {})) {
+      if (col === target || skipCols.has(col)) continue;
+
+      /* Count first, allocate second. Both sides of the indicator must exist or
+         there is no indicator at all, and most columns in a real file have no
+         missing rows — so the common case exits after one scalar pass instead of
+         building two arrays per column the length of the dataset. */
+      let present = 0, absent = 0;
+      for (let i = 0; i < data.length; i++) {
+        if (targetKeys[i] === null) continue;
+        if (isMissing(data[i][col])) absent++; else present++;
+      }
+      if (present < MIN_PRESENCE_ROWS || absent < MIN_PRESENCE_ROWS) continue;
+
+      const flags = [], keys = [];
+      for (let i = 0; i < data.length; i++) {
+        if (targetKeys[i] === null) continue;
+        flags.push(isMissing(data[i][col]) ? "absent" : "present");
+        keys.push(targetKeys[i]);
+      }
+
+      const cv = cramersV(flags, keys);
+      if (!cv || cv.v < PRESENCE_MIN_V) continue;
+
+      presenceSignals.push({
+        col,
+        cramersV:   r2(cv.v),
+        pValue:     cv.pValue,
+        n:          cv.n,
+        presentPct: r2((present / (present + absent)) * 100),
+        statement:  `Whether "${col}" was recorded at all is associated with "${target}" `
+                  + `(Cramér's V ${r2(cv.v).toFixed(2)}, n = ${cv.n}) — a "${col}_present" indicator `
+                  + `carries signal the column's values alone do not.`,
+      });
+    }
+    presenceSignals.sort((a, b) => b.cramersV - a.cramersV);
+  }
 
   /* ── Dataset-level observations ── */
   const observations = [];
@@ -547,5 +611,6 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     observations,
     excludedColumns,
     unscoredColumns,
+    presenceSignals,
   };
 }
