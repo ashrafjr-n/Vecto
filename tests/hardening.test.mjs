@@ -590,5 +590,42 @@ check("fallback and direct paths produce an identical score",
 check("a hostile input through the async wrapper resolves as an error, never rejects",
   await runAnalysis(null, null, null).then(r => r.result === null && !!r.error, () => false));
 
+/* ── Chi-square over the WHOLE contingency table ──────────────────────────
+   A cell that was never observed still has a non-zero expectation, and it
+   contributes exactly that expectation to chi-square. Summing only over the
+   cells that occurred understates the statistic, and it does so worst on SPARSE
+   tables — which is precisely where the association is strongest. Measured on
+   the real ginf.csv before the fix: "league" and "country" are a perfect 1:1
+   map (5 leagues, 5 countries, 5 of 25 cells occupied) and V came back 0.8946
+   instead of 1.0000, so a deterministic relationship read as merely "strong". */
+console.log("\nCHI-SQUARE — empty contingency cells\n");
+
+const diagA = [], diagB = [];
+for (let lvl = 0; lvl < 5; lvl++) {
+  for (let i = 0; i < 400; i++) { diagA.push(`L${lvl}`); diagB.push(`C${lvl}`); }
+}
+const diag = cramersV(diagA, diagB);
+check("a perfect 1-to-1 mapping over a sparse table scores V = 1",
+  Math.abs(diag.v - 1) < 1e-9);
+
+// Independence must stay at 0: the empty-cell term is an addition to chi-square,
+// so the risk it introduces is inflating an association that is not there.
+const indA = [], indB = [];
+for (let i = 0; i < 4000; i++) { indA.push(`a${i % 4}`); indB.push(`b${Math.floor(i / 4) % 5}`); }
+check("a fully crossed, independent table still scores V = 0",
+  cramersV(indA, indB).v === 0);
+
+/* Both call sites, one estimator. relations.js used to carry its own copy of the
+   contingency table + Bergsma correction, which is how the two came to disagree:
+   fixing one left the other reporting the old number against the TARGET, the
+   place the value is most likely to be acted on. */
+const cvRows = [];
+for (let lvl = 0; lvl < 4; lvl++) {
+  for (let i = 0; i < 250; i++) cvRows.push({ f: `L${lvl}`, t: `T${lvl}` });
+}
+const cvRel = getRelationshipsV3(cvRows, [], "t", new Set(), ["f"]);
+check("the target branch reports the same V as the shared estimator",
+  cvRel.targetCorrelations.f?.metric === "cramers_v" && cvRel.targetCorrelations.f.value === 1);
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
