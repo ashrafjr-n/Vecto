@@ -93,6 +93,61 @@ function CorrelationRanking({ strongRelationships }) {
   );
 }
 
+/* The categorical counterpart to the heatmap below, which covers numericCols
+   only — 4 of titanic's 12 columns. Two category columns encoding the same thing
+   were undetectable: the engine could report that Age and Fare move together but
+   not that Ticket and Cabin do. Same Bergsma-corrected Cramér's V used against
+   the target, so the two can be read on one scale.
+
+   This lives here rather than in Target Signal because it is a feature-to-feature
+   relationship — redundancy between columns, not evidence about the target. */
+function CategoricalAssociations({ associations }) {
+  if (!associations?.length) return null;
+
+  return (
+    <SectionCard
+      title={`Categorical associations — ${associations.length} found`}
+      action={<span className="font-mono text-[11px] text-ink-faint">Cramér's V · 0 to 1</span>}
+    >
+      <p className="-mt-2 mb-3 text-[12px] leading-relaxed text-ink-faint">
+        The heatmap below covers numeric columns only. These are pairs of categorical
+        columns that carry overlapping information — encoding both costs feature space
+        without adding signal.
+      </p>
+      <div className="divide-y divide-line">
+        {associations.map((a, i) => (
+          <div key={`${a.col1}|${a.col2}`} className="py-3 first:pt-0 last:pb-0">
+            <div className="flex items-center gap-3">
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-soft">
+                {a.col1} <span className="text-ink-faint">&harr;</span> {a.col2}
+              </span>
+              <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-paper-sunken">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.round(a.cramersV * 100)}%` }}
+                  transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.4, ease: "easeOut" }}
+                  className="h-full rounded-full"
+                  style={{ background: correlationFill(a.cramersV) }}
+                />
+              </div>
+              <span className="w-14 shrink-0 text-right font-mono text-[12px] font-semibold text-ink">
+                V = {a.cramersV.toFixed(2)}
+              </span>
+              {a.cramersV >= 0.6 && <StatusBadge severity="warning">redundant</StatusBadge>}
+            </div>
+            <div className="mt-1 text-[11.5px] text-ink-faint">
+              {a.levels[0]} × {a.levels[1]} levels over {a.nPairs.toLocaleString()} rows
+              {a.pValue != null && (
+                <> · {a.pValue < 0.001 ? "p < 0.001" : `p = ${a.pValue.toFixed(3)}`}</>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 const LEGEND = [
   { fill: "#7A5C15", label: "Strong +" },
   { fill: "#D9B450", label: "Moderate +" },
@@ -189,6 +244,7 @@ function RelationshipsTab({ result }) {
       <LeakageWarnings suspects={relationships.leakageSuspects} />
       <Observations observations={relationships.observations} />
       <CorrelationRanking strongRelationships={relationships.strongRelationships} />
+      <CategoricalAssociations associations={relationships.categoricalAssociations} />
       <CorrelationHeatmap relationships={relationships} />
     </div>
   );
