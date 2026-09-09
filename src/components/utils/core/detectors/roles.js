@@ -17,7 +17,24 @@ import { ROLE } from "../roles.constants.js";
    Deliberate ceiling: 5-8 distinct integers stay NUMERIC. A count feature
    (SibSp 0-8) and an encoded code (region 1..8) are indistinguishable from the
    values alone, and calling a count categorical costs it its mean/std/outliers.
-   Separating them needs a signal this function does not have. */
+   Separating them needs a signal this function does not have.
+
+   REVIEWED against a published data dictionary (events.csv ships one), which is
+   the strongest evidence available for this question, and the ceiling STAYS 4.
+   The dictionary proves the cost: `event_type` (12 codes), `shot_place` (13),
+   `location` (19) and `assist_method` (5) are all read as measurements, so the
+   report states mean(event_type) = 4.33 — the average of Announcement, Attempt,
+   Corner, Foul, Yellow card. But raising the ceiling to cover them would sweep up
+   ginf's `fthg`/`ftag` (goals per match, 0-10) and smoking's `amt_weekends`
+   (cigarettes per day, 24 levels), which ARE counts, and strip their mean, std
+   and outliers. The values still do not separate the two cases, and 9 of the
+   corpus's small-integer columns split 5 codes to 4 counts — no threshold gets
+   both right.
+
+   What changed instead: quality.js now REPORTS the ambiguity on any column with
+   this shape, naming the range and saying plainly that if the integers are codes
+   its statistics are meaningless. That is answerable by the reader, who knows
+   what the column is, and it is not a guess the engine had no basis to make. */
 const ENCODED_CATEGORICAL_MAX = 4;
 
 /* Distinct-value counting stops here. It used to be ENCODED_CATEGORICAL_MAX (4),
