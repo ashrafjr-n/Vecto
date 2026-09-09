@@ -17,4 +17,5 @@ datassert-docs.md
 
 # Dataset test reports written by tools/report.mjs — local test artifacts, not build output
 reports/
-titanic-train.csv
+# Test datasets — large third-party CSVs, never part of the repo
+forTesting/
