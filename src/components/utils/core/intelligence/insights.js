@@ -19,7 +19,9 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   relationships.leakageSuspects.forEach(leak => {
     push("critical",
       "Possible Target Leakage",
-      `"${leak.col}" has near-perfect correlation with the target (r = ${leak.correlation.toFixed(2)}). This column may cause data leakage.`,
+      /* The warning is composed where the metric is known. Re-writing it here
+         printed "r = 0.99" for a Cramér's V, which is a different statistic. */
+      leak.warning,
       100
     );
   });

@@ -425,8 +425,8 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       category:  "Data Integrity",
       priority:  "high",
       column:    leak.col,
-      issue:     `Possible target leakage (r = ${leak.correlation.toFixed(2)})`,
-      action:    `Investigate "${leak.col}" — it has near-perfect correlation with the target. Verify it is not derived from or computed using the target variable.`,
+      issue:     `Possible target leakage (${leak.metric === "cramers_v" ? "Cramér's V" : "r"} = ${leak.correlation.toFixed(2)})`,
+      action:    `Investigate "${leak.col}". ${leak.warning}`,
       rationale: "Target leakage causes models to appear highly accurate during training but fail completely in production.",
     });
   });
