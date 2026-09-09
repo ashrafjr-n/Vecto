@@ -74,6 +74,15 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
   const unscoredColumns = [];
   const unscored = (col, reason) => unscoredColumns.push({ col, reason });
 
+  /* Columns dropped because the target did not vary on their present rows. Their
+     missingness is what carries the information, if anything does — so the reason
+     is completed below with the MEASURED verdict rather than a suggestion to go
+     and test it. Suggesting a test the engine itself runs two blocks later is how
+     a report ends up disagreeing with itself: on events.csv it told the reader to
+     try "player_in_present" while the measurement it had already made said that
+     indicator scores 0.03. */
+  const presenceCandidates = new Set();
+
   if (target) {
     // Determine target type — guard against empty target column
     const targetVals = getValues(data, target);
@@ -164,7 +173,8 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
            missing rows are the target's other class, so the surviving rows all
            carry one target value. */
         if (dy2 === 0) {
-          unscored(col, `"${target}" holds a single value across all ${pairs.length} rows where "${col}" is a number, so there is no variation to correlate against — the PRESENCE of "${col}" may itself predict the target. Worth testing as a yes/no indicator.`);
+          presenceCandidates.add(col);
+          unscored(col, `"${target}" holds a single value across all ${pairs.length} rows where "${col}" is a number, so there is nothing varying to correlate against.`);
           return;
         }
         if (dx2 === 0) {
@@ -225,7 +235,8 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           if (la.length < 5) {
             unscored(col, `only ${la.length} row${la.length === 1 ? "" : "s"} have both this column and "${target}" — too few to measure against.`);
           } else if (targetLevelsLeft < 2) {
-            unscored(col, `every row where "${col}" is present has the same "${target}" value, so nothing varies to correlate against — which means the PRESENCE of this column may itself predict the target. Worth testing as a yes/no indicator.`);
+            presenceCandidates.add(col);
+            unscored(col, `every row where "${col}" is present has the same "${target}" value, so there is nothing varying to correlate against.`);
           } else {
             unscored(col, `"${col}" has a single value on the rows where "${target}" is also present — a constant cannot be correlated.`);
           }
@@ -476,6 +487,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
      unmeasurable on its complete rows (that is what unscoredColumns records) and
      still be decisive through its presence. */
   const presenceSignals = [];
+  const presenceMeasured = new Map();   // every column the indicator could be measured on
   if (target) {
     const targetKeys = data.map(r => (isMissing(r[target]) ? null : normalizeValue(r[target])));
 
@@ -501,7 +513,9 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       }
 
       const cv = cramersV(flags, keys);
-      if (!cv || cv.v < PRESENCE_MIN_V) continue;
+      if (!cv) continue;
+      presenceMeasured.set(col, r2(cv.v));
+      if (cv.v < PRESENCE_MIN_V) continue;
 
       presenceSignals.push({
         col,
@@ -515,6 +529,23 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
       });
     }
     presenceSignals.sort((a, b) => b.cramersV - a.cramersV);
+  }
+
+  /* Finish the reason for every column dropped for a constant target: the
+     indicator either carries the signal or it does not, and both answers are
+     already computed above. */
+  for (const entry of unscoredColumns) {
+    if (!presenceCandidates.has(entry.col)) continue;
+    const v = presenceMeasured.get(entry.col);
+    if (v === undefined) {
+      entry.reason += ` Its presence could not be tested either — one side of the indicator has too few rows.`;
+    } else if (v >= PRESENCE_MIN_V) {
+      entry.reason += ` What DOES carry signal is whether the value was recorded at all: that indicator alone `
+                    + `is associated with "${target}" at Cramér's V ${v.toFixed(2)}. Build "${entry.col}_present".`;
+    } else {
+      entry.reason += ` Whether the value was recorded at all was tested too, and scores only Cramér's V `
+                    + `${v.toFixed(2)} against "${target}" — the missingness carries no usable signal here either.`;
+    }
   }
 
   /* ── Dataset-level observations ── */
