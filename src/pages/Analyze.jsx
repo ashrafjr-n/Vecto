@@ -29,10 +29,28 @@ const stepVariants = {
    work ran on the main thread, so the animation was frozen for exactly as long
    as the user was waiting. */
 const MIN_VISIBLE_MS = 550;
-function ProcessingStep() {
+
+/* The spinner now says what it is waiting for. frontend.md rules out a fake
+   percentage and fake-progress theatre; this is neither — the label is the phase
+   the engine is executing, posted from the worker as it enters it. The premise
+   the spec was written on ("near-instant on realistic datasets") did not survive
+   measurement: 386,414 rows x 17 columns is ~18 seconds of real work, and a bare
+   spinner for that long tells the user nothing about whether anything is wrong.
+
+   No phase yet means the worker has not started; the label is held back rather
+   than guessed. */
+function ProcessingStep({ phase }) {
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
+    <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4">
       <LoaderCircle size={28} className="animate-spin text-gold-ink" />
+      {phase && (
+        <div className="text-center">
+          <div className="text-[13px] text-ink-soft">{phase.label}</div>
+          <div className="mt-1 font-mono text-[11.5px] text-ink-faint">
+            step {phase.index + 1} of {phase.total}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -72,6 +90,8 @@ function Analyze() {
   const [csvData]                           = useState(entry?.data    ?? null);
   const [columns]                           = useState(entry?.columns ?? []);
   const [target,         setTarget]         = useState(entry?.target ?? "");
+  // Which phase the engine is in, pushed by runAnalysis while the worker runs.
+  const [phase,          setPhase]          = useState(null);
   const [analysisResult, setAnalysisResult] = useState(entry?.result ?? null);
   const [failure,        setFailure]        = useState(entry?.error  ?? null);
 
@@ -88,7 +108,8 @@ function Analyze() {
     setStep("processing");
 
     const startedAt = Date.now();
-    runAnalysis(csvData, columns, selectedTarget).then(({ result, error }) => {
+    setPhase(null);
+    runAnalysis(csvData, columns, selectedTarget, setPhase).then(({ result, error }) => {
       const remaining = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt));
       setTimeout(() => {
         if (error) {
@@ -125,7 +146,7 @@ function Analyze() {
 
           {step === "processing" && (
             <motion.div key="processing" {...stepVariants}>
-              <ProcessingStep />
+              <ProcessingStep phase={phase} />
             </motion.div>
           )}
 
