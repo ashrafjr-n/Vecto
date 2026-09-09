@@ -578,6 +578,17 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     );
   }
 
+  /* Ahead of the "weak signal" verdict, and unshifted AFTER the unscored
+     list so it lands above it — it is the ANSWER to the question that list raises. */
+  if (presenceSignals.length > 0) {
+    const top = presenceSignals[0];
+    observations.unshift(
+      `Whether "${top.col}" was recorded at all is associated with "${target}" (Cramér's V ${top.cramersV.toFixed(2)}` +
+      `${presenceSignals.length > 1 ? `, and ${presenceSignals.length - 1} other column${presenceSignals.length > 2 ? "s" : ""} likewise` : ""}) — ` +
+      `the missingness carries signal, so build "${top.col}_present" rather than dropping the column.`
+    );
+  }
+
   if (categoricalAssociations.length > 0) {
     observations.push(
       `${categoricalAssociations.length} categorical feature pair${categoricalAssociations.length > 1 ? "s are" : " is"} ` +
