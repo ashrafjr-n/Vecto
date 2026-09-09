@@ -15,7 +15,7 @@ import { basename, extname, join } from "node:path";
 import Papa from "papaparse";
 
 import { analyzeDataset, detectTarget } from "../src/components/utils/core/index.js";
-import { inspectParseResult, MAX_SIZE_MB, MAX_SIZE_B } from "../src/lib/csvIntake.js";
+import { inspectParseResult, transformHeader, MAX_SIZE_MB, MAX_SIZE_B } from "../src/lib/csvIntake.js";
 
 const args    = process.argv.slice(2);
 const files   = args.filter(a => !a.startsWith("--"));
@@ -33,7 +33,7 @@ mkdirSync(outDir, { recursive: true });
 for (const file of files) {
   const name   = basename(file, extname(file));
   const bytes  = statSync(file).size;
-  const parsed = Papa.parse(readFileSync(file, "utf8"), { header: true, skipEmptyLines: true });
+  const parsed = Papa.parse(readFileSync(file, "utf8"), { header: true, skipEmptyLines: true, transformHeader });
   const intake = inspectParseResult(parsed);
 
   const report = {

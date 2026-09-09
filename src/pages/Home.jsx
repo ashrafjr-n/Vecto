@@ -13,7 +13,7 @@ import {
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import { setPendingDataset } from "../lib/datasetHandoff.js";
-import { validateFile, inspectParseResult, MAX_SIZE_MB } from "../lib/csvIntake.js";
+import { validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader } from "../lib/csvIntake.js";
 
 const ERRORS = {
   format: {
@@ -358,6 +358,7 @@ function Home() {
     Papa.parse(file, {
       header:         true,
       skipEmptyLines: true,
+      transformHeader,
       complete: (results) => {
         const { error: verdict, malformed } = inspectParseResult(results);
         if (verdict) {

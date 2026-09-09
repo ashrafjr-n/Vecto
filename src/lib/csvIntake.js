@@ -12,6 +12,22 @@ export const MAX_SIZE_B  = MAX_SIZE_MB * 1024 * 1024;
    only the listed examples are capped. */
 const ROW_SAMPLE = 3;
 
+/* A header cell can be empty — an index column written by pandas or R is the
+   common case, and smoking.csv has one. PapaParse then keys every row on the
+   empty string, and every message the engine writes about that column reads
+   `Drop "" before training`.
+
+   Renaming it here, as a PapaParse `transformHeader`, is the only place the fix
+   costs nothing: the header is rewritten before a single row object is built, so
+   the rows are keyed correctly from the start instead of being rebuilt afterwards
+   (941,009 rows × 22 columns of rebuilding, to fix a label).
+
+   Pass it to every Papa.parse() call that reads a user's file, so the CLI report
+   and the app describe the same columns. */
+export function transformHeader(header, index) {
+  return String(header ?? "").trim() === "" ? `column_${index + 1}` : header;
+}
+
 /* → "format" | "size" | null  (null = accepted) */
 export function validateFile(file) {
   if (!file) return "format";
