@@ -53,6 +53,7 @@ const enumLockChecks = [
   ['ROLE.BINARY === "binary"',           ROLE.BINARY      === "binary"],
   ['ROLE.IDENTIFIER === "identifier"',   ROLE.IDENTIFIER  === "identifier"],
   ['ROLE.TEMPORAL === "temporal"',       ROLE.TEMPORAL    === "temporal"],
+  ['ROLE.TEXT === "text"',               ROLE.TEXT        === "text"],
 ];
 for (const [msg, ok] of enumLockChecks) {
   if (!ok) failures++;
