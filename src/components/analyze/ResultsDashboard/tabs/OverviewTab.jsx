@@ -217,6 +217,15 @@ function RecommendationsCard({ recommendations }) {
             </div>
             <div className="mt-1.5 text-[13px] text-ink">{rec.issue}</div>
             <div className="mt-0.5 text-[12.5px] leading-relaxed text-ink-soft">{rec.action}</div>
+            {/* The reason the engine gives this advice. It was computed for every
+                recommendation and rendered nowhere — advice without a reason can
+                only be obeyed or ignored, and the reason is what lets a user
+                disagree with it on the evidence. */}
+            {rec.rationale && (
+              <p className="mt-2 border-l-2 border-line pl-3 text-[12px] leading-relaxed text-ink-faint">
+                {rec.rationale}
+              </p>
+            )}
           </div>
         ))}
       </div>
