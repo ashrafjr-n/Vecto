@@ -12,8 +12,41 @@ export function getValues(data, col) {
   return data.map(r => r[col]).filter(v => v !== "" && v != null);
 }
 
+/* The ONE string-to-number policy. parseFloat() reads a leading numeric PREFIX
+   and discards the rest, so it answers a different question than isNumeric():
+   parseFloat("125+") is 125, parseFloat("12kg") is 12, parseFloat("1,234") is 1.
+   Those two policies coexisted — isNumeric() gated which columns counted as
+   numeric, parseFloat() produced the values that were then averaged — so a
+   column could be admitted on the strict rule and measured on the lenient one.
+
+   Measured on openpowerlifting.csv "WeightClassKg", where 25,813 of 382,602
+   values are super-heavyweight classes written "125+", "120+", "84+": every one
+   was silently rewritten to its own lower bound and averaged in, reporting
+   mean 88.53 over 382,602 values where the numbers alone give 86.78 over
+   356,789. Nothing in the report said a value had been reinterpreted.
+
+   NaN means "this is not a number", and every caller already handles NaN. */
+export function toNumber(v) {
+  return isNumeric(v) ? parseFloat(v) : NaN;
+}
+
 export function getNumericValues(data, col) {
-  return getValues(data, col).map(v => parseFloat(v)).filter(v => !isNaN(v));
+  return getValues(data, col).map(toNumber).filter(v => !isNaN(v));
+}
+
+/* How many present values in a column are not numbers, alongside how many are.
+   A column that is 93% numeric is still ANALYSED as numeric — the alternative is
+   throwing away a real column over a handful of dirty cells — but the rows that
+   were dropped to do so are a fact about the data, and quality.js reports them
+   rather than letting them disappear between the two policies above. */
+export function countNonNumeric(data, col) {
+  let numeric = 0, nonNumeric = 0;
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i][col];
+    if (isMissing(v)) continue;
+    if (isNumeric(v)) numeric++; else nonNumeric++;
+  }
+  return { numeric, nonNumeric };
 }
 
 /* ── FIX #3: shared missing-value detection (matches reference harness) ── */
