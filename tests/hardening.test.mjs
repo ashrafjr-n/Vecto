@@ -702,5 +702,40 @@ const nearlyEmptyLimit = analyzeDataset(nearlyEmpty, ["a", "b", "y"], "y").healt
 check("a column with a few real values is never called 100% empty",
   !!nearlyEmptyLimit && !nearlyEmptyLimit.reason.includes("100%") && nearlyEmptyLimit.reason.includes("99.7%"));
 
+/* ── The presence of a value as its own variable ───────────────────────────
+   The engine advised building a "<col>_present" indicator for mostly-empty
+   columns and justified it with "often correlates with something meaningful" —
+   a claim about datasets in general, standing in for the answer about THIS one,
+   which is a single contingency table away. On smoking.csv the answer is total:
+   the indicator separates the target perfectly while the report was calling the
+   strongest association 0.22. */
+console.log("\nPRESENCE SIGNAL — missingness measured, not asserted\n");
+
+const presRows = [];
+for (let i = 0; i < 300; i++) presRows.push({ amt: String(10 + (i % 9)), keep: String(i % 20), y: "yes" });
+for (let i = 0; i < 300; i++) presRows.push({ amt: "", keep: String(i % 20), y: "no" });
+
+const pres = analyzeDataset(presRows, ["amt", "keep", "y"], "y");
+const amtSignal = pres.relationships.presenceSignals.find(p => p.col === "amt");
+check("a perfectly target-aligned missingness is measured at V = 1",
+  amtSignal?.cramersV === 1 && amtSignal.n === 600);
+
+check("a column with no missing rows produces no presence signal",
+  !pres.relationships.presenceSignals.some(p => p.col === "keep"));
+
+check("the presence finding reaches the observations",
+  pres.relationships.observations.some(o => o.includes("recorded at all") && o.includes('"amt"')));
+
+check("the recommendation quotes the measured association instead of asserting one",
+  pres.recommendations.some(r => r.column === "amt" && r.rationale.includes("1.00")
+                              && !r.rationale.includes("often correlates")));
+
+/* Missingness unrelated to the target must NOT produce a signal — the measure
+   has to be able to say no, or it is just the old assertion with a number on it. */
+const noiseRows = [];
+for (let i = 0; i < 600; i++) noiseRows.push({ amt: i % 3 === 0 ? "" : String(i % 11), y: i % 2 ? "yes" : "no" });
+check("missingness unrelated to the target reports no presence signal",
+  analyzeDataset(noiseRows, ["amt", "y"], "y").relationships.presenceSignals.length === 0);
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
