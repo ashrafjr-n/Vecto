@@ -356,11 +356,17 @@ export function cramersV(labelsA, labelsB) {
   const n = Math.min(labelsA.length, labelsB.length);
   if (n < 5) return null;
 
+  /* Nested maps, not a "a|||b" string key. The concatenation built one throwaway
+     string per row per pair — 386,414 of them for a single column pair, and this
+     function is called from the target scan, the categorical pair scan and the
+     presence scan. The nesting also removes the matching indexOf/slice needed to
+     take the key apart again in the chi-square loop below. */
   const joint = new Map(), margA = new Map(), margB = new Map();
   for (let i = 0; i < n; i++) {
     const a = labelsA[i], b = labelsB[i];
-    const k = `${a}|||${b}`;
-    joint.set(k, (joint.get(k) || 0) + 1);
+    let row = joint.get(a);
+    if (row === undefined) { row = new Map(); joint.set(a, row); }
+    row.set(b, (row.get(b) || 0) + 1);
     margA.set(a, (margA.get(a) || 0) + 1);
     margB.set(b, (margB.get(b) || 0) + 1);
   }
@@ -385,10 +391,12 @@ export function cramersV(labelsA, labelsB) {
      That keeps this O(observed cells): iterating r x c would be 4.5 billion
      cells on the events.csv "text" x "player" pair alone. */
   let chi2 = 0, expSeen = 0;
-  for (const [k, obs] of joint) {
-    const sep = k.indexOf("|||");
-    const exp = (margA.get(k.slice(0, sep)) * margB.get(k.slice(sep + 3))) / n;
-    if (exp > 0) { chi2 += ((obs - exp) ** 2) / exp; expSeen += exp; }
+  for (const [a, row] of joint) {
+    const marginA = margA.get(a);
+    for (const [b, obs] of row) {
+      const exp = (marginA * margB.get(b)) / n;
+      if (exp > 0) { chi2 += ((obs - exp) ** 2) / exp; expSeen += exp; }
+    }
   }
   // Clamp: on a dense table expSeen sums to n and float error can make this < 0.
   chi2 += Math.max(0, n - expSeen);
