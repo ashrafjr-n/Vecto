@@ -9,7 +9,27 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      and never asked what KIND of column it was talking about. meta.columnRoles
      has existed all along and was never consulted here. */
   const roleOf   = col => meta.columnRoles?.[col];
+
+  /* Whether a column was recorded at all, measured against the target. The advice
+     below used to assert that missingness "often correlates with something
+     meaningful" and stop there — a claim about datasets in general, offered in
+     place of the answer for THIS one, which relations.js can now supply. */
+  const presenceOf = new Map((relationships.presenceSignals ?? []).map(p => [p.col, p]));
   const catViz   = new Map(visualizations.filter(v => v.type === "categorical").map(v => [v.col, v]));
+
+  /* What to say about the presence indicator: the measured association where
+     there is one, and an honest "not measured to matter here" where there is
+     not. Both are more use than a general claim about data. */
+  const presenceRationale = (col) => {
+    const p = presenceOf.get(col);
+    if (!p) {
+      return "Whether the value exists at all is still real, measured information — here it shows no notable "
+           + "association with the target, so keep the indicator only if domain knowledge says the missingness means something.";
+    }
+    return `Whether the value exists at all is not noise here: the presence indicator alone is associated with `
+         + `"${meta.target}" at Cramér's V ${p.cramersV.toFixed(2)} over ${p.n} rows`
+         + `${p.cramersV >= 0.95 ? " — it separates the target almost perfectly, so check it is not simply a restatement of the label" : ""}.`;
+  };
 
   /* Imputation depends on what the column IS, not on whether a statistics entry
      happened to exist for it. The old rule read `stat ? (skewed ? median : mean)
@@ -61,7 +81,8 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
           column:    c.col,
           issue:     `Missing values (${pct}%)`,
           action:    `Replace "${c.col}" with a binary "${c.col}_present" indicator rather than dropping it outright, then drop the original.`,
-          rationale: `${pct}% missing is past the point where imputing the VALUE is defensible — ${method} would be invented for ${pct}% of rows. Whether the value exists at all is still real, measured information and often correlates with something meaningful, so keep that and discard the rest.`,
+          rationale: `${pct}% missing is past the point where imputing the VALUE is defensible — ${method} would be invented for ${pct}% of rows. `
+                   + presenceRationale(c.col),
         });
       } else if (pct > 20) {
         push({
@@ -70,7 +91,9 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
           column:    c.col,
           issue:     `Missing values (${pct}%)`,
           action:    `Impute "${c.col}" with ${method}, and add a binary "${c.col}_was_missing" indicator alongside it.`,
-          rationale: `${pct}% missing is high enough that the imputed value becomes a real part of the column — ${why}. The indicator lets the model separate imputed rows from measured ones instead of treating them as equally trustworthy.`,
+          rationale: `${pct}% missing is high enough that the imputed value becomes a real part of the column — ${why}. `
+                   + `The indicator lets the model separate imputed rows from measured ones instead of treating them as equally trustworthy. `
+                   + presenceRationale(c.col),
         });
       } else if (pct > 5) {
         push({
