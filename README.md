@@ -46,6 +46,17 @@ required — the app is fully static.
 | `npm run preview` | Serve the built output locally |
 | `npm run lint` | Run ESLint over the project |
 
+Ad-hoc dataset reports (no npm script — it takes file arguments):
+
+```bash
+node tools/report.mjs data/*.csv [--target=Col] [--out=reports]
+```
+
+Parses each CSV exactly as the app does, runs the analysis engine over it, and
+writes the full `analyzeDataset()` output to `reports/<name>.json` — one file per
+dataset, so a result can be diffed or re-read later. Written for testing the
+engine against many datasets; it is not part of the shipped app.
+
 ## Tests
 
 The analysis engine has a dependency-free regression suite that runs on plain Node:
