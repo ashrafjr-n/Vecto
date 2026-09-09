@@ -11,7 +11,6 @@ import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { getVisualizations } from "../src/components/utils/core/analyzers/stats.js";
-import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
 import { etaCorrelation } from "../src/components/utils/core/helpers.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 
@@ -227,48 +226,52 @@ console.log("\nFix #4 — health.js quality-dimension weighting (duplicates skip
 
 // Minimal inputs: no target (targetDim neutral, classBalance null), pristine
 // quality except the duplicate fields, so qualityDim is isolated & predictable.
-const baseMeta = {
-  target: null, rows: 100, columns: 5,
-  numericCols: ["a", "b"], categoricalCols: ["c"], identifierCols: [],
-};
-const baseRel = { multicollinearPairs: [], targetCorrelations: {}, leakageSuspects: [] };
-const baseQuality = { missingPct: 0, columnsWithIssues: [] };
-
 const sumWeights = comps => Object.values(comps).reduce((s, c) => s + c.weight, 0);
 
-// Case 1 — duplicatesComputed = true, 10/100 rows duplicated.
-const h1 = getHealthScore({
-  meta: baseMeta, relationships: baseRel, classBalance: null, statistics: [],
-  quality: { ...baseQuality, duplicatesComputed: true, duplicateRows: 10 },
-});
-const c1 = h1.qualityBreakdown.components;
+/* The weighted quality model lives in quality.js now. There used to be two of
+   them — this one, and a flat "100 minus penalties" in quality.js — and they
+   openly disagreed (11 vs 40 on openpowerlifting.csv). health.js reads the
+   published score rather than computing a second one, so these cases test the
+   model where it is written. */
+
+// Case 1 — duplicates computed, 10 of 100 rows duplicated.
+const dupRows = [];
+for (let i = 0; i < 90; i++) dupRows.push({ a: `v${i}`, b: `w${i % 7}` });
+for (let i = 0; i < 10; i++) dupRows.push({ a: "v0", b: "w0" });
+const q1 = getQuality(dupRows, ["a", "b"], [], [], []);
+const c1 = q1.qualityComponents;
 // expected 4-weight formula: 100*.45 + 0*.25 + 100*.15 + 100*.15 = 75
 const case1a = "duplicates" in c1;
 const case1b = Math.abs(sumWeights(c1) - 1.0) < 1e-9;
-const case1c = h1.breakdown.quality === 75 && Number.isFinite(h1.score);
+const case1c = q1.qualityScore === 75;
 for (const [ok, msg] of [
   [case1a, "computed: components INCLUDE duplicates term"],
   [case1b, `computed: 4 weights sum to 1.0 (${sumWeights(c1)})`],
-  [case1c, `computed: qualityDim uses 4-weight formula (=${h1.breakdown.quality}, expected 75)`],
+  [case1c, `computed: quality score uses the 4-weight formula (=${q1.qualityScore}, expected 75)`],
 ]) { if (!ok) failures++; console.log(`${ok ? "PASS" : "FAIL"}  ${msg}`); }
 
-// Case 2 — duplicatesComputed = false, duplicateRows = null.
-const h2 = getHealthScore({
-  meta: baseMeta, relationships: baseRel, classBalance: null, statistics: [],
-  quality: { ...baseQuality, duplicatesComputed: false, duplicateRows: null },
-});
-const c2 = h2.qualityBreakdown.components;
-const case2a = Number.isFinite(h2.score) && Number.isFinite(h2.breakdown.quality); // no NaN
+// Case 2 — over the duplicate-detection ceiling, so the term is absent entirely.
+const bigRows = [];
+for (let i = 0; i < 50001; i++) bigRows.push({ a: `v${i}`, b: `w${i % 7}` });
+const q2 = getQuality(bigRows, ["a", "b"], [], [], []);
+const c2 = q2.qualityComponents;
+const case2a = Number.isFinite(q2.qualityScore);                 // no NaN from a null count
 const case2b = Math.abs(sumWeights(c2) - 1.0) < 1e-9
   && Math.abs(c2.missing.weight - 0.60) < 1e-9
   && Math.abs(c2.constant.weight - 0.20) < 1e-9
-  && Math.abs(c2.id.weight - 0.20) < 1e-9;                 // renormalized {0.60,0.20,0.20}
-const case2c = !("duplicates" in c2);                       // duplicates dim absent
+  && Math.abs(c2.id.weight - 0.20) < 1e-9;                       // renormalized {0.60,0.20,0.20}
+const case2c = !("duplicates" in c2);                            // duplicates dim absent
 for (const [ok, msg] of [
-  [case2a, `skipped: no NaN (score=${h2.score}, quality=${h2.breakdown.quality})`],
+  [case2a, `skipped: no NaN (quality=${q2.qualityScore})`],
   [case2b, `skipped: 3 weights renormalized & sum to 1.0 (${sumWeights(c2)})`],
-  [case2c, `skipped: duplicates dimension ABSENT from breakdown (keys: ${Object.keys(c2).join(",")})`],
+  [case2c, `skipped: duplicates dimension ABSENT from components (keys: ${Object.keys(c2).join(",")})`],
 ]) { if (!ok) failures++; console.log(`${ok ? "PASS" : "FAIL"}  ${msg}`); }
+
+/* One number, not two: the health dimension IS the published quality score. */
+const oneScore = analyzeDataset(dupRows, ["a", "b"], null);
+const case3 = oneScore.healthScore.breakdown.quality === oneScore.quality.qualityScore;
+if (!case3) failures++;
+console.log(`${case3 ? "PASS" : "FAIL"}  the health quality dimension equals quality.qualityScore (${oneScore.healthScore.breakdown.quality} vs ${oneScore.quality.qualityScore})`);
 
 /* ── Fix #5a — correlation ratio η vs reference harness ── */
 const eta = parseCsv(

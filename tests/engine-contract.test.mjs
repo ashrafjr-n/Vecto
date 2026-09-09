@@ -70,7 +70,8 @@ assertKeysExact(withTarget.meta, [
 
 assertKeysExact(withTarget.quality, [
   "missingCells", "missingPct", "duplicateRows", "duplicatesComputed",
-  "columnsWithIssues", "qualityScore", "scorePenalties", "scoreBase",
+  "columnsWithIssues", "qualityScore", "qualityComponents", "worstMissingColumn",
+  "scorePenalties", "scoreBase",
 ], "quality");
 
 assertType(withTarget.statistics, "array", "statistics");
@@ -139,7 +140,7 @@ if (withTarget.insights.length > 0) {
 }
 
 assertKeysExact(withTarget.healthScore, [
-  "score", "grade", "breakdown", "qualityBreakdown", "limits", "hasTarget",
+  "score", "grade", "breakdown", "limits", "hasTarget",
 ], "healthScore");
 assertType(withTarget.healthScore.limits, "array", "healthScore.limits (always an array, [] when uncapped)");
 assertKeysExact(withTarget.healthScore.breakdown, [

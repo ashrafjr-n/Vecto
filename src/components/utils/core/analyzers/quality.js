@@ -126,41 +126,75 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
   }
   const missingPct    = (missingCells / (data.length * columns.length)) * 100;
 
-  // Score breakdown
-  const penalties = [];
+  /* ── The quality score ────────────────────────────────────────────────────
+     There were TWO of these. This file computed a flat 100 minus penalties, and
+     health.js computed a weighted average of four component scores from these
+     same outputs — different models, both called "quality", and they disagreed
+     openly: openpowerlifting.csv scored 11 here and 40 there, events.csv 7 and 39.
 
-  const missingPenalty = Math.round(missingPct * 2);
-  if (missingPenalty > 0) {
-    penalties.push({
-      label:   "Missing values",
-      detail:  `${missingPct.toFixed(1)}% of cells are empty`,
-      penalty: missingPenalty,
-    });
+     The flat model is the one that goes. It double-counted (a mostly-empty column
+     was charged once through missingPct and again through the column-issue count)
+     and the issue count was unbounded, so adding a new KIND of issue silently
+     moved every dataset's score — which is exactly what happened when
+     `mixed_numeric` and `possible_code` were added. The weighted model is bounded
+     per component and says what each part contributed.
+
+     The presentation is unchanged: a weighted average IS a base minus deductions,
+     since 100 − Σ wᵢ(100 − sᵢ) = Σ wᵢsᵢ. So `scorePenalties` still reads as a
+     waterfall from 100, each row now naming the component and its weight. */
+  const pct = (n, d) => (d > 0 ? (n / d) * 100 : 0);
+
+  /* Overall emptiness, then an extra charge for the WORST single column: a file
+     that is 5% empty overall because one column is 90% empty is not the same
+     dataset as one where every column is 5% short. */
+  let worstColMissingPct = 0;
+  let worstMissingCol    = null;
+  let highMissingCols    = 0;
+  for (const c of columnsWithIssues) {
+    if (c.issue !== "missing") continue;
+    const p = pct(c.count ?? 0, data.length);
+    if (p > 20) highMissingCols++;
+    if (p > worstColMissingPct) { worstColMissingPct = p; worstMissingCol = c.col; }
   }
+  const worstColPenalty = worstColMissingPct > 20
+    ? Math.round(((worstColMissingPct - 20) / 80) * 30)
+    : 0;
 
-  // FIX #4: only penalize duplicates when they were actually computed — never let
-  // null coerce to a 0 (perfect) penalty. Skipped datasets get no duplicate term.
-  if (duplicatesComputed) {
-    const dupPenalty = Math.round((duplicateRows / data.length) * 50);
-    if (dupPenalty > 0) {
-      penalties.push({
-        label:   "Duplicate rows",
-        detail:  `${duplicateRows} duplicate row${duplicateRows > 1 ? "s" : ""} found`,
-        penalty: dupPenalty,
-      });
-    }
-  }
+  const missingScore  = Math.max(0, 100 - missingPct * 2 - worstColPenalty - highMissingCols * 5);
+  const constantCols  = columnsWithIssues.filter(c => c.issue === "constant").length;
+  const constantScore = Math.max(0, 100 - constantCols * 15);
+  // Identifiers are expected in real data — a small charge, not a defect.
+  const idScore       = Math.max(0, 100 - identifierCols.length * 3);
 
-  const issuePenalty = columnsWithIssues.length * 3;
-  if (issuePenalty > 0) {
-    penalties.push({
-      label:   "Column issues",
-      detail:  `${columnsWithIssues.length} column${columnsWithIssues.length > 1 ? "s" : ""} with structural issues`,
-      penalty: issuePenalty,
-    });
-  }
+  /* The duplicates term participates only when duplicates were actually counted.
+     When the check is skipped its weight is redistributed across the other three
+     rather than scored as a perfect 100 — "not measured" must never read as
+     "measured, and clean". */
+  const components = duplicatesComputed
+    ? {
+        missing:    { score: missingScore,  weight: 0.45, detail: `${missingPct.toFixed(1)}% of cells empty${worstMissingCol ? `, worst column "${worstMissingCol}" at ${worstColMissingPct.toFixed(1)}%` : ""}` },
+        duplicates: { score: Math.max(0, 100 - pct(duplicateRows, data.length) * 50), weight: 0.25, detail: `${duplicateRows} duplicate row${duplicateRows === 1 ? "" : "s"}` },
+        constant:   { score: constantScore, weight: 0.15, detail: `${constantCols} constant column${constantCols === 1 ? "" : "s"}` },
+        id:         { score: idScore,       weight: 0.15, detail: `${identifierCols.length} identifier column${identifierCols.length === 1 ? "" : "s"}` },
+      }
+    : {
+        missing:  { score: missingScore,  weight: 0.60, detail: `${missingPct.toFixed(1)}% of cells empty${worstMissingCol ? `, worst column "${worstMissingCol}" at ${worstColMissingPct.toFixed(1)}%` : ""}` },
+        constant: { score: constantScore, weight: 0.20, detail: `${constantCols} constant column${constantCols === 1 ? "" : "s"}` },
+        id:       { score: idScore,       weight: 0.20, detail: `${identifierCols.length} identifier column${identifierCols.length === 1 ? "" : "s"}` },
+      };
 
-  const score = Math.max(0, Math.round(100 - penalties.reduce((s, p) => s + p.penalty, 0)));
+  const LABEL = { missing: "Missing values", duplicates: "Duplicate rows", constant: "Constant columns", id: "Identifier columns" };
+  const penalties = Object.entries(components)
+    .map(([key, c]) => ({
+      label:   LABEL[key],
+      detail:  `${c.detail} · ${Math.round(c.weight * 100)}% of the quality score`,
+      penalty: Math.round(c.weight * (100 - c.score)),
+    }))
+    .filter(p => p.penalty > 0);
+
+  const score = Math.max(0, Math.round(
+    Object.values(components).reduce((sum, c) => sum + c.score * c.weight, 0),
+  ));
 
   return {
     missingCells,
@@ -169,6 +203,13 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
     duplicatesComputed,
     columnsWithIssues,
     qualityScore:   score,
+    qualityComponents: components,
+    /* The single worst-affected column, computed once here for the missing-value
+       component and read by health.js for its score cap — which used to walk
+       columnsWithIssues again to find the same column. */
+    worstMissingColumn: worstMissingCol
+      ? { col: worstMissingCol, pct: Math.round(worstColMissingPct * 10) / 10 }
+      : null,
     scorePenalties: penalties,
     scoreBase:      100,
   };
