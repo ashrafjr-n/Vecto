@@ -81,13 +81,25 @@ export function mean(arr) {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-export function median(arr) {
-  if (!arr.length) return 0;
-  const sorted = [...arr].sort((a, b) => a - b);
-  const mid    = Math.floor(sorted.length / 2);
+/* The sorted-array forms. getStatistics needed q1, q3, the median, the min and
+   the max of one column and reached them through four separate calls, each of
+   which sorted its own private copy — four full sorts of the same values per
+   column, and getVisualizations then did it again for the same columns. At
+   386,414 rows x 12 numeric columns that is 96 sorts where 12 would do.
+
+   The public median()/quantile() keep their signatures and simply sort first, so
+   nothing that only has an unsorted array has to change. */
+export function medianSorted(sorted) {
+  if (!sorted.length) return 0;
+  const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0
     ? (sorted[mid - 1] + sorted[mid]) / 2
     : sorted[mid];
+}
+
+export function median(arr) {
+  if (!arr.length) return 0;
+  return medianSorted([...arr].sort((a, b) => a - b));
 }
 
 export function stdDev(arr) {
@@ -153,15 +165,18 @@ export function etaCorrelation(numericValues, categoryLabels) {
   return Math.sqrt(ssBetween / ssTotal);
 }
 
-export function quantile(arr, q) {
-  const sorted = [...arr].sort((a, b) => a - b);
-  const pos    = (sorted.length - 1) * q;
-  const base   = Math.floor(pos);
-  const rest   = pos - base;
+export function quantileSorted(sorted, q) {
+  const pos  = (sorted.length - 1) * q;
+  const base = Math.floor(pos);
+  const rest = pos - base;
   if (sorted[base + 1] !== undefined) {
     return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
   }
   return sorted[base];
+}
+
+export function quantile(arr, q) {
+  return quantileSorted([...arr].sort((a, b) => a - b), q);
 }
 
 /* ── FIX #1: Pearson uses paired rows to handle missing values correctly ── */
