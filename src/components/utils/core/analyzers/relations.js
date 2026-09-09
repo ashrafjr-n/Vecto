@@ -547,6 +547,26 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     presenceSignals.sort((a, b) => b.cramersV - a.cramersV);
   }
 
+  /* A presence indicator that separates the target almost perfectly is leakage of
+     the same kind, arriving by a different route: the column is not filled in for
+     one class of row, so "was this recorded" restates the label. It cannot come
+     from the loop above because these columns are precisely the ones the target
+     scan could not score — smoking.csv's "type" has no targetCorrelations entry
+     at all, and openpowerlifting's "TotalKg" presence decides "Place" (no total
+     recorded, no placing). Appended here because presenceSignals is computed
+     after the leakage scan. */
+  for (const p of presenceSignals) {
+    if (p.cramersV < LEAKAGE_MIN) continue;
+    leakageSuspects.push({
+      col: p.col,
+      correlation: p.cramersV,
+      metric: "presence",
+      warning: `Whether "${p.col}" was recorded at all almost completely determines "${target}" `
+             + `(Cramér's V ${p.cramersV.toFixed(2)}, n = ${p.n}) — the column is filled in for one class and empty for the other. `
+             + `Possible target leakage: verify the missingness is not a consequence of the label rather than a predictor of it.`,
+    });
+  }
+
   /* Finish the reason for every column dropped for a constant target: the
      indicator either carries the signal or it does not, and both answers are
      already computed above. */
