@@ -822,5 +822,80 @@ check("the strongest-signal line names the share of rows behind a narrow measure
 check("it names the best broadly-measured feature beside the narrow one",
   /"broad"/.test(covObs ?? "") && /over 4000 rows/.test(covObs ?? ""));
 
+/* ── Column roles ──────────────────────────────────────────────────────────
+   Three separate defects, all about a column being routed as something it is
+   not. Measured on events.csv (941,009 rows, ships a published data dictionary)
+   and meets/ginf. */
+console.log("\nCOLUMN ROLES — free text, string keys, and codes that look like counts\n");
+
+const sentence = i => `Attempt missed. Player ${i % 700} takes a left footed shot from outside the box, high and wide to the left.`;
+const textRows = [];
+for (let i = 0; i < 800; i++) {
+  textRows.push({
+    note: sentence(i),                                  // ~110 chars, spaces, ~700 distinct
+    url:  `/soccer/germany/match-${i}-abcdef/`,          // long, unique, NO spaces
+    name: `Player Number ${i % 90}`,                     // spaces, but short
+    y:    String(i % 2),
+  });
+}
+const textRoles = detectColumnRoles(textRows, ["note", "url", "name", "y"], "y");
+check("a commentary column is read as free text, not as a category",
+  textRoles.note === ROLE.TEXT);
+
+check("a long unique string with no spaces is an identifier, not free text",
+  textRoles.url === ROLE.IDENTIFIER);
+
+check("a short spaced label stays categorical",
+  textRoles.name === ROLE.CATEGORICAL);
+
+/* Free text used to become the strongest reported association with the target,
+   because the commentary describes the event it was being correlated against. */
+const textAnalysis = analyzeDataset(textRows, ["note", "url", "name", "y"], "y");
+check("free text is kept out of the target scan",
+  !("note" in textAnalysis.relationships.targetCorrelations)
+  && textAnalysis.meta.textCols.includes("note"));
+
+check("and it says so rather than simply vanishing",
+  textAnalysis.relationships.unscoredColumns.some(u => u.col === "note" && /free text/i.test(u.reason)));
+
+/* An identifier or a date was skipped from the target scan with no trace at all
+   — ginf.csv's "id_odsp" and "date" were absent from the tab with no reason. */
+check("an identifier skipped from the scan is named with its reason",
+  textAnalysis.relationships.unscoredColumns.some(u => u.col === "url" && /identifier/i.test(u.reason)));
+
+/* A string key with no telltale name: one distinct value per row, measured over
+   the whole column, not a 200-row head. */
+const keyRows = [];
+for (let i = 0; i < 300; i++) keyRows.push({ slug: `aa/bb/${i}-${i * 7}`, grp: `g${i % 5}`, y: String(i % 2) });
+check("a string key with no id-like name is an identifier",
+  detectColumnRoles(keyRows, ["slug", "grp", "y"], "y").slug === ROLE.IDENTIFIER);
+
+/* ...and the two detectors that used to disagree about it now agree. */
+const keyQuality = analyzeDataset(keyRows, ["slug", "grp", "y"], "y");
+check("quality no longer calls the same column 'likely an ID' while roles call it categorical",
+  !keyQuality.quality.columnsWithIssues.some(i => i.issue === "high_cardinality" && i.col === "slug"));
+
+/* Codes that look like counts: the ceiling stays at 4, but the ambiguity is
+   stated. events.csv's event_type is 12 codes and the report said mean = 4.33. */
+const codeRows = [];
+for (let i = 0; i < 600; i++) {
+  codeRows.push({
+    code:  String(1 + (i % 12)),        // 12 gapless integers from 1 — the events shape
+    spread: String((i % 24) * 3),        // 24 integers, gaps everywhere — a real count
+    y:     String(i % 2),
+  });
+}
+const codeQuality = analyzeDataset(codeRows, ["code", "spread", "y"], "y").quality.columnsWithIssues;
+check("a gapless run of small integers is reported as possibly coded",
+  codeQuality.some(i => i.issue === "possible_code" && i.col === "code" && /1 to 12/.test(i.detail)));
+
+check("a column with gaps is not reported as coded",
+  !codeQuality.some(i => i.issue === "possible_code" && i.col === "spread"));
+
+/* The ceiling itself did not move: a 12-level integer column is still NUMERIC,
+   so it keeps the mean/std/outliers a genuine count needs. */
+check("the encoded-categorical ceiling did not move",
+  detectColumnRoles(codeRows, ["code", "spread", "y"], "y").code === ROLE.NUMERIC);
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
