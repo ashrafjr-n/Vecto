@@ -182,8 +182,8 @@ export function quantile(arr, q) {
 export function pearson(data, colA, colB) {
   const pairs = [];
   data.forEach(row => {
-    const a = parseFloat(row[colA]);
-    const b = parseFloat(row[colB]);
+    const a = toNumber(row[colA]);
+    const b = toNumber(row[colB]);
     if (!isNaN(a) && !isNaN(b)) pairs.push([a, b]);
   });
 
@@ -492,7 +492,7 @@ export const MI_BINS = 8;
 export function discretize(values) {
   const numeric = values.filter(v => isNumeric(v));
   if (numeric.length / values.length > 0.8 && new Set(numeric).size > MI_BINS) {
-    return quantileBins(values.map(v => parseFloat(v)), MI_BINS).map(String);
+    return quantileBins(values.map(toNumber), MI_BINS).map(String);
   }
   return values.map(normalizeValue);
 }
@@ -537,7 +537,7 @@ export function pearsonOf(xs, ys) {
 export function rankColumn(data, col) {
   const idx = [];
   for (let i = 0; i < data.length; i++) {
-    const v = parseFloat(data[i][col]);
+    const v = toNumber(data[i][col]);
     if (!isNaN(v)) idx.push([v, i]);
   }
   const ranks = new Array(data.length).fill(NaN);
@@ -561,8 +561,8 @@ export function spearmanOf(xs, ys) {
 export function spearman(data, colA, colB) {
   const xs = [], ys = [];
   for (let i = 0; i < data.length; i++) {
-    const a = parseFloat(data[i][colA]);
-    const b = parseFloat(data[i][colB]);
+    const a = toNumber(data[i][colA]);
+    const b = toNumber(data[i][colB]);
     if (isNaN(a) || isNaN(b)) continue;
     xs.push(a); ys.push(b);
   }
@@ -591,7 +591,7 @@ export function isIdentifierCol(data, col) {
   const unique = new Set(vals.map(String)).size;
 
   if (unique / vals.length > 0.95 && vals.length > 10) {
-    const nums = vals.map(v => parseFloat(v)).filter(v => !isNaN(v));
+    const nums = vals.map(toNumber).filter(v => !isNaN(v));
     if (nums.length / vals.length > 0.95) {
       const sorted = [...nums].sort((a, b) => a - b);
       const diffs  = sorted.slice(1).map((v, i) => v - sorted[i]);
