@@ -60,98 +60,112 @@ function ResultsDashboard({ result, onReset }) {
   };
 
   return (
-    <div className="mx-auto max-w-[1400px] px-6 pb-16 pt-8 sm:px-12">
+    <>
+      {/* ── REPORT HEADER — the editorial hero of this page, same shape as
+          Home's and TargetStep's: one large surface curving away at the
+          bottom into the dotted canvas that holds the report itself.
 
-      {/* Sidebar + content */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          The six figures live here rather than in the sidebar, where they used
+          to sit directly above the tab nav. They were the only numbers on the
+          page with no section of their own, and repeating them in a rail beside
+          a report that states each one again is duplication, not emphasis. ── */}
+      <section className="rounded-b-[2.5rem] bg-paper-sunken px-6 pt-14 pb-14 sm:rounded-b-[4.5rem] sm:px-12 sm:pt-20 sm:pb-16 lg:rounded-b-[7rem]">
+        <div className="mx-auto max-w-[1400px]">
 
-        <div className="flex flex-col items-center gap-3 lg:sticky lg:top-20 lg:w-[240px] lg:shrink-0">
+          <div className="flex items-baseline gap-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
+            <span>02</span>
+            <span className="h-px flex-1 bg-line" />
+            <span>Dataset report</span>
+          </div>
 
-          <aside className="w-full overflow-hidden rounded-xl border border-line bg-paper">
+          <h1 className="mt-10 max-w-[22ch] text-[2rem] font-semibold leading-[1.06] tracking-[-0.035em] text-ink sm:text-5xl">
+            {meta.target ? <>Audited against <span className="font-mono text-gold-ink">{meta.target}</span>.</> : "Exploratory audit, no target."}
+          </h1>
 
-            {/* Scope */}
-            <div className="border-b border-line px-4 py-4">
-              <div className="text-[11px] uppercase tracking-wide text-ink-faint">Scope</div>
-              <div className="mt-1.5 text-[13px] leading-relaxed text-ink-soft">
-                {meta.target ? (
-                  <>Target <span className="font-mono font-medium text-ink">{meta.target}</span> · {meta.datasetType}</>
-                ) : (
-                  "No target selected · Exploratory analysis"
-                )}
-              </div>
-            </div>
+          <p className="mt-8 max-w-2xl text-[15px] leading-[1.7] text-ink-soft">
+            {meta.target
+              ? <>Task type read as {meta.datasetType}. Every figure below is computed from the file in this tab, and each one is stated with the reasoning that produced it.</>
+              : <>Class balance and task type need a target and are omitted. Every other section is computed normally.</>}
+          </p>
 
-            {/* KPI stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32 }}
-              className="divide-y divide-line border-b border-line"
-            >
-              {stats.map((s) => (
-                <div key={s.label} className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-[12.5px] text-ink-faint">{s.label}</span>
-                  <span className={`font-mono text-[13px] font-semibold ${toneCls[s.tone] ?? "text-ink"}`}>
-                    {s.value}
-                    {s.suffix && <span className="ml-0.5 text-[11px] font-normal text-ink-faint">{s.suffix}</span>}
-                  </span>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.32 }}
+            className="mt-12 grid grid-cols-2 border-t border-line sm:grid-cols-3 lg:grid-cols-6"
+          >
+            {stats.map((s) => (
+              <div key={s.label} className="border-b border-line py-6 pr-6 lg:border-b-0">
+                <div className={`font-mono text-[1.75rem] font-medium tracking-tight sm:text-4xl ${toneCls[s.tone] ?? "text-ink"}`}>
+                  {s.value}
+                  {s.suffix && <span className="text-sm font-normal text-ink-faint">{s.suffix}</span>}
                 </div>
-              ))}
-            </motion.div>
+                <div className="mt-3 font-mono text-[10.5px] uppercase tracking-[0.16em] text-ink-faint">{s.label}</div>
+              </div>
+            ))}
+          </motion.div>
 
-            {/* Tab nav */}
-            <nav className="flex flex-col gap-0.5 p-2">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`whitespace-nowrap rounded-md px-3.5 py-2.5 text-left text-[13px] font-medium transition-colors ${
-                    activeTab === tab.id
-                      ? "bg-gold-tint text-gold-ink"
-                      : "text-ink-soft hover:bg-paper-sunken hover:text-ink"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+        </div>
+      </section>
+
+      {/* ── THE REPORT — panels on the dotted canvas ── */}
+      <div className="mx-auto max-w-[1400px] px-6 pb-24 pt-16 sm:px-12 sm:pt-20">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
+
+          <div className="lg:sticky lg:top-24 lg:w-[220px] lg:shrink-0">
+            <nav className="border-t border-line">
+              {tabs.map((tab, i) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className="flex w-full items-center gap-4 border-b border-line py-3.5 text-left transition-colors"
+                  >
+                    <span className={`font-mono text-[10.5px] ${isActive ? "text-gold-ink" : "text-ink-faint"}`}>
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className={`text-[14px] tracking-tight ${isActive ? "text-ink" : "text-ink-soft"}`}>
+                      {tab.label}
+                    </span>
+                  </button>
+                );
+              })}
             </nav>
 
-          </aside>
-
-          <button
-            type="button"
-            onClick={onReset}
-            className="inline-flex w-1/2 items-center justify-center whitespace-nowrap rounded-md border border-line px-3 py-2 text-[12.5px] font-medium text-ink-soft transition-colors hover:bg-paper-sunken hover:text-ink"
-          >
-            New analysis
-          </button>
-
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
+            <button
+              type="button"
+              onClick={onReset}
+              className="mt-8 inline-flex items-center rounded-xl border border-line px-4 py-2.5 text-[12.5px] font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
             >
-              {activeTab === "overview"       && <OverviewTab       result={result} />}
-              {activeTab === "quality"        && <QualityTab        result={result} />}
-              {activeTab === "statistics"     && <StatisticsTab     result={result} />}
-              {activeTab === "visualizations" && <VisualizationsTab result={result} />}
-              {activeTab === "targetsignal"   && <TargetSignalTab   result={result} />}
-              {activeTab === "relationships"  && <RelationshipsTab  result={result} />}
-              {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
-            </motion.div>
-          </AnimatePresence>
+              New analysis
+            </button>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+              >
+                {activeTab === "overview"       && <OverviewTab       result={result} />}
+                {activeTab === "quality"        && <QualityTab        result={result} />}
+                {activeTab === "statistics"     && <StatisticsTab     result={result} />}
+                {activeTab === "visualizations" && <VisualizationsTab result={result} />}
+                {activeTab === "targetsignal"   && <TargetSignalTab   result={result} />}
+                {activeTab === "relationships"  && <RelationshipsTab  result={result} />}
+                {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
         </div>
-
       </div>
-
-    </div>
+    </>
   );
 }
 
