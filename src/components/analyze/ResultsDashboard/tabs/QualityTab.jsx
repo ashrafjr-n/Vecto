@@ -35,7 +35,7 @@ function MissingRanking({ cols }) {
           return (
             <div key={col} className="flex items-center gap-3">
               <span className="w-32 shrink-0 truncate font-mono text-[12px] text-ink-soft">{col}</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-sunken">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper">
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: BAR_COLOR[tone] }}
@@ -122,7 +122,7 @@ function QualityTab({ result }) {
             {score}<span className="text-sm font-normal text-ink-faint">/100</span>
           </div>
         </div>
-        <div className="my-4 h-1.5 overflow-hidden rounded-full bg-paper-sunken">
+        <div className="my-4 h-1.5 overflow-hidden rounded-full bg-paper">
           <motion.div
             className={`h-full rounded-full ${SCORE_BG[tone]}`}
             initial={{ width: 0 }}

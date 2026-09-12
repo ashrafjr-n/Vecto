@@ -50,7 +50,7 @@ function ClassBalanceTab({ result }) {
                 <div className="mb-1.5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] font-medium text-ink">{String(cls.value)}</span>
-                    {isMax && <span className="rounded bg-paper-sunken px-1.5 py-0.5 text-[9px] font-medium text-ink-faint">majority</span>}
+                    {isMax && <span className="rounded bg-paper px-1.5 py-0.5 text-[9px] font-medium text-ink-faint">majority</span>}
                     {cls.missing && <span className="rounded bg-warning-tint px-1.5 py-0.5 text-[9px] font-medium text-warning">missing</span>}
                   </div>
                   <div className="flex items-center gap-3">
@@ -58,7 +58,7 @@ function ClassBalanceTab({ result }) {
                     <span className={`w-11 text-right font-mono text-[13px] font-semibold ${isMax ? "text-gold-ink" : "text-ink-soft"}`}>{cls.pct}%</span>
                   </div>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-paper-sunken">
+                <div className="h-1.5 overflow-hidden rounded-full bg-paper">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${cls.pct}%` }}
