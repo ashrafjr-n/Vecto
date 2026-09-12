@@ -35,6 +35,53 @@
   --color-info-tint: #E8F1FA;
 }
 
+/* ─────────────────────────────────────────────
+   NIGHT SCOPE — dark editorial palette, Home only.
+   Redefines the same tokens on a wrapper instead of adding a second set of
+   utilities, so every token-based component inside it (Header, Footer) flips
+   with no prop, no class edit, no dark: variant. Tailwind v4 compiles
+   bg-paper to var(--color-paper), and this unlayered block outranks @theme's
+   layered :root. Light values above are untouched — /analyze stays white.
+───────────────────────────────────────────── */
+.night {
+  /* In the night scope `paper-sunken` is the LIFTED panel surface, not a
+     recessed one — on a near-black canvas a raised surface is the lighter of
+     the two. The token keeps its name so Header/Footer need no dark variant. */
+  --color-paper:        #08090C;
+  --color-paper-sunken: #13161A;
+
+  --color-ink:       #F2F3F5;
+  --color-ink-soft:  #A2A6AE;
+  --color-ink-faint: #6C717A;
+
+  --color-line:        #222529;
+  --color-line-strong: #353941;
+
+  --color-gold:      #C9A94A;
+  --color-gold-ink:  #DCBF69;
+  --color-gold-tint: #1E1A0F;
+
+  --color-success:      #55AF80;
+  --color-success-tint: #0F1F18;
+  --color-warning:      #CC9C4E;
+  --color-warning-tint: #211A10;
+  --color-critical:      #E07070;
+  --color-critical-tint: #241315;
+  --color-info:      #629DD8;
+  --color-info-tint: #0F1924;
+}
+
+/* Overscroll past the page ends must not flash white behind a dark page. */
+html:has(.night) {
+  background: #08090C;
+}
+
+/* Background texture for the negative space between the editorial panels. */
+.dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, #3E434C 1.25px, transparent 0);
+  background-size: 26px 26px;
+}
+
 /* ── Base ── */
 html, body, #root {
   height: 100%;
