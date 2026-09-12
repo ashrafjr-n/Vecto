@@ -22,7 +22,7 @@ function InsightBanner({ text }) {
 function FlatLine({ value }) {
   return (
     <div className="py-3 text-center">
-      <div className="relative h-1 rounded-full bg-paper-sunken">
+      <div className="relative h-1 rounded-full bg-paper">
         <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold" />
       </div>
       <div className="mt-3 text-[11px] text-ink-faint">
@@ -49,7 +49,7 @@ function BoxPlot({ boxplot }) {
         <line x1={fL} y1="14" x2={fR} y2="14" stroke="var(--color-line-strong)" strokeWidth="0.8" />
         <line x1={fL} y1="9" x2={fL} y2="19" stroke="var(--color-ink-faint)" strokeWidth="0.8" />
         <line x1={fR} y1="9" x2={fR} y2="19" stroke="var(--color-ink-faint)" strokeWidth="0.8" />
-        <rect x={q1x} y="7" width={q3x - q1x} height="14" fill="var(--color-paper-sunken)" stroke="var(--color-ink-soft)" strokeWidth="0.8" rx="1" />
+        <rect x={q1x} y="7" width={q3x - q1x} height="14" fill="var(--color-paper)" stroke="var(--color-ink-soft)" strokeWidth="0.8" rx="1" />
         <line x1={medX} y1="7" x2={medX} y2="21" stroke="var(--color-ink)" strokeWidth="1.4" />
         {meanX != null && (
           <polygon
@@ -161,7 +161,7 @@ function CategoricalView({ vis }) {
                   <div className="flex min-w-0 items-center gap-2">
                     <span className={`truncate text-[12.5px] ${isHovered ? "text-ink" : "text-ink-soft"}`}>{item.value}</span>
                     {isHovered && (
-                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${isTop ? "bg-gold-tint text-gold-ink" : "bg-paper-sunken text-ink-faint"}`}>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${isTop ? "bg-gold-tint text-gold-ink" : "bg-paper text-ink-faint"}`}>
                         #{rankMap[item.value]} of {totalCategories}
                       </span>
                     )}
@@ -173,7 +173,7 @@ function CategoricalView({ vis }) {
                     </span>
                   </div>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-paper-sunken">
+                <div className="h-1.5 overflow-hidden rounded-full bg-paper">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
@@ -230,7 +230,7 @@ function VisualizationsTab({ result }) {
                   type="button"
                   onClick={() => setSelected(v.col)}
                   className={`rounded-md px-3 py-1.5 font-mono text-[12px] transition-colors ${
-                    activeCol === v.col ? "bg-gold-tint font-medium text-gold-ink" : "bg-paper-sunken text-ink-soft hover:text-ink"
+                    activeCol === v.col ? "bg-gold-tint font-medium text-gold-ink" : "bg-paper text-ink-soft hover:text-ink"
                   }`}
                 >
                   {v.col}
@@ -249,7 +249,7 @@ function VisualizationsTab({ result }) {
                   type="button"
                   onClick={() => setSelected(v.col)}
                   className={`rounded-md px-3 py-1.5 font-mono text-[12px] transition-colors ${
-                    activeCol === v.col ? "bg-info-tint font-medium text-info" : "bg-paper-sunken text-ink-soft hover:text-ink"
+                    activeCol === v.col ? "bg-info-tint font-medium text-info" : "bg-paper text-ink-soft hover:text-ink"
                   }`}
                 >
                   {v.col}

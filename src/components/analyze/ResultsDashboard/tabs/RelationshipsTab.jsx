@@ -66,7 +66,7 @@ function CorrelationRanking({ strongRelationships }) {
                 <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-soft">
                   {rel.col1} <span className="text-ink-faint">&harr;</span> {rel.col2}
                 </span>
-                <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-paper-sunken">
+                <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-paper">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.round(abs * 100)}%` }}
@@ -80,7 +80,7 @@ function CorrelationRanking({ strongRelationships }) {
                 </span>
                 {isMC
                   ? <StatusBadge severity="critical">redundant</StatusBadge>
-                  : <span className="shrink-0 rounded-full bg-paper-sunken px-2.5 py-0.5 text-[11px] text-ink-soft">{rel.strength}</span>}
+                  : <span className="shrink-0 rounded-full bg-paper px-2.5 py-0.5 text-[11px] text-ink-soft">{rel.strength}</span>}
               </div>
 
               {/* Stage 7 computed a Spearman and a p-value for every pair here and
@@ -141,7 +141,7 @@ function CategoricalAssociations({ associations, hasHeatmap }) {
               <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-soft">
                 {a.col1} <span className="text-ink-faint">&harr;</span> {a.col2}
               </span>
-              <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-paper-sunken">
+              <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-paper">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.round(a.cramersV * 100)}%` }}

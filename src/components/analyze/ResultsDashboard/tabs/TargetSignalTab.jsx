@@ -75,7 +75,7 @@ function SignalRow({ col, entry, index, rows }) {
     <div className="py-3 first:pt-0 last:pb-0">
       <div className="flex items-center gap-3">
         <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-ink">{col}</span>
-        <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-paper-sunken">
+        <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-paper">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${Math.round(abs * 100)}%` }}

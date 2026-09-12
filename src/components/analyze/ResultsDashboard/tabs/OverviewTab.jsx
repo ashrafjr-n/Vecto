@@ -25,7 +25,7 @@ function RadialGauge({ score }) {
   return (
     <div className="relative" style={{ width: SIZE, height: SIZE }}>
       <svg width={SIZE} height={SIZE} className="-rotate-90">
-        <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="var(--color-paper-sunken)" strokeWidth={STROKE} />
+        <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="var(--color-paper)" strokeWidth={STROKE} />
         <motion.circle
           cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none"
           stroke={TONE_STROKE[tone]} strokeWidth={STROKE} strokeLinecap="round"
@@ -66,7 +66,7 @@ function ScoreLimits({ limits }) {
       <ul className="space-y-1.5">
         {limits.map((cap, i) => (
           <li key={i} className="flex items-start gap-2 text-[12px] leading-relaxed text-ink-soft">
-            <span className="mt-px shrink-0 rounded bg-paper-sunken px-1.5 py-0.5 font-mono text-[10.5px] text-ink-faint">
+            <span className="mt-px shrink-0 rounded bg-paper px-1.5 py-0.5 font-mono text-[10.5px] text-ink-faint">
               max {cap.max}
             </span>
             <span>{cap.reason}</span>
@@ -98,7 +98,7 @@ function HealthScoreCard({ healthScore }) {
                   <span className="text-ink-soft">{DIM_LABEL[key]}</span>
                   <span className={`font-mono font-medium ${TONE_TEXT[tone]}`}>{val}</span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-paper-sunken">
+                <div className="h-1.5 overflow-hidden rounded-full bg-paper">
                   <motion.div
                     className="h-full rounded-full"
                     style={{ background: TONE_STROKE[tone] }}
@@ -160,7 +160,7 @@ function ColumnRolesCard({ meta }) {
             <div className="mb-1.5 text-[11px] font-medium text-ink-faint">{g.label} ({g.cols.length})</div>
             <div className="flex flex-wrap gap-1.5">
               {g.cols.map((col) => (
-                <span key={col} className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper-sunken px-2 py-1 font-mono text-[11px] text-ink">
+                <span key={col} className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2 py-1 font-mono text-[11px] text-ink">
                   {col}
                   {g.role !== "target" && <RolePill role={g.role} />}
                 </span>
@@ -203,7 +203,7 @@ function DatasetSnapshot({ snapshot }) {
           </thead>
           <tbody>
             {rows.map((row, i) => (
-              <tr key={i} className="border-b border-line/60 hover:bg-paper-sunken">
+              <tr key={i} className="border-b border-line/60 hover:bg-paper">
                 <td className="px-3 py-1.5 text-right font-mono text-[10px] text-ink-faint">{i + 1}</td>
                 {visibleCols.map((col) => {
                   const val = row[col];

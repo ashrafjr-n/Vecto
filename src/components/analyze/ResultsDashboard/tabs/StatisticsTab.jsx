@@ -42,7 +42,7 @@ function StatisticsTab({ result }) {
             className={`rounded-md px-3 py-1.5 font-mono text-[12px] transition-colors ${
               selected === s.col
                 ? "bg-gold-tint font-medium text-gold-ink"
-                : "bg-paper-sunken text-ink-soft hover:text-ink"
+                : "bg-paper text-ink-soft hover:text-ink"
             }`}
           >
             {s.col}
