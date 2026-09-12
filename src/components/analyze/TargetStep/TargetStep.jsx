@@ -17,7 +17,10 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
     if (!initialTarget) return null;
     const type = colTypes[initialTarget] ?? ROLE.CATEGORICAL;
     return (
-      <div className="flex items-center justify-between rounded-lg border border-line bg-paper-sunken px-4 py-3">
+      /* Nested surfaces recess INWARD here: the enclosing panel is
+         `paper-sunken` (the lifted token), so a box inside it takes `paper`.
+         Reusing `paper-sunken` would make it vanish into its own container. */
+      <div className="flex items-center justify-between rounded-xl border border-line bg-paper px-4 py-3.5">
         <span className="font-mono text-[13px] text-ink">{initialTarget}</span>
         <div className="flex items-center gap-2">
           <RolePill role={type} />
@@ -35,7 +38,7 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
           <select
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
-            className="w-full appearance-none rounded-lg border border-line-strong bg-paper px-4 py-2.5 font-mono text-[13px] text-ink focus:border-gold focus:outline-none"
+            className="w-full appearance-none rounded-xl border border-line-strong bg-paper px-4 py-3 font-mono text-[13px] text-ink focus:border-gold focus:outline-none"
           >
             {columns.map((col) => (
               <option key={col} value={col}>{col} — {colTypes[col]}</option>
@@ -43,7 +46,7 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
           </select>
           <ChevronDown size={14} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-ink-faint" />
         </div>
-        <div className="flex items-center justify-between rounded-lg border border-line bg-paper-sunken px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border border-line bg-paper px-4 py-3.5">
           <span className="font-mono text-[13px] text-ink">{selected}</span>
           <RolePill role={type} />
         </div>
@@ -53,7 +56,7 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
 
   if (mode === "none") {
     return (
-      <div className="flex items-start gap-2.5 rounded-lg border border-line bg-paper-sunken px-4 py-3 text-[12px] leading-relaxed text-ink-soft">
+      <div className="flex items-start gap-2.5 rounded-xl border border-line bg-paper px-4 py-3.5 text-[12.5px] leading-relaxed text-ink-soft">
         <Info size={14} className="mt-0.5 shrink-0 text-ink-faint" />
         Class balance and ML task type will be unavailable without a target
         column. Every other section of the report runs normally.
@@ -81,88 +84,115 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack }) {
     mode === "auto" ? initialTarget :
     selected;
 
+  /* Home's composition, one step in: an editorial hero panel whose bottom
+     corners curve away, then the interaction itself on the dotted canvas
+     below it. Same two radii constants Home uses — see frontend.md. */
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-xl items-center px-6 py-16">
-      <div className="w-full rounded-2xl border border-line bg-paper p-8">
+    <>
+      <section className="rounded-b-[2.5rem] bg-paper-sunken px-6 pt-16 pb-16 sm:rounded-b-[4.5rem] sm:px-10 sm:pt-24 sm:pb-20 lg:rounded-b-[7rem]">
+        <div className="mx-auto max-w-[1400px]">
 
-        <div className="text-[11px] font-medium uppercase tracking-widest text-ink-faint">
-          Configuration
-        </div>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">
-          Select a target column
-        </h1>
-        <p className="mt-1.5 text-[13px] text-ink-soft">
-          Determines the ML task type, class-balance report, and leakage checks.
-        </p>
-
-        <div className="mt-6 flex gap-6 border-y border-line py-4">
-          <div>
-            <div className="font-mono text-lg font-semibold text-ink">{csvData.length.toLocaleString()}</div>
-            <div className="text-[11px] uppercase tracking-wide text-ink-faint">Rows</div>
+          <div className="flex items-baseline gap-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
+            <span>01</span>
+            <span className="h-px flex-1 bg-line" />
+            <span>Configuration</span>
           </div>
-          <div>
-            <div className="font-mono text-lg font-semibold text-ink">{columns.length}</div>
-            <div className="text-[11px] uppercase tracking-wide text-ink-faint">Columns</div>
+
+          <h1 className="mt-12 max-w-[20ch] text-[2.25rem] font-semibold leading-[1.05] tracking-[-0.035em] text-ink sm:text-5xl lg:text-6xl">
+            Select a target column.
+          </h1>
+
+          <p className="mt-10 max-w-2xl border-t border-line pt-10 text-[16px] leading-[1.7] text-ink-soft">
+            The target determines the ML task type, the class-balance report, and which
+            columns are checked for leakage. Every other section of the report is computed
+            either way — picking none is a valid answer, not a skipped step.
+          </p>
+
+          <div className="mt-14 grid grid-cols-2 border-t border-line sm:max-w-md">
+            <div className="py-8 pr-8">
+              <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">
+                {csvData.length.toLocaleString()}
+              </div>
+              <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">Rows</div>
+            </div>
+            <div className="py-8 pr-8">
+              <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">
+                {columns.length}
+              </div>
+              <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">Columns</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <section className="px-6 py-20 sm:px-10 sm:py-28">
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-[2rem] border border-line bg-paper-sunken p-6 sm:p-8">
+
+            {/* Segmented control. The active segment wears the gold wash rather
+                than a raised `bg-paper` tile: on a dark surface the page color
+                is the DARKEST value, so the old lifted-tile treatment made the
+                selected mode read as recessed. Same active token as the report's
+                tab nav, so "selected" looks the same in both places. */}
+            <div className="flex gap-1 rounded-xl bg-paper p-1">
+              {TARGET_MODES.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setMode(opt.id)}
+                  className={`flex-1 rounded-lg px-3 py-2 text-[12.5px] font-medium transition-colors ${
+                    mode === opt.id ? "bg-gold-tint text-gold-ink" : "text-ink-soft hover:text-ink"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={mode}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="mt-5"
+              >
+                <ModePanel
+                  mode={mode}
+                  columns={columns}
+                  colTypes={colTypes}
+                  selected={selected}
+                  setSelected={setSelected}
+                  initialTarget={initialTarget}
+                />
+              </motion.div>
+            </AnimatePresence>
+
+            <div className="mt-8 flex items-center justify-between border-t border-line pt-6">
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-soft transition-colors hover:text-ink"
+              >
+                <ArrowLeft size={14} />
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => onConfirm(effectiveTarget)}
+                className="inline-flex items-center gap-2 rounded-xl bg-ink px-6 py-3 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
+              >
+                Start Analysis
+                <ArrowRight size={14} />
+              </button>
+            </div>
+
           </div>
         </div>
-
-        {/* Segmented control */}
-        <div className="mt-6 flex gap-1 rounded-lg bg-paper-sunken p-1">
-          {TARGET_MODES.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setMode(opt.id)}
-              className={`flex-1 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-                mode === opt.id ? "bg-paper text-ink shadow-sm" : "text-ink-soft hover:text-ink"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={mode}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-            className="mt-4"
-          >
-            <ModePanel
-              mode={mode}
-              columns={columns}
-              colTypes={colTypes}
-              selected={selected}
-              setSelected={setSelected}
-              initialTarget={initialTarget}
-            />
-          </motion.div>
-        </AnimatePresence>
-
-        <div className="mt-7 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-soft hover:text-ink"
-          >
-            <ArrowLeft size={14} />
-            Back
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirm(effectiveTarget)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-5 py-2.5 text-[13px] font-semibold text-paper hover:bg-ink/90"
-          >
-            Start Analysis
-            <ArrowRight size={14} />
-          </button>
-        </div>
-
-      </div>
-    </div>
+      </section>
+    </>
   );
 }
 
