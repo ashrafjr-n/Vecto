@@ -168,12 +168,16 @@ function CategoricalAssociations({ associations, hasHeatmap }) {
   );
 }
 
+/* Swatches are READ FROM the ramp at a representative r, not copied as hexes.
+   They used to be five literals duplicating correlationColor.js, so the legend
+   described the previous palette the moment the ramp changed — the legend is the
+   key to the grid, and a key that disagrees with the grid is worse than none. */
 const LEGEND = [
-  { fill: "#7A5C15", label: "Strong +" },
-  { fill: "#D9B450", label: "Moderate +" },
-  { fill: "#F6F6F4", label: "Weak" },
-  { fill: "#6FA8D8", label: "Moderate −" },
-  { fill: "#1B4C81", label: "Strong −" },
+  { r:  0.95, label: "Strong +"   },
+  { r:  0.50, label: "Moderate +" },
+  { r:  0.00, label: "Weak"       },
+  { r: -0.50, label: "Moderate −" },
+  { r: -0.95, label: "Strong −"   },
 ];
 
 function CorrelationHeatmap({ relationships }) {
@@ -230,7 +234,7 @@ function CorrelationHeatmap({ relationships }) {
           <span className="text-[10px] text-ink-faint">Legend</span>
           {LEGEND.map((l) => (
             <div key={l.label} className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-sm border border-line" style={{ background: l.fill }} />
+              <div className="h-2.5 w-2.5 rounded-sm border border-line" style={{ background: correlationFill(l.r) }} />
               <span className="text-[10px] text-ink-faint">{l.label}</span>
             </div>
           ))}
