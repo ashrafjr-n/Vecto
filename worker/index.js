@@ -152,7 +152,13 @@ async function complete(apiKey, models, name, task, messages) {
   if (res.status === 429) return { error: json({ error: "rate_limited", message }, 429) };
   if (!res.ok) return { error: json({ error: "upstream_error", status: res.status, message }, 502) };
 
-  const content = data?.choices?.[0]?.message?.content;
+  const choice = data?.choices?.[0];
+  /* Cut off at max_tokens: the JSON is incomplete by construction, so asking the
+     model to repair it would spend a second request to hit the same limit. */
+  if (choice?.finish_reason === "length") {
+    return { error: json({ error: "truncated", message: `answer cut off at ${task.maxTokens} tokens by ${data.model}` }, 502) };
+  }
+  const content = choice?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
     return { error: json({ error: "empty_response", message }, 502) };
   }
