@@ -264,19 +264,19 @@ const CHECKS = {
     if (m.repeatedRowShare === 0) {
       return { measurement: m, verdict: "contradicted", verdictText: `Every "${column}" value occurs on one row only, so no entity can appear on both sides of a split.` };
     }
-    const shared = `${Math.round(m.repeatedRowShare * 100)}% of rows share a "${column}" value with another row (${m.groups.toLocaleString()} groups)`;
-    if (m.purity != null) {
-      const lift = m.purity - m.baseline;
-      return {
-        measurement: m,
-        verdict: lift >= 0.1 ? "confirmed" : "partial",
-        verdictText: `${shared}; within those groups the most common target value covers ${Math.round(m.purity * 100)}% of rows, against ${Math.round(m.baseline * 100)}% for the most common class overall.`,
-      };
-    }
+    /* Never "confirmed". The data shows that values repeat and how much of the target
+       a group explains — but an ordinary category explains the target too: seaborn's
+       taxis pickup_zone (194 zones, ~33 trips each) scored η 0.40 against fare and is
+       a legitimate feature, not a memorised entity. Entity or category is a question
+       of meaning, so the measurement is shown and the judgement handed to the user. */
+    const shared = `${Math.round(m.repeatedRowShare * 100)}% of rows share a "${column}" value with another row (${m.groups.toLocaleString()} groups, ${(m.n / m.groups).toFixed(1)} rows each on average)`;
+    const explains = m.purity != null
+      ? `within those groups the most common target value covers ${Math.round(m.purity * 100)}% of rows, against ${Math.round(m.baseline * 100)}% for the most common class overall`
+      : `the group explains the target's ranks at η ${m.eta == null ? "—" : m.eta.toFixed(2)}`;
     return {
       measurement: m,
-      verdict: m.eta != null && m.eta >= 0.3 ? "confirmed" : "partial",
-      verdictText: `${shared}; the group explains the target's ranks at η ${m.eta == null ? "—" : m.eta.toFixed(2)}.`,
+      verdict: "question",
+      verdictText: `${shared}; ${explains}. Is each "${column}" value an entity a model could memorise (a person, a customer), or an ordinary category?`,
     };
   },
 
