@@ -274,8 +274,30 @@ def outliers_reference(path: str) -> dict:
     return out
 
 
+def rank_eta_reference(path: str) -> dict:
+    """Rank-based η (stage 10e): Kruskal-Wallis H with scipy's tie correction, its
+    chi-square p-value, and the bias-corrected effect size η²_H = (H - k + 1)/(n - k)
+    (Tomczak & Tomczak 2014), reported as sqrt(max(0, η²_H)) on η's 0-1 scale."""
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    out = {}
+    for g in ("grp", "many"):
+        for v in ("val", "noise"):
+            labels = df[g].str.strip().str.lower()
+            values = df[v].astype(float)
+            groups = [values[labels == lab].to_numpy() for lab in sorted(labels.unique())]
+            H, p = stats.kruskal(*groups)
+            n, k = len(values), len(groups)
+            out[f"{g}|{v}"] = {"H": float(H), "p": float(p), "n": n, "k": k,
+                               "rank_eta": float(np.sqrt(max(0.0, (H - k + 1) / (n - k)))),
+                               "raw_eta": eta_correlation(values.tolist(), labels.tolist())}
+    return out
+
+
 def main():
     expected = {}
+
+    # rank_eta.csv — Kruskal-Wallis H / p and the rank-based η (stage 10e)
+    expected["rank_eta"] = {"pairs": rank_eta_reference(os.path.join(DATA, "rank_eta.csv"))}
 
     # outliers.csv — medcouple and the skew-adjusted fences (stage 10d)
     expected["outliers"] = {"columns": outliers_reference(os.path.join(DATA, "outliers.csv"))}
