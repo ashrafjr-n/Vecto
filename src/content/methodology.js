@@ -29,13 +29,26 @@ export const PHASES = [
     title: "Column roles",
     lead: "Every column is assigned one of six roles — identifier, temporal, binary, numeric, categorical or free text — and the role alone decides how the column is treated downstream. Roles are inferred from the values, over the whole column, never from a head sample.",
     points: [
-      { label: "Identifiers first", text: "A column is an identifier when its name contains id, uuid, key, index or ref and more than 90% of values are distinct; when it is a gapless integer sequence starting at 0 or 1; or when its values carry leading zeros. Wider hints (zip, phone, account, ticket, serial…) count only alongside a shape signal — a constant width of five or more digits, or more than 99% uniqueness — so account_balance is never called an ID." },
+      { label: "Identifiers first", text: "A column is an identifier when its name contains id, uuid, key, index or ref and more than 90% of values are distinct; when its first 200 values form a gapless integer sequence starting at 0 or 1; or when those values carry leading zeros. Wider hints (zip, phone, account, ticket, serial…) count only alongside a shape signal — a constant width of five or more digits, or more than 99% uniqueness — so account_balance is never called an ID." },
       { label: "Dates", text: "At least 90% of the first 100 non-missing values must parse as one date family: ISO dates and datetimes, year-first or day/month-first numeric dates, or month names. Parsing is strict regex plus range checks, never Date.parse. Bare years and epoch timestamps have no date structure and stay numeric; a day/month column whose values contradict each other is rejected." },
       { label: "Binary", text: "Exactly two distinct levels, however written — 0/1, yes/no, M/F." },
       { label: "Numeric", text: "At least 80% of non-missing values are numbers. An all-integer column with four or fewer distinct values is read as an encoded category instead." },
       { label: "Free text", text: "Average length of at least 40 characters, a space in at least half the values, and more than 50 distinct values. All three must hold: length alone would call a URL free text, spacing alone would call a person's name free text." },
       { label: "String identifiers", text: "A non-numeric column that is more than 95% distinct across the whole column. This rule runs after the free-text rule, and declines to fire when the distinct count exceeds 20,000 rather than estimating a ratio it cannot measure." },
       { label: "Everything else", text: "Categorical. Values are normalised to one grouping key — trimmed, case-folded, numbers by parsed value — so \" Male \", \"MALE\" and \"male\" are one level, displayed with an original spelling." },
+    ],
+  },
+  {
+    id: "quality",
+    title: "Data quality",
+    lead: "Quality is measured before any statistic is computed, because every later number inherits its gaps. Problems are reported per column, with counts and examples, and folded into one weighted quality score.",
+    points: [
+      { label: "Missing values", text: "Empty cells and the tokens NA, N/A, NaN, null, none and ? — trimmed and case-insensitive — are missing, and are excluded from every downstream calculation, not merely counted." },
+      { label: "Mixed numeric columns", text: "A column that is more than 80% numbers is still analysed as numeric, but the values dropped to allow that are reported with their count and up to three real examples. \"125+\" is not silently read as 125." },
+      { label: "Possible codes", text: "A gapless run of 5 to 25 integers starting at 0 or 1 is flagged: from the values alone a count and an encoded category are indistinguishable, and if they are codes, the mean and histogram describe nothing. The engine names the ambiguity instead of guessing." },
+      { label: "Constant and near-unique columns", text: "A column with one distinct value is constant. A column more than 95% distinct that is not already an identifier, date or free text is flagged as likely an ID." },
+      { label: "Duplicate rows", text: "Counted on datasets of up to 50,000 rows. Above that the scan is skipped and reported as not measured — never shown as zero." },
+      { label: "Quality score", text: "A weighted sum: missing values 45%, duplicates 25%, constant columns 15%, identifier columns 15%. When duplicates were not measured their weight is redistributed (60 / 20 / 20) rather than scored as clean. The missing-value component charges overall emptiness, the single worst column, and every column more than 20% empty." },
     ],
   },
 ];
