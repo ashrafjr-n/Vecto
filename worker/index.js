@@ -10,6 +10,8 @@
 
 import { DOSSIER_SCHEMA, DOSSIER_MAX_COLUMNS } from "../src/lib/ai/dossierSchema.js";
 import { dossierMessages } from "./dossierPrompt.js";
+import { LEAKAGE_SCHEMA, LEAKAGE_MAX_COLUMNS } from "../src/lib/ai/leakageSchema.js";
+import { leakageMessages } from "./leakagePrompt.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BODY_CHARS = 256_000;
@@ -45,6 +47,21 @@ const TASKS = {
       && (payload.allColumnNames === undefined
           || (Array.isArray(payload.allColumnNames) && payload.allColumnNames.every((n) => typeof n === "string"))),
     messages: dossierMessages,
+  },
+
+  /* Phase C — semantic leakage and split advice, after the analysis. Built by
+     buildLeakagePayload() (no cell values) and checked by verifyLeakage(), which
+     evaluates every proposed formula on the rows before it is shown. The answer
+     lists only flagged columns, so it stays short on a wide file. */
+  leakage: {
+    maxTokens: 6000,
+    schema: LEAKAGE_SCHEMA,
+    validate: (payload) =>
+      typeof payload?.target?.name === "string"
+      && Array.isArray(payload.columns)
+      && payload.columns.length <= LEAKAGE_MAX_COLUMNS
+      && payload.columns.every((c) => typeof c?.name === "string"),
+    messages: leakageMessages,
   },
 };
 
