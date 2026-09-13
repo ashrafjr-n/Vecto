@@ -1,26 +1,33 @@
 import { NavLink, useNavigate } from "react-router-dom";
 
 /* Fixed, full-width, edge-to-edge — NOT floating/pill-shaped. See frontend.md
-   "Header" spec. Shared by every page (Home + the whole /analyze flow). */
+   "Header" spec. Shared by every page (Home + Methodology + the /analyze flow).
+
+   The bar wears the PANEL surface, not the canvas: every page opens on a
+   paper-sunken hero, so the header reads as the top edge of that panel rather
+   than a darker strip laid over it. Side padding matches the pages' own
+   (px-6 / sm:px-10), so the logo sits on the same left edge as the content. */
 function Header() {
   const navigate = useNavigate();
 
   return (
-    <header className="fixed top-0 left-0 z-50 w-full h-16 bg-paper/90 backdrop-blur border-b border-line">
-      <div className="mx-auto flex h-full max-w-[1400px] items-center justify-between px-6 sm:px-12">
+    <header className="fixed top-0 left-0 z-50 h-16 w-full border-b border-line bg-paper-sunken/85 backdrop-blur">
+      <div className="mx-auto flex h-full max-w-[1400px] items-center justify-between px-6 sm:px-10">
 
-        <button
-          type="button"
-          onClick={() => { window.scrollTo(0, 0); navigate("/"); }}
-          aria-label="Vecto home"
-          className="flex items-center"
-        >
-          {/* Wordmark, not a symbol — it carries the name, so no text sits beside it.
-              White artwork: legible only because every page renders in `.night`. */}
-          <img src="/vecto-logo.png" alt="Vecto" width={538} height={238} className="h-8 w-auto" />
-        </button>
+        <nav aria-label="Primary" className="flex items-center gap-5 sm:gap-8">
+          <button
+            type="button"
+            onClick={() => { window.scrollTo(0, 0); navigate("/"); }}
+            aria-label="Vecto home"
+            className="flex items-center"
+          >
+            {/* Wordmark, not a symbol — it carries the name, so no text sits beside it.
+                White artwork: legible only because every page renders in `.night`. */}
+            <img src="/vecto-logo.png" alt="Vecto" width={538} height={238} className="h-10 w-auto" />
+          </button>
 
-        <div className="flex items-center gap-6 sm:gap-8">
+          <span aria-hidden="true" className="h-5 w-px bg-line-strong" />
+
           {/* scrollTo in the handler: BrowserRouter keeps the previous page's
               scroll position, which would open a long page halfway down. */}
           <NavLink
@@ -33,14 +40,16 @@ function Header() {
           >
             Methodology
           </NavLink>
+        </nav>
 
-          <button
-            type="button"
-            className="inline-flex items-center rounded-md border border-gold bg-transparent px-4 py-2 text-[13px] font-semibold text-gold-ink transition-colors hover:bg-gold-tint"
-          >
-            Start for Free
-          </button>
-        </div>
+        {/* Placeholder — no auth is wired yet. Same ink-on-light treatment as the
+            page CTAs, so the one action in the bar matches every other action. */}
+        <button
+          type="button"
+          className="rounded-lg bg-ink px-4 py-2 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
+        >
+          Log in
+        </button>
 
       </div>
     </header>
