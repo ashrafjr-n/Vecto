@@ -133,8 +133,10 @@ npx wrangler dev                                   # terminal 1, reads .dev.vars
 node --max-old-space-size=8192 tools/ai-eval.mjs   # [--only=titanic] [--fresh] [--rescore]
 ```
 
-One request per file; a rate-limit response stops the run and finished files stay cached.
-`--rescore` makes no requests.
+One request per file, or one per 25 columns for a wider file (the same parts the page sends);
+a rate-limit response stops the run and finished files stay cached. The cache is keyed on the
+payload and on `worker/dossierPrompt.js`, so a prompt change re-asks every file. `--rescore`
+makes no requests.
 
 ## Tests
 
@@ -168,8 +170,8 @@ This runs six files:
   scripted `fetch`: request validation, that client-sent prompts are ignored, the
   rate-limit response, and the single repair round for invalid JSON. No key or network.
 - **`tests/ai-dossier.test.mjs`** — what the column dossier sends (no rows, no free-text
-  values, bounded examples, deterministic) and how a model's answer is verified against the
-  data before it is shown.
+  values, bounded examples, deterministic), how a wide file is split into parts and merged,
+  and how a model's answer is verified against the data before it is shown.
 - **`tests/ai-eval-score.test.mjs`** — the eval's scoring rule on a hand-built dossier.
 
 Run `npm test` after any change under `src/components/utils/core/`.
@@ -209,6 +211,8 @@ src/
       helpers.js              shared numeric utilities
 tests/                        engine regression suite, output-shape contract, Worker tests
 worker/index.js               Cloudflare Worker entry: POST /api/ai (OpenRouter proxy)
+worker/dossierPrompt.js       the column-dossier prompt
+tools/ai-eval.mjs, ai-eval/   dossier eval over the test corpus, known answers, scoring
 wrangler.jsonc                Worker + static-assets config, AI model list
 ```
 
