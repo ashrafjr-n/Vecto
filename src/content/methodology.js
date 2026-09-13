@@ -88,4 +88,27 @@ export const PHASES = [
       { label: "Coverage", text: "A coefficient measured on under half the rows is badged as such, and the strongest broadly-measured feature is named beside it, so a perfect score on 0.3% of the data is not read as the headline." },
     ],
   },
+  {
+    id: "class-balance",
+    title: "Class balance",
+    lead: "The problem type follows the target's role: a numeric target is regression, a binary or categorical one is classification, a date is forecasting. For a classification target the distribution of classes is measured directly.",
+    points: [
+      { label: "Classes", text: "Levels are grouped by the same normalised key as everywhere else, and percentages are taken over all rows, with missing target values shown as their own row so the shares add up." },
+      { label: "Imbalance", text: "A target is imbalanced when the majority class is more than three times the minority, or holds more than 80% of rows. The ratio catches multi-class skew — 60 / 20 / 20 — that a majority threshold alone would pass." },
+      { label: "Absolute counts", text: "The smallest class is named with its row count. Under ten rows is called critically few regardless of what the percentage looks like." },
+      { label: "Identifier as target", text: "A target that is unique per row is an identifier, not a label, and holds the health score to 40. Cardinality cannot detect this — a continuous price is also one value per row — so the identifier rules from the role stage decide it." },
+    ],
+  },
+  {
+    id: "scoring",
+    title: "Health score and recommendations",
+    lead: "The health score is a summary, not a verdict: four weighted dimensions, then caps that can only lower it, each carrying the reason it applied. Recommendations turn findings into actions and state why each one was made.",
+    points: [
+      { label: "Dimensions", text: "Quality (the score from the quality stage), structure (row count, column count, a mix of numeric and categorical features), relationships (redundant pairs, strength of the strongest target association) and target readiness (no leakage suspects, target completeness, class balance). Weighted 30 / 20 / 20 / 30 with a target, 40 / 30 / 30 without one." },
+      { label: "Evidence caps", text: "Under 10 rows holds the score to 25, under 50 to 50, under 200 to 75. A worst column that is 50% or more empty imposes a ceiling that slides with severity — 89 at 50%, 60 at 90%, 45 at 100% — so datasets with unlike problems do not collapse onto one number." },
+      { label: "Grades", text: "90 and above Excellent, 75 Good, 60 Fair, 40 Poor, below that Critical." },
+      { label: "Role-aware advice", text: "Each recommendation is tied to what the column is: a date is never offered mean imputation, a near-unique column is not told to group rare levels into \"Other\", a count is not given the transform meant for a long continuous tail, and a mostly-empty column is weighed as a presence indicator before it is dropped." },
+      { label: "Categories and priority", text: "Actions are tagged Data Cleaning, Feature Selection, Feature Engineering, Modeling or Data Integrity, prioritised high, medium or low, and every one carries its rationale." },
+    ],
+  },
 ];
