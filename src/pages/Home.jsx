@@ -351,7 +351,7 @@ function Home() {
               {/* Before / after as one recessed specimen. Hairline rows and a large mono
                   figure — the hero's stat grammar — instead of icon badges in a card
                   nested inside a card. Static illustration, not live data. */}
-              <div className="mt-12 grid overflow-hidden rounded-[2rem] border border-line bg-paper lg:grid-cols-[minmax(0,5fr)_auto_minmax(0,7fr)]">
+              <div className="mt-12 grid divide-y divide-line overflow-hidden rounded-[2rem] border border-line bg-paper lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:divide-x lg:divide-y-0">
 
                 <div className="p-8 sm:p-10">
                   <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">Input</div>
@@ -364,10 +364,6 @@ function Home() {
                       </div>
                     ))}
                   </dl>
-                </div>
-
-                <div className="flex items-center justify-center border-y border-line py-4 lg:border-x lg:border-y-0 lg:px-6 lg:py-0">
-                  <ArrowRight size={18} className="rotate-90 text-ink-faint lg:rotate-0" />
                 </div>
 
                 <div className="p-8 sm:p-10">
