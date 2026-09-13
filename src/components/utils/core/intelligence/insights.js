@@ -1,5 +1,14 @@
+import { columnDecisions } from "./recommendations.js";
+
 export function getPriorityInsights({ meta, quality, statistics, relationships, classBalance }) {
   const insights = [];
+
+  /* The cards follow the same per-column decisions as the recommendations — see
+     columnDecisions(). A card about a column the advice already dropped, replaced
+     or sent to a leakage check contradicts the list beside it. */
+  const { dropped, leaking, notKept } = columnDecisions({ meta, quality, relationships });
+  const kept     = col => !notKept.has(col) && col !== meta.target;
+  const bothKept = (a, b) => kept(a) && kept(b);
 
   const push = (severity, title, text, score) => {
     insights.push({ severity, title, text, priorityScore: score });
@@ -43,7 +52,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
       const pct   = rawP2 < 1 && rawP2 > 0
         ? Math.max(0.1, Math.round(rawP2 * 10) / 10)
         : Math.round(rawP2);
-      if (pct > 50) {
+      if (pct > 50 && !leaking.has(c.col) && !dropped.has(c.col)) {
         push("critical",
           `Critical Missing Values in "${c.col}"`,
           `${pct}% of values in "${c.col}" are missing. This column may not be usable.`,
@@ -85,7 +94,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
     .filter(c => c.issue === "missing")
     .forEach(c => {
       const pct = Math.round(((c.count ?? parseInt(c.detail)) / meta.rows) * 100);
-      if (pct > 5 && pct <= 50) {
+      if (pct > 5 && pct <= 50 && !notKept.has(c.col)) {
         push("warning",
           `Missing Values in "${c.col}"`,
           c.col === meta.target
@@ -97,13 +106,14 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
     });
 
   // Multicollinearity
-  if (relationships.multicollinearPairs.length > 0) {
-    const pairs = relationships.multicollinearPairs.slice(0, 2)
+  const keptPairs = relationships.multicollinearPairs.filter(p => bothKept(p.col1, p.col2));
+  if (keptPairs.length > 0) {
+    const pairs = keptPairs.slice(0, 2)
       .map(p => `"${p.col1}" ↔ "${p.col2}"`)
       .join(", ");
     push("warning",
       "Highly Correlated Features",
-      `${relationships.multicollinearPairs.length} pair${relationships.multicollinearPairs.length > 1 ? "s" : ""} of nearly identical features: ${pairs}. Consider dropping one from each pair.`,
+      `${keptPairs.length} pair${keptPairs.length > 1 ? "s" : ""} of nearly identical features: ${pairs}. Consider dropping one from each pair.`,
       75
     );
   }
@@ -126,7 +136,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
 
   // Outliers in features
   const colsWithOutliers = statistics
-    .filter(s => !s.empty && s.outlierCount > 0)
+    .filter(s => !s.empty && s.outlierCount > 0 && kept(s.col))
     .sort((a, b) => b.outlierCount - a.outlierCount)
     .slice(0, 2);
 
@@ -142,7 +152,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   }
 
   // High cardinality
-  const hiCard = quality.columnsWithIssues.filter(c => c.issue === "high_cardinality");
+  const hiCard = quality.columnsWithIssues.filter(c => c.issue === "high_cardinality" && kept(c.col));
   if (hiCard.length > 0) {
     push("warning",
       "High Cardinality Columns",
@@ -152,7 +162,8 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   }
 
   // Constant columns
-  const constCols = quality.columnsWithIssues.filter(c => c.issue === "constant" && c.col !== meta.target);
+  // Only the constants the advice removes: a constant with gaps is kept as its presence indicator.
+  const constCols = quality.columnsWithIssues.filter(c => c.issue === "constant" && dropped.has(c.col) && !leaking.has(c.col));
   if (constCols.length > 0) {
     push("warning",
       "Constant Columns",
@@ -193,7 +204,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
 
   // Strong correlations between features (non-critical)
   const strongNonMC = relationships.strongRelationships
-    .filter(r => Math.abs(r.correlation) >= 0.7 && Math.abs(r.correlation) < 0.9)
+    .filter(r => Math.abs(r.correlation) >= 0.7 && Math.abs(r.correlation) < 0.9 && bothKept(r.col1, r.col2))
     .slice(0, 2);
 
   if (strongNonMC.length > 0) {
@@ -289,7 +300,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   // SHAPE signal, distinct from the outlier-count warning; info@46 so Outliers leads when both
   // fire. Constant / n<4 columns auto-excluded (kurtosis returns 0). Composite: top-3 desc.
   const heavyTailed = statistics
-    .filter(s => !s.empty && typeof s.kurtosis === "number" && s.kurtosis > 3)
+    .filter(s => !s.empty && typeof s.kurtosis === "number" && s.kurtosis > 3 && kept(s.col))
     .sort((a, b) => b.kurtosis - a.kurtosis)
     .slice(0, 3);
   if (heavyTailed.length > 0) {
@@ -327,6 +338,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   }
 
   // No multicollinearity
+  // A statement about the data, not the advice: any near-perfect pair at all falsifies it.
   if (relationships.multicollinearPairs.length === 0 && relationships.cols.length >= 2) {
     push("success",
       "No Highly Correlated Pairs",
