@@ -18,9 +18,9 @@ import { analyzeDataset } from "../components/utils/core/index.js";
 /* Direct call, errors returned rather than thrown. The results-step call site is
    asynchronous and ErrorBoundary only catches errors thrown during render, so a
    throw escaping here leaves a spinner turning forever with no message. */
-export function runAnalysisSync(data, columns, target, onPhase) {
+export function runAnalysisSync(data, columns, target, onPhase, roleOverrides) {
   try {
-    return { result: analyzeDataset(data, columns, target, onPhase), error: null };
+    return { result: analyzeDataset(data, columns, target, onPhase, roleOverrides), error: null };
   } catch (err) {
     console.error("analyzeDataset() failed:", err);
     return { result: null, error: err?.message ?? "Unknown error" };
@@ -40,14 +40,17 @@ export function runAnalysisSync(data, columns, target, onPhase) {
    `signal` (an AbortSignal) cancels a running analysis: the worker is
    terminated and the promise settles with `aborted: true` and no error. The
    synchronous fallback cannot be cancelled — it owns the main thread, so
-   nothing could deliver the abort until it had already finished. */
-export function runAnalysis(data, columns, target, onPhase, signal) {
+   nothing could deliver the abort until it had already finished.
+
+   `roleOverrides` ({ column: ROLE }) are the user's accepted role decisions,
+   passed straight through to analyzeDataset(). */
+export function runAnalysis(data, columns, target, onPhase, signal, roleOverrides) {
   return new Promise((resolve) => {
     let worker;
     try {
       worker = new Worker(new URL("./analysisWorker.js", import.meta.url), { type: "module" });
     } catch {
-      resolve(runAnalysisSync(data, columns, target, onPhase));
+      resolve(runAnalysisSync(data, columns, target, onPhase, roleOverrides));
       return;
     }
 
@@ -69,13 +72,13 @@ export function runAnalysis(data, columns, target, onPhase, signal) {
     };
     // The fallback still reports its phases — on the main thread, so the screen
     // will not repaint between them, but the caller's contract does not change.
-    worker.onerror   = () => finish(runAnalysisSync(data, columns, target, onPhase));
+    worker.onerror   = () => finish(runAnalysisSync(data, columns, target, onPhase, roleOverrides));
 
     try {
-      worker.postMessage({ data, columns, target });
+      worker.postMessage({ data, columns, target, roleOverrides });
     } catch {
       // Structured clone can refuse a value the engine would have accepted.
-      finish(runAnalysisSync(data, columns, target, onPhase));
+      finish(runAnalysisSync(data, columns, target, onPhase, roleOverrides));
     }
   });
 }
