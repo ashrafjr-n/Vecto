@@ -132,7 +132,8 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
        over timestamps or sentences measures how unique they are. Every column is
        recorded with that reason rather than scored with a number that looks real. */
     const unscorableTarget =
-        targetRole === ROLE.TEMPORAL ? `"${target}" is a date — no association statistic here applies to a raw timestamp target; derive the quantity to predict (a duration, a month, a flag) and pick that as the target.`
+        levelsOf(target).length < 2  ? `"${target}" holds a single value on every row that has one — there is nothing varying to associate any column with. Pick a target that varies.`
+      : targetRole === ROLE.TEMPORAL ? `"${target}" is a date — no association statistic here applies to a raw timestamp target; derive the quantity to predict (a duration, a month, a flag) and pick that as the target.`
       : targetRole === ROLE.TEXT     ? `"${target}" is free text — no association statistic here applies to sentences as a target.`
       : null;
 

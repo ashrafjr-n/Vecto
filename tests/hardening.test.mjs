@@ -146,8 +146,10 @@ const idRows = Array.from({ length: 2000 }, (_, i) => ({ pid: String(i), v: Stri
 check("a fully-unique identifier chosen as target does not crash",
   survives(() => analyzeDataset(idRows, ["pid", "v"], "pid")));
 
+/* Text ids: a numeric target is regression and has no classes at all (10b). */
+const idTextRows = idRows.map(r => ({ ...r, pid: `p${r.pid}` }));
 check("a target with thousands of distinct classes still returns finite class balance",
-  (() => { const r = analyzeDataset(idRows, ["pid", "v"], "pid");
+  (() => { const r = analyzeDataset(idTextRows, ["pid", "v"], "pid");
            return r.classBalance.classes.length > 1000
              && r.classBalance.classes.every(c => Number.isFinite(c.pct)); })());
 
