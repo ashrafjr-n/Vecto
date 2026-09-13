@@ -141,3 +141,14 @@ export const PRINCIPLES = [
     text: "Parsing and analysis run in this browser tab, in a background worker. Nothing is uploaded, and sampling is deterministic, so the same file and target always produce the same report.",
   },
 ];
+
+/* What the engine does not decide. Stated for the reader who will otherwise find
+   each one the hard way. */
+export const LIMITS = [
+  { title: "Meaning", text: "The engine sees values, not semantics. It cannot know that a column is a post-outcome field, or that an outlier is a data-entry error rather than a real event." },
+  { title: "Codes versus counts", text: "Integer columns with 5 to 25 levels stay numeric and are flagged; only you know whether they are codes." },
+  { title: "Dates", text: "Detected from the first 100 non-missing values. Epoch timestamps, compact YYYYMMDD, week, quarter and time-only formats are not recognised." },
+  { title: "Scale", text: "Files up to 40MB. Duplicate rows are counted up to 50,000 rows, the correlation matrix holds 40 numeric columns and categorical pairing 25 columns, and mutual information is estimated on a 20,000-row sample." },
+  { title: "Spearman in the matrix", text: "Ranks are computed once per column, so where columns have different missing rows, ρ can differ slightly from a pairwise scipy.stats.spearmanr. Spearman against the target is computed exactly on each pair." },
+  { title: "Multicollinearity", text: "Redundancy is pairwise correlation. A column that is a linear combination of three others will not be caught by it." },
+];
