@@ -75,4 +75,17 @@ export const PHASES = [
       { label: "Scan limits", text: "Up to 40 numeric columns enter the matrix; above that the 40 with the most distinct values are kept and the rest are listed as excluded. Up to 25 categorical columns are paired. Identifier, date and free-text columns are left out, each with the reason stated." },
     ],
   },
+  {
+    id: "target-signal",
+    title: "Target signal and leakage",
+    lead: "Each feature is measured against the target with the statistic its pair of types allows, and every coefficient is published with its p-value and the number of rows behind it. Results are grouped per metric and never merged into one ranking: Pearson, Cramér's V and η share a 0–1 scale without meaning the same thing.",
+    points: [
+      { label: "Metric by type", text: "Numeric feature against a numeric or binary target: Pearson (point-biserial on a 0/1 target) with Spearman beside it. Categorical feature: bias-corrected Cramér's V. Numeric feature against a multi-class target: the correlation ratio η, with a p-value from its equivalent one-way ANOVA F-test. Binary levels are sorted before 0/1 encoding, so the sign of r never depends on row order." },
+      { label: "Non-monotonic signal", text: "When both |r| and |ρ| are under 0.3, normalised mutual information is estimated with the Miller–Madow correction, on eight quantile bins and a deterministic 20,000-row sample. A feature the correlations call noise but that scores MI ≥ 0.15 is reported as a real, non-monotonic relationship." },
+      { label: "Nothing leaves silently", text: "A column that cannot be scored is listed with its reason. A constant feature, or a target that never varies across the feature's rows, is unmeasurable — not a correlation of zero, which would claim a relationship was tested and absent." },
+      { label: "Presence as signal", text: "For columns with missing values, whether the value was recorded at all is tested against the target. With at least 20 rows on each side and Cramér's V ≥ 0.3, the report proposes a presence indicator and quotes the measured V." },
+      { label: "Leakage", text: "A feature is a leakage suspect at |r| ≥ 0.95 or Cramér's V ≥ 0.95 against the target — after the corrections above, both mean near-determinism. A presence indicator at V ≥ 0.95 is flagged the same way. η is deliberately excluded: η near 1 also occurs for genuinely strong categorical predictors." },
+      { label: "Coverage", text: "A coefficient measured on under half the rows is badged as such, and the strongest broadly-measured feature is named beside it, so a perfect score on 0.3% of the data is not read as the headline." },
+    ],
+  },
 ];
