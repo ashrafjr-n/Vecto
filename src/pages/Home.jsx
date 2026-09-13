@@ -37,7 +37,7 @@ const ERRORS = {
 const DIAGNOSTICS = [
   { value: "10+", label: "Diagnostics computed" },
   { value: "6",   label: "Report sections" },
-  { value: "0",   label: "Bytes sent to a server" },
+  { value: "0",   label: "Rows uploaded" },
 ];
 
 /* Grounded, checkable claims — not marketing adjectives. Every one of these is
@@ -178,8 +178,9 @@ function Home() {
                 class-balance diagnostics, and a weighted health score.
               </p>
               <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                No file is uploaded to a server — parsing and analysis run locally, in
-                this tab. The report is a statistical document, not a dashboard: every
+                No file is uploaded — parsing and analysis run locally, in this tab. An
+                optional AI assistant sends a column summary, only when you ask and only
+                after you can inspect it. The report is a statistical document, not a dashboard: every
                 number arrives with the reasoning behind it, and every score that was
                 held back says which piece of evidence held it.
               </p>
