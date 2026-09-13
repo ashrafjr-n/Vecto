@@ -19,3 +19,6 @@ vecto-docs.md
 reports/
 # Test datasets — large third-party CSVs, never part of the repo
 forTesting/
+
+# Local knowledge vault (Obsidian) — notes about the project, not part of the app
+vecto-brain/
