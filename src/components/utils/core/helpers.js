@@ -651,6 +651,18 @@ export function spearman(data, colA, colB) {
   return { rho: spearmanOf(xs, ys), n: xs.length };
 }
 
+/* A share of rows for display. Whole numbers normally, one decimal at the ends,
+   and NEVER 0 or 100 unless it is exactly that: openpowerlifting's "Squat4Kg" holds
+   1,243 real values out of 386,414, and "100% missing" tells the reader to delete
+   a column that is not empty. health.js established the rule; the recommendations
+   and cards rounded on their own and broke it. Returns a number. */
+export function sharePct(count, total) {
+  const raw = total > 0 ? (count / total) * 100 : 0;
+  if (raw > 0 && raw < 1)    return Math.max(0.1, Math.round(raw * 10) / 10);
+  if (raw > 99 && raw < 100) return Math.min(99.9, Math.floor(raw * 10) / 10);
+  return Math.round(raw);
+}
+
 /* The words of a column name: "MeetID" → ["meet", "id"], "price_range" →
    ["price", "range"], "Price (in rupees)" → ["price", "in", "rupees"]. A regex
    word boundary cannot split camelCase — "meetid" has none before "id". */
