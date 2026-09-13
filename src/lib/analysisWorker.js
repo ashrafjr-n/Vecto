@@ -12,12 +12,12 @@
 import { analyzeDataset } from "../components/utils/core/index.js";
 
 self.onmessage = (event) => {
-  const { data, columns, target } = event.data ?? {};
+  const { data, columns, target, roleOverrides } = event.data ?? {};
   try {
     /* Phase messages are tagged so runAnalysis() can tell an update from the
        answer. The final message carries `result`/`error` and nothing else does. */
     const onPhase = (phase) => self.postMessage({ type: "phase", phase });
-    self.postMessage({ result: analyzeDataset(data, columns, target, onPhase), error: null });
+    self.postMessage({ result: analyzeDataset(data, columns, target, onPhase, roleOverrides), error: null });
   } catch (err) {
     // Errors are RETURNED, not thrown. A throw here would surface as a bare
     // worker error event with no message, which is how the old synchronous path
