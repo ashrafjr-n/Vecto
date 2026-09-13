@@ -261,7 +261,7 @@ function Home() {
 
             <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                Upload a CSV and select a target column. Datassert returns column-role
+                Upload a CSV and select a target column. Vecto returns column-role
                 detection, missing-value and duplicate analysis, per-column statistics,
                 a correlation matrix with multicollinearity and target-leakage checks,
                 class-balance diagnostics, and a weighted health score.
