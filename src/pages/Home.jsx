@@ -127,50 +127,6 @@ const TRUST_POINTS = [
 
 const index2 = (i) => String(i + 1).padStart(2, "0");
 
-/* Exactly one topic open at all times (never collapses to nothing) — clicking a
-   row switches which one is open rather than toggling it closed. */
-function ProcessTopics() {
-  const [open, setOpen] = useState(0);
-  return (
-    <div className="mt-10 border-t border-line">
-      {PROCESS_TOPICS.map((topic, i) => {
-        const isOpen = open === i;
-        return (
-          <div key={topic.title} className="border-b border-line">
-            <button
-              type="button"
-              onClick={() => setOpen(i)}
-              className="flex w-full items-center gap-5 py-5 text-left transition-colors sm:gap-8"
-            >
-              <span className="font-mono text-[11px] text-ink-faint">{index2(i)}</span>
-              <span className={`flex-1 text-[17px] tracking-tight transition-colors sm:text-xl ${isOpen ? "text-ink" : "text-ink-soft"}`}>
-                {topic.title}
-              </span>
-              <ChevronDown size={16} className={`shrink-0 text-ink-faint transition-transform ${isOpen ? "rotate-180" : ""}`} />
-            </button>
-            <AnimatePresence initial={false}>
-              {isOpen && (
-                <motion.div
-                  key="content"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <p className="max-w-3xl pb-7 text-[14px] leading-[1.75] text-ink-soft sm:pl-[54px]">
-                    {topic.text}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function Home() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
