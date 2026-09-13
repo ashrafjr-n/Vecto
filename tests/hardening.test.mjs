@@ -1101,5 +1101,56 @@ check("a per-row-unique text target is an identifier, not a 300-class problem",
   nameRes.meta.targetIsIdentifier
   && !nameRes.recommendations.some(r => r.column === "who" && /Group rare/i.test(r.action)));
 
+/* ══════════════════════════════════════════
+   STAGE 10c — advice that does not contradict itself
+══════════════════════════════════════════ */
+console.log("\nCONSISTENT ADVICE — one decision per column\n");
+
+/* presRows: "amt" is present only where y = "yes" — a presence leak at V = 1. */
+const leakAdvice = analyzeDataset(presRows, ["amt", "keep", "y"], "y");
+const amtRecs = leakAdvice.recommendations.filter(r => r.column === "amt");
+check("a presence leak is labelled with its own statistic, not r",
+  amtRecs.some(r => /presence = 1\.00/.test(r.issue)) && !amtRecs.some(r => /\(r = /.test(r.issue)));
+check("a leaking column is not also advised to be built into an indicator or imputed",
+  amtRecs.length === 1 && amtRecs[0].category === "Data Integrity");
+check("the observations do not tell the reader to build the leaking indicator",
+  !leakAdvice.relationships.observations.some(o => /build "amt_present" rather than/.test(o)));
+
+/* An empty column has no presence to encode — the indicator would be constant. */
+const emptyRows = Array.from({ length: 200 }, (_, i) => ({ blank: "", f: String(i % 7), y: i % 2 ? "a" : "b" }));
+const blankRecs = analyzeDataset(emptyRows, ["blank", "f", "y"], "y").recommendations.filter(r => r.column === "blank");
+check("an empty column is dropped, not turned into a presence indicator",
+  blankRecs.length === 1 && /no values at all/.test(blankRecs[0].action));
+
+/* V is symmetric, dependency is not: 60 fine levels each map to one of 3 coarse
+   ones. "Keep one of the two" would lose the fine column's detail. */
+const dirRows = Array.from({ length: 1200 }, (_, i) => ({
+  fine: `s${i % 60}`, coarse: `c${(i % 60) % 3}`, y: String((i * 7919) % 13),
+}));
+const dirRecs = analyzeDataset(dirRows, ["fine", "coarse", "y"], "y").recommendations;
+check("an uneven categorical dependency names its direction instead of 'keep one of'",
+  dirRecs.some(r => r.column === "fine" && /largely determines/.test(r.issue))
+  && !dirRecs.some(r => /Keep one of/.test(r.action)));
+
+/* Three columns with a few missing cells each: one item, not three. */
+const lightRows = Array.from({ length: 400 }, (_, i) => ({
+  a: i % 50 === 0 ? "" : String(i % 11), b: i % 40 === 0 ? "" : String(i % 13),
+  c: i % 60 === 0 ? "" : ["x", "z", "w"][i % 3], y: i % 2 ? "p" : "q",
+}));
+const lightRecs = analyzeDataset(lightRows, ["a", "b", "c", "y"], "y").recommendations
+  .filter(r => /missing/i.test(r.issue));
+check("lightly-missing columns are grouped into one recommendation",
+  lightRecs.length === 1 && lightRecs[0].issue.includes("3 columns"));
+
+/* Pair advice about columns the report already replaces is a contradiction. */
+const pairRows = Array.from({ length: 400 }, (_, i) => {
+  const v = i % 5 === 0 ? String(i) : "";
+  return { p1: v, p2: v === "" ? "" : String(Number(v) * 2 + 1), f: String(i % 9), y: i % 2 ? "p" : "q" };
+});
+const pairRecs = analyzeDataset(pairRows, ["p1", "p2", "f", "y"], "y").recommendations;
+check("columns replaced by presence indicators get no pair advice",
+  pairRecs.some(r => r.column === "p1" && /_present/.test(r.action))
+  && !pairRecs.some(r => /"p1" ↔ "p2"|"p1" or "p2"/.test(r.issue + r.action)));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
