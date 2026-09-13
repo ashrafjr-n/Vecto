@@ -420,6 +420,36 @@ export function etaAdjusted(eta, n, k) {
   return Math.sqrt(Math.max(0, e2));
 }
 
+/* Rank-based η: Kruskal-Wallis H and its bias-corrected effect size, the measure
+   the target scan reports for numeric ↔ categorical pairs.
+
+   Plain η is a ratio of variances, so ONE extreme value decides it. Measured on
+   house_prices.csv, where a single 6.7M price sits among values near 6,000: it
+   swamps the total variance and pushed η to 1.00 for the column that isolates
+   that row (Society) and down to 0.11 for location, whose rank-based η is 0.65.
+   Ranks bound each row's influence, so neither direction survives.
+
+   H with scipy's tie correction is exactly (n - 1) · SS_between / SS_total over
+   the average ranks, which is how it is computed here. The effect size is
+   η²_H = (H - k + 1) / (n - k) (Tomczak & Tomczak 2014): H has expectation k - 1
+   under independence, so subtracting it is the same df correction etaAdjusted
+   applied — a feature with 150 levels of noise scores 0, not 0.45. Reported as
+   sqrt(max(0, η²_H)) so it stays on η's 0-1 scale. Validated against
+   scipy.stats.kruskal in phase0.test.mjs. Returns null when nothing is testable. */
+export function rankEta(values, labels) {
+  const n = values.length;
+  const k = new Set(labels).size;
+  if (n < 3 || k < 2 || n <= k) return null;
+  const ranks = rankValues(values);
+  const H = (n - 1) * etaCorrelation(ranks, labels) ** 2;
+  return {
+    H,
+    pValue: chiSquarePValue(H, k - 1),
+    value:  Math.sqrt(Math.max(0, (H - k + 1) / (n - k))),
+    n, k,
+  };
+}
+
 /* Bergsma-corrected Cramer's V for two aligned label arrays, with the
    chi-square tail. Same estimator relations.js uses against the target — pulled
    out here so feature-to-feature categorical pairs get the identical treatment
