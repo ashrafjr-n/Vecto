@@ -1,7 +1,7 @@
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
-import { METHODOLOGY_INTRO, PHASES } from "../content/methodology.js";
+import { METHODOLOGY_INTRO, PHASES, PRINCIPLES } from "../content/methodology.js";
 
 const index2 = (i) => String(i + 1).padStart(2, "0");
 
@@ -92,6 +92,22 @@ function Methodology() {
                   </dl>
                 </article>
               ))}
+            </div>
+
+            <div className="mt-24 sm:mt-32">
+              <SectionLabel mark="03">Trustworthy by construction</SectionLabel>
+              <h2 className="mt-10 max-w-[20ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
+                Why the numbers can be checked, not just believed.
+              </h2>
+              <div className="mt-12 grid gap-x-14 gap-y-12 border-t border-line pt-12 sm:grid-cols-2 lg:grid-cols-3">
+                {PRINCIPLES.map((principle, i) => (
+                  <div key={principle.title}>
+                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
+                    <h3 className="mt-4 text-[17px] font-medium leading-snug tracking-tight text-ink">{principle.title}</h3>
+                    <p className="mt-3 text-[13.5px] leading-[1.75] text-ink-soft">{principle.text}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
           </div>
