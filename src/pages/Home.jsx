@@ -309,25 +309,28 @@ function Home() {
               </Link>
             </div>
 
-            {/* Full width now that it no longer shares the row: the headline holds the
-                left column and the list the right, so neither half sits beside a gap. */}
+            {/* Headline and lead share the top row so neither half is empty; the six
+                layers sit below as an even 3 × 2 grid, each cell opened by its own
+                hairline — the stats row's grammar, not a list crowded into one column. */}
             <div className="mt-24 sm:mt-32">
               <SectionLabel mark="04">Six diagnostic layers</SectionLabel>
-              <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
+              <div className="mt-10 grid gap-x-16 gap-y-6 lg:grid-cols-2 lg:items-end">
                 <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
                   One dataset, read six ways.
                 </h2>
-                <div className="border-t border-line">
-                  {DIAGNOSTIC_LAYERS.map((layer, i) => (
-                    <div key={layer.title} className="flex items-baseline gap-5 border-b border-line py-5 sm:gap-8">
-                      <span className="font-mono text-[11px] text-ink-faint">{index2(i)}</span>
-                      <div>
-                        <div className="text-[15px] font-medium tracking-tight text-ink">{layer.title}</div>
-                        <p className="mt-1.5 text-[13.5px] leading-[1.7] text-ink-soft">{layer.text}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <p className="max-w-xl text-[15px] leading-[1.7] text-ink-soft">
+                  Each layer is a section of the report, computed from the same parse of the
+                  file — so a column flagged in one layer is the same column everywhere else.
+                </p>
+              </div>
+              <div className="mt-14 grid gap-x-12 sm:grid-cols-2 lg:grid-cols-3">
+                {DIAGNOSTIC_LAYERS.map((layer, i) => (
+                  <div key={layer.title} className="border-t border-line pt-6 pb-10">
+                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
+                    <div className="mt-4 text-[17px] font-medium tracking-tight text-ink">{layer.title}</div>
+                    <p className="mt-2 max-w-sm text-[13.5px] leading-[1.7] text-ink-soft">{layer.text}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
