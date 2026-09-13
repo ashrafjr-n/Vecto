@@ -82,6 +82,12 @@ out = await res.json();
 check("a truncated answer is 502 truncated with no repair round", res.status === 502 && out.error === "truncated" && sent.length === 1);
 check("reasoning is switched off in the request", sent[0].reasoning?.enabled === false);
 
+script([200, { error: { code: 502, message: "Upstream error from Nvidia: Service temporarily overloaded" } }]);
+res = await post({ task: "ping" });
+out = await res.json();
+check("an error carried inside a 200 is upstream_error with the provider message, no repair round",
+  res.status === 502 && out.error === "upstream_error" && /overloaded/.test(out.message) && sent.length === 1);
+
 // --- dossier task: payload validated before any call, profile fenced as data ---
 script();
 check("dossier without columns is 400 invalid_payload", (await (await post({ task: "dossier", payload: { rows: 3 } })).json()).error === "invalid_payload");
