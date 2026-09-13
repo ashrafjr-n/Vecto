@@ -1181,5 +1181,34 @@ const noTarget = Array.from({ length: 400 }, (_, i) => ({ MeetID: String(i), reg
 check("the fallback is never an identifier or a many-level name column",
   !["MeetID", "MeetName"].includes(detectTarget(Object.keys(noTarget[0]), noTarget)));
 
+/* ══════════════════════════════════════════
+   STAGE 10d — keys and entities are not features
+══════════════════════════════════════════ */
+console.log("\nKEYS AND ENTITIES — foreign keys, and Sex↔Name\n");
+
+/* openpowerlifting.csv "MeetID": 8,482 repeated integers keyed into meets.csv.
+   Unique-per-row detection missed it, so it got a mean and a histogram. */
+const fkRows = Array.from({ length: 2000 }, (_, i) => ({
+  MeetID: String(Math.floor(i / 7)), store_id: String(i % 12), weight: String(50 + (i * 37) % 90), y: String(i % 2),
+}));
+const fkRoles = detectColumnRoles(fkRows, ["MeetID", "store_id", "weight", "y"], "y");
+check("a repeated key named as an id is an identifier, not a measurement",
+  fkRoles.MeetID === ROLE.IDENTIFIER);
+check("a key with a handful of groups is categorical, never numeric",
+  fkRoles.store_id === ROLE.CATEGORICAL && fkRoles.weight === ROLE.NUMERIC);
+
+/* openpowerlifting.csv: 136,687 lifter names determine each lifter's sex, and the
+   report said "Keep one of Name or Sex" — reproduced verbatim on 8d02d07. */
+const lifterRows = Array.from({ length: 1500 }, (_, i) => {
+  const person = Math.floor(i / 3);
+  return { Name: `Lifter ${person}`, Sex: person % 2 ? "M" : "F", Equipment: ["Raw", "Wraps"][i % 2], Place: String((i * 7919) % 9) };
+});
+const lifter = analyzeDataset(lifterRows, ["Name", "Sex", "Equipment", "Place"], "Place");
+check("an entity too fine to learn from is not offered as the column to keep",
+  lifter.recommendations.some(r => r.column === "Name" && /too fine/.test(r.issue) && /Keep "Sex"/.test(r.action))
+  && !lifter.recommendations.some(r => /Keep one of "Name" or "Sex"|If you keep "Name"/.test(r.action)));
+check("the association statement names its direction",
+  lifter.relationships.categoricalAssociations.some(a => a.statement.includes('"Name" largely determines "Sex"')));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
