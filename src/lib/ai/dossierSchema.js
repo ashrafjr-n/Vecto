@@ -68,6 +68,12 @@ export const DOSSIER_SCHEMA = {
   additionalProperties: false,
 };
 
-/* Upper bound on columns per call. The widest file in the corpus (sonar) has 61.
-   ponytail: one call, capped; split into chunks when a real file exceeds it. */
+/* Upper bound on columns per file (at most 6 parts). */
 export const DOSSIER_MAX_COLUMNS = 150;
+
+/* Columns per request. Measured 2026-09-14: on sonar (61 columns) BOTH nemotron
+   models returned exactly 32 entries with finish_reason "stop" at ~2.4–5k output
+   tokens — not a token limit, and unchanged by telling the model the count. A
+   wider file is sent in parts of this size; a file at or under it is one request
+   with an unchanged payload. */
+export const DOSSIER_PART_COLUMNS = 25;
