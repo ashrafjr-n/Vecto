@@ -104,6 +104,11 @@ function Analyze() {
   const [phase,          setPhase]          = useState(null);
   const [analysisResult, setAnalysisResult] = useState(entry?.result ?? null);
   const [failure,        setFailure]        = useState(entry?.error  ?? null);
+  /* The AI dossier (verified) and the roles the user accepted from it. Held here,
+     not in TargetStep, because Cancel on the processing step unmounts the picker
+     and a finished answer costs a request from a small daily quota. */
+  const [dossier,        setDossier]        = useState(null);
+  const [roleOverrides,  setRoleOverrides]  = useState({});
   // The running analysis's AbortController, so Cancel and unmount can stop it.
   const runRef = useRef(null);
 
@@ -129,7 +134,7 @@ function Analyze() {
     const run = new AbortController();
     runRef.current = run;
     setPhase(null);
-    runAnalysis(csvData, columns, selectedTarget, setPhase, run.signal).then(({ result, error }) => {
+    runAnalysis(csvData, columns, selectedTarget, setPhase, run.signal, roleOverrides).then(({ result, error }) => {
       const remaining = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt));
       setTimeout(() => {
         // Cancelled — including during the minimum-visible delay after the
@@ -174,6 +179,10 @@ function Analyze() {
                 initialTarget={target}
                 onConfirm={handleTargetConfirmed}
                 onBack={handleReset}
+                dossier={dossier}
+                onDossier={setDossier}
+                roleOverrides={roleOverrides}
+                onRoleOverridesChange={setRoleOverrides}
               />
             </motion.div>
           )}
