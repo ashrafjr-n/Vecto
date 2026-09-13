@@ -1,7 +1,7 @@
 import {
   getNumericValues,
-  mean, isNumeric, isMissing, etaCorrelation, normalizeValue, toNumber,
-  spearmanOf, correlationPValue, etaPValue, etaAdjusted,
+  mean, isNumeric, isMissing, normalizeValue, toNumber,
+  spearmanOf, correlationPValue, rankEta,
   cramersV, mutualInformation, discretize, sampleIndices, rankColumn, pearsonOf,
 } from "../helpers.js";
 import { detectColumnRoles } from "../detectors/roles.js";
@@ -148,9 +148,9 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     const targetLevels = discretize(miIdx.map(k => data[k][target]));
 
     /* η for a numeric variable grouped by a nominal one — either direction. The
-       grouping side can be a categorical FEATURE with thousands of levels, so the
-       value is the df-corrected η (etaAdjusted); the p-value is the ANOVA F-test,
-       which is exact from the raw η. */
+       value is the RANK-based, bias-corrected η from Kruskal-Wallis (rankEta): the
+       grouping side can be a feature with thousands of levels, and the numeric side
+       can carry one value that decides a variance ratio on its own. */
     const scoreEta = (col, numericSide, groupSide) => {
       const values = [], labels = [];
       for (let i = 0; i < data.length; i++) {
@@ -178,14 +178,13 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         unscored(col, `"${col}" has a different value on nearly every shared row (${k} levels over ${n} rows) — there are no groups to compare "${target}" across.`);
         return;
       }
-      const eta = etaCorrelation(values, labels);
-      const adj = etaAdjusted(eta, n, k);
+      const res = rankEta(values, labels);
       targetCorrelations[col] = {
         metric:   "eta",
-        value:    r2(adj),
-        absValue: r2(adj),
+        value:    r2(res.value),
+        absValue: r2(res.value),
         spearman: null,           // undefined against a nominal side
-        pValue:   etaPValue(eta, n, k),
+        pValue:   res.pValue,     // Kruskal-Wallis, chi-square with k - 1 df
         n,
       };
     };
