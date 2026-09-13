@@ -347,6 +347,18 @@ export function etaPValue(eta, n, k) {
   return betaI(d2 / 2, d1 / 2, d2 / (d2 + d1 * F));
 }
 
+/* η with the degrees-of-freedom correction (epsilon-squared, Kelley 1935), for
+   the same reason Cramér's V carries Bergsma: plug-in η² has expectation
+   (k−1)/(n−1) under independence, so it climbs with the number of groups alone.
+   Harmless with 3 target classes, fatal when the groups are a categorical
+   FEATURE's levels — thousands of Societies against a price. A correction that
+   goes below zero is no association, returned as 0. Needs n > k. */
+export function etaAdjusted(eta, n, k) {
+  if (!Number.isFinite(eta) || k < 2 || n <= k) return null;
+  const e2 = 1 - (1 - eta * eta) * (n - 1) / (n - k);
+  return Math.sqrt(Math.max(0, e2));
+}
+
 /* Bergsma-corrected Cramer's V for two aligned label arrays, with the
    chi-square tail. Same estimator relations.js uses against the target — pulled
    out here so feature-to-feature categorical pairs get the identical treatment
