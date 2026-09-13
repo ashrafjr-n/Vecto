@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
+
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
@@ -128,6 +131,19 @@ function Methodology() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            <div className="mt-24 flex flex-col gap-10 border-t border-line pt-16 sm:mt-32 lg:flex-row lg:items-end lg:justify-between">
+              <p className="max-w-[20ch] text-[2rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-5xl">
+                Read the method. Then run it on your own data.
+              </p>
+              <Link
+                to="/"
+                className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-ink px-6 py-3 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90 lg:self-auto"
+              >
+                Analyze a dataset
+                <ArrowRight size={14} />
+              </Link>
             </div>
 
           </div>
