@@ -78,7 +78,8 @@ function Methodology() {
                   id={phase.id}
                   className="grid scroll-mt-24 gap-x-16 gap-y-8 border-t border-line py-12 sm:py-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
                 >
-                  <div>
+                  {/* Sticky beside a long list of rules, so the stage being read stays named. */}
+                  <div className="lg:sticky lg:top-24 lg:self-start">
                     <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
                     <h3 className="mt-4 text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-3xl">
                       {phase.title}
