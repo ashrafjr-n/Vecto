@@ -16,7 +16,7 @@ import { getStatistics, getVisualizations } from "../src/components/utils/core/a
 import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { getRelationshipsV3 } from "../src/components/utils/core/analyzers/relations.js";
 import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
-import { analyzeDataset, ANALYSIS_PHASES } from "../src/components/utils/core/index.js";
+import { analyzeDataset, ANALYSIS_PHASES, detectTarget } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 import { validateFile, inspectParseResult, transformHeader, MAX_SIZE_B } from "../src/lib/csvIntake.js";
@@ -1151,6 +1151,35 @@ const pairRecs = analyzeDataset(pairRows, ["p1", "p2", "f", "y"], "y").recommend
 check("columns replaced by presence indicators get no pair advice",
   pairRecs.some(r => r.column === "p1" && /_present/.test(r.action))
   && !pairRecs.some(r => /"p1" ↔ "p2"|"p1" or "p2"/.test(r.issue + r.action)));
+
+/* ══════════════════════════════════════════
+   STAGE 10d — the target guess only offers usable columns
+══════════════════════════════════════════ */
+console.log("\nTARGET DETECTION — never suggest a column 10b would refuse\n");
+
+/* house_prices.csv: "Status" matched by name and holds one value plus blanks. */
+const guessRows = Array.from({ length: 300 }, (_, i) => ({
+  Status: i % 50 === 0 ? "" : "Ready to Move",
+  "Price (in rupees)": String(3000 + (i * 7919) % 9000),
+  marital_status: ["single", "married", "divorced"][i % 3],
+  smoke: i % 4 ? "No" : "Yes",
+}));
+check("a constant column is never the guess, even when its name matches",
+  detectTarget(Object.keys(guessRows[0]), guessRows) === "Price (in rupees)");
+
+/* smoking.csv: "status" inside "marital_status" is a feature, not a target name. */
+const noPrice = guessRows.map(({ Status, smoke, marital_status }) => ({ Status, marital_status, smoke }));
+check("a target word inside a feature name does not win ('marital_status')",
+  detectTarget(Object.keys(noPrice[0]), noPrice) === "smoke");
+
+check("a target word inside a name is matched when it is unambiguous ('price_range')",
+  detectTarget(["ram", "price_range", "wifi"],
+    Array.from({ length: 100 }, (_, i) => ({ ram: String(i * 13), price_range: String(i % 4), wifi: String(i % 2) }))) === "price_range");
+
+/* meets.csv: nothing looks like a target, and the fallback was an identifier-like name column. */
+const noTarget = Array.from({ length: 400 }, (_, i) => ({ MeetID: String(i), region: `r${i % 30}`, MeetName: `Meet number ${i % 300}` }));
+check("the fallback is never an identifier or a many-level name column",
+  !["MeetID", "MeetName"].includes(detectTarget(Object.keys(noTarget[0]), noTarget)));
 
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
