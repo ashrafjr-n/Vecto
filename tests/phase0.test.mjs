@@ -11,7 +11,7 @@ import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { getVisualizations } from "../src/components/utils/core/analyzers/stats.js";
-import { etaCorrelation } from "../src/components/utils/core/helpers.js";
+import { etaCorrelation, medcouple, adjustedFences, quantileSorted } from "../src/components/utils/core/helpers.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -98,6 +98,28 @@ for (const col of sk.header) {
       `${pass ? "PASS" : "FAIL"}  ${col.padEnd(12)} ${name.padEnd(8)} ` +
       `actual=${actual.toFixed(12)}  expected=${want.toFixed(12)}  |diff|=${diff.toExponential(3)}`,
     );
+  }
+}
+
+/* ── Stage 10d — medcouple and the skew-adjusted outlier fences ── */
+const ol = parseCsv(join(__dirname, "reference", "datasets", "outliers.csv"));
+console.log("\nStage 10d — medcouple + adjusted boxplot fences vs reference harness\n");
+for (const col of ol.header) {
+  const vals = ol.rows.map(r => parseFloat(r[col])).filter(v => !isNaN(v));
+  const sorted = [...vals].sort((a, b) => a - b);
+  const want = expected.outliers.columns[col];
+  const mc = medcouple(sorted);
+  const { lower, upper } = adjustedFences(quantileSorted(sorted, 0.25), quantileSorted(sorted, 0.75), mc);
+  const count = vals.filter(v => v < lower || v > upper).length;
+  const checks = [
+    ["medcouple",   Math.abs(mc - want.medcouple) <= TOL,       `${mc} vs ${want.medcouple}`],
+    ["lowerFence",  Math.abs(lower - want.lower_fence) <= TOL,  `${lower} vs ${want.lower_fence}`],
+    ["upperFence",  Math.abs(upper - want.upper_fence) <= TOL,  `${upper} vs ${want.upper_fence}`],
+    ["outliers",    count === want.outlier_count,               `${count} vs ${want.outlier_count}`],
+  ];
+  for (const [name, pass, detail] of checks) {
+    if (!pass) failures++;
+    console.log(`${pass ? "PASS" : "FAIL"}  ${col.padEnd(13)} ${name.padEnd(11)} ${detail}`);
   }
 }
 

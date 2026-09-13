@@ -79,7 +79,7 @@ if (withTarget.statistics.length > 0) {
   assertKeysExact(withTarget.statistics[0], [
     "col", "mean", "median", "min", "max", "std", "q1", "q3", "iqr",
     "skewness", "kurtosis", "skewnessLabel", "outlierCount",
-    "lowerFence", "upperFence", "count", "histogram", "isConstant",
+    "medcouple", "lowerFence", "upperFence", "count", "histogram", "isConstant",
   ], "statistics[0] (non-empty numeric column)");
 } else {
   failures++;
