@@ -1210,5 +1210,28 @@ check("an entity too fine to learn from is not offered as the column to keep",
 check("the association statement names its direction",
   lifter.relationships.categoricalAssociations.some(a => a.statement.includes('"Name" largely determines "Sex"')));
 
+/* ══════════════════════════════════════════
+   STAGE 10d — an outlier cutoff that allows for skew
+══════════════════════════════════════════ */
+console.log("\nOUTLIER CUTOFF — a long tail is not a list of errors\n");
+
+/* Titanic Fare shape: a smooth exponential tail. Tukey flagged ~13% of it. */
+const tailRows = Array.from({ length: 1000 }, (_, i) => ({ fare: (-Math.log(1 - (i + 0.5) / 1000) * 20).toFixed(3) }));
+const tailStat = getStatistics(tailRows, ["fare"])[0];
+check("a smooth long tail is not flagged wholesale as outliers",
+  tailStat.outlierCount / tailStat.count < 0.03 && tailStat.medcouple > 0);
+
+/* One genuine error in the same tail must still be caught. */
+const tailWithError = [...tailRows, { fare: "670000" }];
+check("a genuine extreme value is still an outlier under the adjusted fences",
+  getStatistics(tailWithError, ["fare"])[0].upperFence < 670000);
+
+/* The advice must cap at the cutoff that flagged the values, not a different one. */
+const skewAdvice = analyzeDataset(
+  Array.from({ length: 1000 }, (_, i) => ({ v: i % 9 === 0 ? String(5000 + i) : String(i % 97), y: String(i % 2) })),
+  ["v", "y"], "y").recommendations.find(r => r.column === "v" && /outside/.test(r.action));
+check("outlier advice quotes the fences it detected with, never a percentile cap",
+  !!skewAdvice && !/percentile/.test(skewAdvice.action));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
