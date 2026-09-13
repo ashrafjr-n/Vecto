@@ -79,7 +79,7 @@ function ResultsDashboard({ result, onReset }) {
           </div>
 
           <h1 className="mt-10 max-w-[22ch] text-[2rem] font-semibold leading-[1.06] tracking-[-0.035em] text-ink sm:text-5xl">
-            {meta.target ? <>Audited against <span className="font-mono text-gold-ink">{meta.target}</span>.</> : "Exploratory audit, no target."}
+            {meta.target ? <>Audited against <span className="font-mono text-accent-ink">{meta.target}</span>.</> : "Exploratory audit, no target."}
           </h1>
 
           <p className="mt-8 max-w-2xl text-[15px] leading-[1.7] text-ink-soft">
@@ -123,7 +123,7 @@ function ResultsDashboard({ result, onReset }) {
                     onClick={() => setActiveTab(tab.id)}
                     className="flex w-full items-center gap-4 border-b border-line py-3.5 text-left transition-colors"
                   >
-                    <span className={`font-mono text-[10.5px] ${isActive ? "text-gold-ink" : "text-ink-faint"}`}>
+                    <span className={`font-mono text-[10.5px] ${isActive ? "text-accent-ink" : "text-ink-faint"}`}>
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className={`text-[14px] tracking-tight ${isActive ? "text-ink" : "text-ink-soft"}`}>
