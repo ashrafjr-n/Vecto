@@ -1060,5 +1060,46 @@ check("a date target is not scored — every column says why",
   Object.keys(dateRel.targetCorrelations).length === 0
   && dateRel.unscoredColumns.some(u => u.col === "f" && u.reason.includes("is a date")));
 
+/* ══════════════════════════════════════════
+   STAGE 10b — the target is not a feature
+══════════════════════════════════════════ */
+console.log("\nTARGET HANDLING — regression, missing, constant, per-row-unique\n");
+
+/* ai_student: Post_Semester_GPA reported 2,269 "classes" and a class-imbalance
+   warning on a regression problem. */
+const gpaRows = Array.from({ length: 600 }, (_, i) => ({
+  hours: String(i % 37), gpa: (2 + ((i * 7919) % 200) / 100).toFixed(2),
+}));
+const gpa = analyzeDataset(gpaRows, ["hours", "gpa"], "gpa");
+check("a numeric target has no class balance and no imbalance advice",
+  gpa.classBalance === null
+  && !gpa.recommendations.some(r => /imbalance/i.test(r.issue))
+  && !gpa.insights.some(i => /imbalance/i.test(i.title)));
+
+/* "Impute Price with median" invents the answer the model is graded against. */
+const missTargetRows = gpaRows.map((r, i) => ({ ...r, gpa: i % 10 === 0 ? "" : r.gpa }));
+const missTarget = analyzeDataset(missTargetRows, ["hours", "gpa"], "gpa").recommendations
+  .filter(r => r.column === "gpa" && /missing/i.test(r.issue));
+check("a missing target is dropped, never imputed",
+  missTarget.length === 1 && /do not impute/i.test(missTarget[0].action) && !/^Impute/.test(missTarget[0].action));
+
+/* A single-valued target was told to be dropped as a constant column and to be
+   oversampled with SMOTE. */
+const constRows = Array.from({ length: 300 }, (_, i) => ({ f: String(i % 9), y: "yes" }));
+const constRes = analyzeDataset(constRows, ["f", "y"], "y");
+check("a constant target is flagged, capped, and gets no feature-style advice",
+  constRes.meta.targetIsConstant
+  && constRes.healthScore.score <= 25
+  && constRes.recommendations.some(r => r.issue === "Target never varies")
+  && !constRes.recommendations.some(r => /SMOTE|Constant column|imbalance/i.test(r.issue + r.action))
+  && Object.keys(constRes.relationships.targetCorrelations).length === 0);
+
+/* Titanic "Name" as target: not a name/sequence identifier, but 100% distinct. */
+const nameRows = Array.from({ length: 300 }, (_, i) => ({ f: String(i % 4), who: `Person ${i}, Mr.` }));
+const nameRes = analyzeDataset(nameRows, ["f", "who"], "who");
+check("a per-row-unique text target is an identifier, not a 300-class problem",
+  nameRes.meta.targetIsIdentifier
+  && !nameRes.recommendations.some(r => r.column === "who" && /Group rare/i.test(r.action)));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
