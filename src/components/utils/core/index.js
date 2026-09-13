@@ -80,7 +80,7 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
   // statistics first — getVisualizations reads its rows instead of recomputing them.
   const visualizations = getVisualizations(data, columns, numericCols, categoricalCols, statistics);
   phase(4);
-  const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation, categoricalCols);
+  const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation, categoricalCols, columnRoles);
   const classBalance   = getClassBalance(data, target);
   const snapshot       = getDatasetSnapshot(data, columns);
 
