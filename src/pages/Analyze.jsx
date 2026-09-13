@@ -42,7 +42,7 @@ const MIN_VISIBLE_MS = 550;
 function ProcessingStep({ phase, onCancel }) {
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-6">
-      <LoaderCircle size={26} className="animate-spin text-gold-ink" />
+      <LoaderCircle size={26} className="animate-spin text-accent-ink" />
       {phase && (
         <div className="mt-10 text-center">
           <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
