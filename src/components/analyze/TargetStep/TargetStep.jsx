@@ -198,7 +198,6 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack, dossie
             data={csvData}
             columns={columns}
             roles={colTypes}
-            engineTarget={initialTarget}
             dossier={dossier}
             onDossier={onDossier}
             overrides={roleOverrides}

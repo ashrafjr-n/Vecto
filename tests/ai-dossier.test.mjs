@@ -27,9 +27,9 @@ const ROLES = detectColumnRoles(ROWS, COLUMNS, null);
 
 console.log("PAYLOAD — what leaves the browser\n");
 
-const payload = buildDossierPayload(ROWS, COLUMNS, ROLES, "label");
+const payload = buildDossierPayload(ROWS, COLUMNS, ROLES);
 const byName = Object.fromEntries(payload.columns.map((c) => [c.name, c]));
-check("payload is deterministic", JSON.stringify(payload) === JSON.stringify(buildDossierPayload(ROWS, COLUMNS, ROLES, "label")));
+check("payload is deterministic", JSON.stringify(payload) === JSON.stringify(buildDossierPayload(ROWS, COLUMNS, ROLES)));
 check("no row objects are sent", !JSON.stringify(payload).includes('"weight":"'));
 check("free text sends no values, only its length", ROLES.note === ROLE.TEXT
   && !byName.note.examples && !byName.note.topValues && byName.note.avgLength > 40
@@ -41,7 +41,7 @@ check("a mostly-numeric column carries its summary and the values that did not p
 check("low-cardinality columns carry top values with counts",
   byName.sex.topValues.length === 2 && byName.sex.topValues.every(([, n]) => n === 150));
 check("an empty column reports 100% missing and no summary", byName.empty.missingPct === 100 && !byName.empty.summary);
-check("the engine's own target guess is included", payload.engineTargetGuess === "label");
+check("the engine's target guess is NOT sent (it anchored the model)", !("engineTargetGuess" in payload));
 
 console.log("\nVERIFY — what the browser believes\n");
 
