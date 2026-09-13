@@ -109,6 +109,8 @@ function Analyze() {
      and a finished answer costs a request from a small daily quota. */
   const [dossier,        setDossier]        = useState(null);
   const [roleOverrides,  setRoleOverrides]  = useState({});
+  // The AI leakage review of the CURRENT report — cleared whenever a new analysis starts.
+  const [leakageReview,  setLeakageReview]  = useState(null);
   // The running analysis's AbortController, so Cancel and unmount can stop it.
   const runRef = useRef(null);
 
@@ -128,6 +130,7 @@ function Analyze() {
      frame. */
   const handleTargetConfirmed = (selectedTarget) => {
     setTarget(selectedTarget);
+    setLeakageReview(null);
     setStep("processing");
 
     const startedAt = Date.now();
@@ -227,7 +230,11 @@ function Analyze() {
           {step === "results" && (
             <motion.div key="results" {...stepVariants}>
               <Suspense fallback={<div className="min-h-[60vh]" />}>
-                <ResultsDashboard result={analysisResult} onReset={handleReset} />
+                <ResultsDashboard
+                  result={analysisResult}
+                  onReset={handleReset}
+                  ai={{ data: csvData, dossier, leakageReview, onLeakageReview: setLeakageReview }}
+                />
               </Suspense>
             </motion.div>
           )}
