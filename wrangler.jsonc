@@ -1,0 +1,23 @@
+{
+  // Cloudflare Worker with static assets (NOT Pages). Workers Builds runs
+  // `npm run build` then `npx wrangler deploy` on every push, which reads this file.
+  "name": "vecto",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist/",
+    "binding": "ASSETS",
+    // Deep links (/methodology, /analyze) get index.html instead of a 404.
+    "not_found_handling": "single-page-application",
+    // Only API routes reach the script; everything else is served as an asset.
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    // Tried in order by OpenRouter's `models` fallback. Each is the free variant of a
+    // paid model, so dropping ":free" later changes billing, not behaviour.
+    // Empty string = AI switched off (the endpoint answers 503 ai_disabled).
+    "AI_MODELS": "nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free"
+  }
+  // OPENROUTER_API_KEY is a Worker SECRET (dashboard or `wrangler secret put`), and
+  // `.dev.vars` locally — never a var here, never VITE_*.
+}

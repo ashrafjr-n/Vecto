@@ -24,3 +24,8 @@ forTesting/
 
 # Local knowledge vault (Obsidian) — notes about the project, not part of the app
 vecto-brain/
+
+# Wrangler local state (wrangler dev) and local Worker secrets — .dev.vars holds the
+# OpenRouter key for local runs and must never be committed
+.wrangler/
+.dev.vars
