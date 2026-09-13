@@ -35,8 +35,13 @@ export function runAnalysisSync(data, columns, target, onPhase) {
    thrown exception. In every one of those cases the analysis still runs and
    still returns the same shape — the page just blocks while it does, exactly as
    it did before this file existed. Degrading to the old behaviour is always
-   better than showing nothing. */
-export function runAnalysis(data, columns, target, onPhase) {
+   better than showing nothing.
+
+   `signal` (an AbortSignal) cancels a running analysis: the worker is
+   terminated and the promise settles with `aborted: true` and no error. The
+   synchronous fallback cannot be cancelled — it owns the main thread, so
+   nothing could deliver the abort until it had already finished. */
+export function runAnalysis(data, columns, target, onPhase, signal) {
   return new Promise((resolve) => {
     let worker;
     try {
@@ -53,6 +58,8 @@ export function runAnalysis(data, columns, target, onPhase) {
       worker.terminate();
       resolve(payload);
     };
+    signal?.addEventListener("abort",
+      () => finish({ result: null, error: null, aborted: true }), { once: true });
 
     /* A phase update is not the answer. Only the message carrying result/error
        settles the promise; everything tagged "phase" is forwarded and dropped. */
