@@ -1,7 +1,7 @@
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
-import { METHODOLOGY_INTRO, PHASES, PRINCIPLES } from "../content/methodology.js";
+import { METHODOLOGY_INTRO, PHASES, PRINCIPLES, LIMITS } from "../content/methodology.js";
 
 const index2 = (i) => String(i + 1).padStart(2, "0");
 
@@ -107,6 +107,26 @@ function Methodology() {
                     <p className="mt-3 text-[13.5px] leading-[1.75] text-ink-soft">{principle.text}</p>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="mt-24 sm:mt-32">
+              <SectionLabel mark="04">Limits</SectionLabel>
+              <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
+                <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
+                  What the engine does not decide.
+                </h2>
+                <div className="border-t border-line">
+                  {LIMITS.map((limit, i) => (
+                    <div key={limit.title} className="flex items-baseline gap-5 border-b border-line py-5 sm:gap-8">
+                      <span className="font-mono text-[11px] text-ink-faint">{index2(i)}</span>
+                      <div>
+                        <div className="text-[15px] font-medium tracking-tight text-ink">{limit.title}</div>
+                        <p className="mt-1.5 text-[13.5px] leading-[1.7] text-ink-soft">{limit.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
