@@ -90,7 +90,9 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
 
   const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier, targetIsConstant);
   phase(1);
-  const quality        = getQuality(data, columns, identifierCols, temporalCols, textCols);
+  // Numeric by ROLE, target included: a near-unique price is a measurement, not an ID.
+  const quality        = getQuality(data, columns, identifierCols, temporalCols, textCols,
+                                    columns.filter(c => columnRoles[c] === ROLE.NUMERIC));
   phase(2);
   const statistics     = getStatistics(data, numericCols);
   phase(3);

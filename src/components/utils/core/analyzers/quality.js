@@ -19,7 +19,7 @@ const NUMERIC_SHARE = 0.8;
 const CODE_MIN_DISTINCT = 5;
 const CODE_MAX_DISTINCT = 25;
 
-export function getQuality(data, columns, identifierCols = [], temporalCols = [], textCols = []) {
+export function getQuality(data, columns, identifierCols = [], temporalCols = [], textCols = [], numericRoleCols = []) {
   let missingCells = 0;
   const columnsWithIssues = [];
 
@@ -103,6 +103,10 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
         !identifierCols.includes(col) &&
         !temporalCols.includes(col) &&        // dates are all-unique but not "likely an ID"
         !textCols.includes(col) &&            // nor is a commentary field, for the same reason
+        /* Nor a measurement: continuous values are near-unique by nature. sonar.csv's
+           60 signal columns were each called "likely an ID column" and advised to
+           "group rare categories into Other" — 36 recommendations for a number. */
+        !numericRoleCols.includes(col) &&
         (unique.length / nonEmpty.length) > 0.95 &&
         nonEmpty.length > 10
       ) {
