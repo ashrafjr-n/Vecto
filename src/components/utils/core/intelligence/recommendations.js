@@ -218,8 +218,8 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       priority:  "high",
       column:    col,
       issue:     "Identifier column",
-      action:    `Drop "${col}" before training — it appears to be a row identifier.`,
-      rationale: "Identifier columns leak row identity into the model, causing overfitting on training data.",
+      action:    `Drop "${col}" as a feature before training — it identifies a row or an entity rather than describing one. If its values repeat, it is a key: join on it to bring in the other table's columns, or group the train/test split on it so one entity never lands on both sides.`,
+      rationale: "An identifier leaks row or entity identity into the model: it memorises who, not why, and scores well on training data it will never see again. A repeated key also means rows are not independent — a random split puts the same entity in train and test and overstates accuracy.",
     });
   });
 
