@@ -3,7 +3,8 @@
    Pure JavaScript · No AI · No external APIs
 ───────────────────────────────────────────── */
 
-import { detectColumnRoles }       from "./detectors/roles.js";
+import { detectColumnRoles,
+         IDENTIFIER_MIN_DISTINCT_SHARE } from "./detectors/roles.js";
 import { getQuality }              from "./analyzers/quality.js";
 import { getStatistics,
          getVisualizations }       from "./analyzers/stats.js";
@@ -69,9 +70,25 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
      identifierCols. It has to be asked separately — without it, PassengerId as a
      target looks exactly like a legitimate continuous regression target (a price
      column is ALSO one distinct value per row) and scored 88 "Good". */
-  const targetIsIdentifier = !!target && isIdentifierCol(data, target);
+  const targetLevels = target ? valueFrequencies(data, target) : [];
+  const targetPresent = targetLevels.reduce((n, l) => n + l.count, 0);
 
-  const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier);
+  /* The name/sequence check misses a text target that is one value per row —
+     titanic's "Name" as target came back an 891-class classification problem
+     and was advised to "group rare categories into Other". The whole-column
+     distinct share is the same rule roles.js applies to every other column; it
+     is safe for the target only when the role is CATEGORICAL, because a numeric
+     target (price) is legitimately near-unique too. */
+  const targetIsIdentifier = !!target && (isIdentifierCol(data, target)
+    || (columnRoles[target] === ROLE.CATEGORICAL && targetPresent > 10
+        && targetLevels.length / targetPresent > IDENTIFIER_MIN_DISTINCT_SHARE));
+
+  /* One value (or none) in the target: there is nothing to predict. It used to
+     pass straight through — the advice was to DROP the target as a constant
+     column and to oversample its single class with SMOTE. */
+  const targetIsConstant = !!target && targetLevels.length < 2;
+
+  const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier, targetIsConstant);
   phase(1);
   const quality        = getQuality(data, columns, identifierCols, temporalCols, textCols);
   phase(2);
@@ -81,7 +98,7 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
   const visualizations = getVisualizations(data, columns, numericCols, categoricalCols, statistics);
   phase(4);
   const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation, categoricalCols, columnRoles);
-  const classBalance   = getClassBalance(data, target);
+  const classBalance   = getClassBalance(data, target, columnRoles[target]);
   const snapshot       = getDatasetSnapshot(data, columns);
 
   phase(5);
@@ -98,7 +115,7 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
 }
 
 
-function getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier) {
+function getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier, targetIsConstant) {
   let datasetType = "Unknown";
 
   if (target) {
@@ -138,13 +155,18 @@ function getMeta(data, columns, target, numericCols, categoricalCols, identifier
     columnRoles,
     target,
     targetIsIdentifier,
+    targetIsConstant,
     datasetType,
   };
 }
 
 
-function getClassBalance(data, target) {
-  if (!target) return null;
+/* Classes exist only for a classification target. A numeric target used to get
+   a class table anyway — ai_student's Post_Semester_GPA reported 2,269 "classes"
+   and a "majority class at 9.6%" imbalance warning on a regression problem.
+   health.js already reads null as "regression, no balance concern". */
+function getClassBalance(data, target, targetRole) {
+  if (!target || (targetRole !== ROLE.BINARY && targetRole !== ROLE.CATEGORICAL)) return null;
 
   const allVals     = data.map(r => r[target]);
   const totalRows   = allVals.length;
