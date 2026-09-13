@@ -119,6 +119,23 @@ analysis itself still runs entirely in the browser.
 | `429 rate_limited` | every model in the list is rate-limited, or the daily quota is spent |
 | `502 upstream_error` / `empty_response` / `invalid_json` | OpenRouter failed, or the model's reply was not valid JSON after one repair attempt |
 
+### AI eval
+
+`tools/ai-eval.mjs` runs the column dossier through the real `/api/ai` endpoint over the
+local test corpus and scores each answer against known answers in
+`tools/ai-eval/expectations.mjs` (targets, roles and subtypes, written before the first run).
+Answers are verified exactly as the page verifies them, cached by payload hash in
+`reports/ai-eval/`, and summarised in `reports/ai-eval/summary.md`, including the engine's
+own target guess for comparison.
+
+```bash
+npx wrangler dev                                   # terminal 1, reads .dev.vars
+node --max-old-space-size=8192 tools/ai-eval.mjs   # [--only=titanic] [--fresh] [--rescore]
+```
+
+One request per file; a rate-limit response stops the run and finished files stay cached.
+`--rescore` makes no requests.
+
 ## Tests
 
 The analysis engine has a dependency-free regression suite that runs on plain Node:
@@ -127,7 +144,7 @@ The analysis engine has a dependency-free regression suite that runs on plain No
 npm test
 ```
 
-This runs five files:
+This runs six files:
 
 - **`tests/phase0.test.mjs`** — statistical correctness. Results are asserted against a
   Python reference (pandas/scipy) rather than hand-written expectations.
@@ -153,6 +170,7 @@ This runs five files:
 - **`tests/ai-dossier.test.mjs`** — what the column dossier sends (no rows, no free-text
   values, bounded examples, deterministic) and how a model's answer is verified against the
   data before it is shown.
+- **`tests/ai-eval-score.test.mjs`** — the eval's scoring rule on a hand-built dossier.
 
 Run `npm test` after any change under `src/components/utils/core/`.
 
