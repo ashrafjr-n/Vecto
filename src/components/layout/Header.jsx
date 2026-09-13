@@ -6,13 +6,14 @@ import { NavLink, useNavigate } from "react-router-dom";
    The bar wears the PANEL surface, not the canvas: every page opens on a
    paper-sunken hero, so the header reads as the top edge of that panel rather
    than a darker strip laid over it. Side padding matches the pages' own
-   (px-6 / sm:px-10), so the logo sits on the same left edge as the content. */
+   (px-6 / sm:px-10, OUTSIDE the 1400px box, as the page sections do), so the
+   logo sits on the same left edge as the content at every width. */
 function Header() {
   const navigate = useNavigate();
 
   return (
-    <header className="fixed top-0 left-0 z-50 h-16 w-full border-b border-line bg-paper-sunken/85 backdrop-blur">
-      <div className="mx-auto flex h-full max-w-[1400px] items-center justify-between px-6 sm:px-10">
+    <header className="fixed top-0 left-0 z-50 h-16 w-full border-b border-line bg-paper-sunken/85 px-6 backdrop-blur sm:px-10">
+      <div className="mx-auto flex h-full max-w-[1400px] items-center justify-between">
 
         <nav aria-label="Primary" className="flex items-center gap-5 sm:gap-8">
           <button
