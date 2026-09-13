@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 
 import SectionCard from "../../shared/SectionCard.jsx";
 import RolePill     from "../../shared/RolePill.jsx";
+import AiBadge      from "../../shared/AiBadge.jsx";
 import StatusBadge  from "../../shared/StatusBadge.jsx";
 import { ROLE }      from "../../../utils/core/roles.constants.js";
 
@@ -163,6 +164,11 @@ function ColumnRolesCard({ meta }) {
                 <span key={col} className="inline-flex items-center gap-1.5 rounded-md border border-line bg-paper px-2 py-1 font-mono text-[11px] text-ink">
                   {col}
                   {g.role !== "target" && <RolePill role={g.role} />}
+                  {meta.roleOverrides?.[col] && (
+                    <AiBadge title={`Detected as ${meta.roleOverrides[col].from}; you chose ${meta.roleOverrides[col].to} (suggested by AI)`}>
+                      set by you
+                    </AiBadge>
+                  )}
                 </span>
               ))}
             </div>
