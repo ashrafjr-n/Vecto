@@ -52,9 +52,9 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
                             (columnRoles[c] === ROLE.CATEGORICAL || columnRoles[c] === ROLE.BINARY)
                             && c !== target);
 
-  // Non-feature columns skipped by the target-correlation scan (relations.js re-derives
-  // types from raw values, ignoring roles — so identifiers AND temporals must be named
-  // explicitly there or they leak back in as spurious predictors).
+  // Non-feature columns skipped by the target-correlation scan. The scan reads
+  // columnRoles, but any role it is not told to skip is measured as nominal — so
+  // identifiers, temporals and text must be named here or they leak back in.
   /* A Map, not a Set, so the scan can say WHY a column was left out instead of
      just leaving it out. Map answers .has() exactly as the Set did, so callers
      that only ask membership are unaffected. */
