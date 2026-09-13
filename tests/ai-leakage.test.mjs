@@ -106,7 +106,8 @@ check("a formula that holds is confirmed with the rows it was checked on",
 check("a formula that fails on the data is contradicted", byCol("tip", "derived_from_target").verdict === "contradicted");
 check("a formula over a non-numeric or unrelated column is withheld, the claim stays unchecked",
   byCol("distance", "derived_from_target").verdict === "unchecked" && v.withheld.some((w) => w.column === "distance" && /formula withheld/.test(w.reason)));
-check("a real entity key is a confirmed group leak", byCol("driver", "group_leak").verdict === "confirmed");
+check("a repeated key is measured and handed over as a question, never confirmed",
+  byCol("driver", "group_leak").verdict === "question" && /100% of rows share/.test(byCol("driver", "group_leak").verdictText) && /η 0\.9|η 1\.00/.test(byCol("driver", "group_leak").verdictText));
 check("a unique id claimed as a group leak is contradicted", byCol("trip_id", "group_leak").verdict === "contradicted");
 check("restates_label on a weak association is contradicted by the engine's measurement", byCol("rating", "restates_label").verdict === "contradicted");
 check("recorded_after_outcome is a question, never a finding", byCol("tolls", "recorded_after_outcome").verdict === "question");
