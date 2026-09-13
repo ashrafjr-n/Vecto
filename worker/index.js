@@ -153,6 +153,14 @@ async function complete(apiKey, models, name, task, messages) {
   if (res.status === 429) return { error: json({ error: "rate_limited", message }, 429) };
   if (!res.ok) return { error: json({ error: "upstream_error", status: res.status, message }, 502) };
 
+  /* A provider can fail AFTER OpenRouter has answered 200 — measured on the eval:
+     "Upstream error from Nvidia: Service temporarily overloaded" arrived as a 200
+     whose body carries `error` and no content. It is an availability failure, not
+     an empty answer, and saying so tells the user that trying again may work. */
+  const upstreamError = data?.error ?? data?.choices?.[0]?.error;
+  if (upstreamError) {
+    return { error: json({ error: "upstream_error", status: upstreamError.code ?? res.status, message: upstreamError.message ?? message }, 502) };
+  }
   const choice = data?.choices?.[0];
   /* Cut off at max_tokens: the JSON is incomplete by construction, so asking the
      model to repair it would spend a second request to hit the same limit. */
