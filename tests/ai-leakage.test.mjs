@@ -67,6 +67,18 @@ const gc = measureGroupLeak(classRows, "driver", "label", ROLE.BINARY);
 check("for a class target, purity is reported beside the baseline", gc.purity === 1 && gc.baseline === 0.5);
 check("a unique column has no repeated rows", measureGroupLeak(ROWS, "trip_id", "fare", ROLE.NUMERIC).repeatedRowShare === 0);
 
+/* The taxis shape: total carries a surcharge from a small fixed set. */
+const surcharged = ROWS.map((r, i) => ({ ...r, total: (+r.fare + +r.tip + +r.tolls + [3.3, 3.8, 0.8][i % 3]).toFixed(2) }));
+const fixed = evaluateFormula(surcharged, { result: "total", op: "sum", terms: ["fare", "tip", "tolls"] });
+check("a formula off by a few fixed amounts is recognised as such",
+  fixed.matchShare === 0 && fixed.fixedOffsetShare === 1 && fixed.fixedOffsets.length === 3);
+const scattered = evaluateFormula(ROWS, { result: "total", op: "sum", terms: ["fare", "rating"] });
+check("a wrong formula scatters its differences", scattered.fixedOffsetShare < 0.9);
+const surchargedResult = analyzeDataset(surcharged, COLUMNS, "fare");
+const fv = verifyLeakage({ findings: [{ column: "total", category: "derived_from_target", reason: "", formula: { result: "total", op: "sum", terms: ["fare", "tip", "tolls"] } }], split: null },
+  { data: surcharged, result: surchargedResult }).findings[0];
+check("that verdict is partial and names the amounts", fv.verdict === "partial" && /\+3\.3 on 33\.\d%/.test(fv.verdictText));
+
 console.log("\nVERIFY\n");
 
 const answer = {
