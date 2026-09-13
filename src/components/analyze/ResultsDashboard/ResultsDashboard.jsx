@@ -85,7 +85,9 @@ function ResultsDashboard({ result, onReset }) {
           </h1>
 
           <p className="mt-8 max-w-2xl text-[15px] leading-[1.7] text-ink-soft">
-            {meta.target
+            {meta.target && (meta.targetIsConstant || meta.targetIsIdentifier)
+              ? <>No task type can be read: <span className="font-mono text-ink">{meta.target}</span> {meta.targetIsConstant ? "has the same value on every row" : "is unique per row — an identifier, not a label"}. Pick a different target; the sections below describe the data, not a model problem.</>
+              : meta.target
               ? <>Task type read as {meta.datasetType}. Every figure below is computed from the file in this tab, and each one is stated with the reasoning that produced it.</>
               : <>Class balance and task type need a target and are omitted. Every other section is computed normally.</>}
           </p>
