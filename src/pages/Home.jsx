@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import {
   UploadCloud, LoaderCircle, TriangleAlert,
@@ -296,6 +296,16 @@ function Home() {
                 </div>
               ))}
             </div>
+
+            {/* The detail that used to be an accordion here lives on /methodology. */}
+            <Link
+              to="/methodology"
+              onClick={() => window.scrollTo(0, 0)}
+              className="mt-10 inline-flex items-center gap-2 text-[14px] font-medium text-ink-soft transition-colors hover:text-ink"
+            >
+              How each stage works — thresholds, estimators and limits
+              <ArrowRight size={14} />
+            </Link>
 
             {/* Full width now that it no longer shares the row: the headline holds the
                 left column and the list the right, so neither half sits beside a gap. */}
