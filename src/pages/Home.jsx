@@ -182,19 +182,6 @@ function Home() {
               ))}
             </div>
 
-            <div className="mt-12 sm:mt-20">
-              <SectionLabel mark="02">Why it's built this way</SectionLabel>
-              <div className="mt-10 grid gap-x-14 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-                {TALKING_POINTS.map((p, i) => (
-                  <div key={p.title}>
-                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
-                    <h3 className="mt-4 text-[17px] font-medium leading-snug tracking-tight text-ink">{p.title}</h3>
-                    <p className="mt-3 text-[13.5px] leading-[1.75] text-ink-soft">{p.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
           </div>
         </section>
 
@@ -286,26 +273,41 @@ function Home() {
         <section className={`bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
           <div className="mx-auto max-w-[1400px]">
 
-            <SectionLabel mark="03">What happens to your dataset</SectionLabel>
-            <div className="mt-10 grid grid-cols-1 border-t border-line sm:grid-cols-2 lg:grid-cols-5">
-              {PROCESS_FLOW.map((step, i) => (
-                <div key={step.title} className="border-b border-line py-7 pr-8 lg:border-b-0">
-                  <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
-                  <div className="mt-4 text-[17px] font-medium tracking-tight text-ink">{step.title}</div>
-                  <div className="mt-2 text-[13.5px] leading-[1.7] text-ink-soft">{step.desc}</div>
-                </div>
-              ))}
+            <div>
+              <SectionLabel mark="02">Why it's built this way</SectionLabel>
+              <div className="mt-10 grid gap-x-14 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+                {TALKING_POINTS.map((p, i) => (
+                  <div key={p.title}>
+                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
+                    <h3 className="mt-4 text-[17px] font-medium leading-snug tracking-tight text-ink">{p.title}</h3>
+                    <p className="mt-3 text-[13.5px] leading-[1.75] text-ink-soft">{p.text}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* The detail that used to be an accordion here lives on /methodology. */}
-            <Link
-              to="/methodology"
-              onClick={() => window.scrollTo(0, 0)}
-              className="mt-10 inline-flex items-center gap-2 text-[14px] font-medium text-ink-soft transition-colors hover:text-ink"
-            >
-              How each stage works — thresholds, estimators and limits
-              <ArrowRight size={14} />
-            </Link>
+            <div className="mt-24 sm:mt-32">
+              <SectionLabel mark="03">What happens to your dataset</SectionLabel>
+              <div className="mt-10 grid grid-cols-1 border-t border-line sm:grid-cols-2 lg:grid-cols-5">
+                {PROCESS_FLOW.map((step, i) => (
+                  <div key={step.title} className="border-b border-line py-7 pr-8 lg:border-b-0">
+                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
+                    <div className="mt-4 text-[17px] font-medium tracking-tight text-ink">{step.title}</div>
+                    <div className="mt-2 text-[13.5px] leading-[1.7] text-ink-soft">{step.desc}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* The detail that used to be an accordion here lives on /methodology. */}
+              <Link
+                to="/methodology"
+                onClick={() => window.scrollTo(0, 0)}
+                className="mt-10 inline-flex items-center gap-2 text-[14px] font-medium text-ink-soft transition-colors hover:text-ink"
+              >
+                How each stage works — thresholds, estimators and limits
+                <ArrowRight size={14} />
+              </Link>
+            </div>
 
             {/* Full width now that it no longer shares the row: the headline holds the
                 left column and the list the right, so neither half sits beside a gap. */}
