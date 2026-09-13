@@ -18,10 +18,12 @@ export const PHASES = [
     title: "Target selection",
     lead: "The target column decides which measurements are possible, so it is fixed before anything else runs. You can pick it, run without one, or let the engine guess.",
     points: [
-      { label: "Name match", text: "An exact, case-insensitive match against common label names: target, label, class, outcome, churn, purchased, survived, default, fraud, status, result, y, output." },
-      { label: "Binary values", text: "Otherwise, a column whose two levels are 0/1, yes/no or true/false. When several qualify the last one wins — targets tend to sit at the end of a file." },
-      { label: "Low cardinality", text: "Otherwise, scanning from the last column backwards, the first column with at least two distinct values and no more than 5% distinct relative to the row count." },
-      { label: "Fallback", text: "Otherwise the last column. The guess is a starting point shown in the picker, never a silent decision." },
+      { label: "Usable only", text: "Every rule picks from usable columns only: a numeric, binary or categorical role, at least two distinct values, and at least half the rows filled in. An identifier, a date, free text or a single-valued column is never suggested." },
+      { label: "Name match", text: "An exact, case-insensitive match against common label names: target, label, class, outcome, churn, purchased, survived, default, fraud, status, result, y, output, price. Then a word inside a longer name — only target, label, outcome, churn, fraud, survived, purchased or price, because \"marital_status\" and \"passenger_class\" are features." },
+      { label: "Last column", text: "Otherwise the last column, when it is binary or a categorical with at most 20 levels — targets tend to sit at the end of a file." },
+      { label: "Binary values", text: "Otherwise the last column whose two levels are 0/1, yes/no or true/false." },
+      { label: "Low cardinality", text: "Otherwise, scanning from the last column backwards, the first with no more than 5% distinct values relative to the row count." },
+      { label: "Fallback", text: "Otherwise the last usable measurement or short class list, and failing that the coarsest usable column. The guess is a starting point shown in the picker, never a silent decision." },
     ],
   },
   {
