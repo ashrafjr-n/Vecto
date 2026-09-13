@@ -1,9 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import Papa from "papaparse";
 import {
-  UploadCloud, LoaderCircle, TriangleAlert, ChevronDown,
+  UploadCloud, LoaderCircle, TriangleAlert,
   ArrowRight, FileWarning, CheckCircle2, TrendingUp, Lightbulb,
 } from "lucide-react";
 
@@ -60,44 +59,6 @@ const TALKING_POINTS = [
   {
     title: "Built for people who read a correlation matrix",
     text: "No dumbed-down thresholds, no hand-holding copy. If you know what target leakage or multicollinearity means, this tool assumes you do.",
-  },
-];
-
-/* Real documentation of how each phase actually works, sourced directly from the
-   analysis engine's logic — expand-on-click, not a wall of text no one asked
-   for. See frontend.md "Home" spec. */
-const PROCESS_TOPICS = [
-  {
-    title: "Column role detection",
-    text: "Each column is classified as identifier, numeric, categorical, binary, or temporal. Numeric-looking integers with very low cardinality (≤8 unique values, under 5% of rows) are reclassified as encoded categorical, so a country code stored as 1–5 isn't treated as a continuous measurement. Identifier columns need a uniqueness signal plus supporting evidence — a name hint or leading-zero codes — width and uniqueness alone are never enough on their own.",
-  },
-  {
-    title: "Missing values & duplicates",
-    text: "Missing tokens are matched broadly — empty strings, NA, null, N/A, whitespace — and excluded from every downstream calculation, not just counted. Duplicate-row scanning runs on datasets up to 50,000 rows; past that it's skipped and reported as skipped, never silently shown as zero.",
-  },
-  {
-    title: "Correlation methods",
-    text: "Numeric pairs use Pearson correlation. Categorical pairs use Cramér's V. A numeric feature against a categorical target uses the correlation ratio (η). Pairs at |r| ≥ 0.9 are flagged as redundant; a feature correlated above that threshold with the target itself is flagged as possible leakage.",
-  },
-  {
-    title: "Health score",
-    text: "A single 0–100 score, weighted across four dimensions: quality (missing/duplicate/constant columns), structure (row-to-feature ratio, identifier leakage), relationships (multicollinearity, leakage), and target readiness (class balance, when a target is set). A dimension's own sub-weights renormalize when a check — like the duplicate scan — is skipped, rather than silently scoring it as passing.",
-  },
-  {
-    title: "Class balance",
-    text: "For a classification target, the majority-to-minority ratio is compared against a 3× threshold (or an 80% majority share) to flag imbalance. The minority class's absolute row count is called out separately — under 10 rows reads as critically few no matter what the percentage says.",
-  },
-  {
-    title: "Target auto-detection",
-    text: "When no target is chosen, the column is guessed in four passes: an exact name match against common labels (target, label, class, outcome, churn, survived, y, output…), then a binary column (0/1, yes/no, true/false — the last one found, since targets tend to sit at the end), then a low-cardinality column scanned from the end (≤5% unique values), and finally the last column in the file as a fallback.",
-  },
-  {
-    title: "Feature clusters",
-    text: "Beyond flagging single redundant pairs, columns are grouped: any column correlated at |r| ≥ 0.7 with two or more others is added to a cluster. Three or more clustered columns trigger a dimensionality-reduction suggestion, since dropping one flagged pair at a time misses that they're all measuring roughly the same thing.",
-  },
-  {
-    title: "Recommendations",
-    text: "Every finding becomes a prioritized action — drop a column, impute a specific way, investigate an outlier — tagged by category (Data Cleaning, Feature Selection, Feature Engineering, Modeling, Data Integrity) and priority, not a generic checklist.",
   },
 ];
 
