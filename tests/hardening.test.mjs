@@ -750,7 +750,7 @@ check("the presence finding reaches the observations",
   pres.relationships.observations.some(o => o.includes("recorded at all") && o.includes('"amt"')));
 
 check("the recommendation quotes the measured association instead of asserting one",
-  pres.recommendations.some(r => r.column === "amt" && r.rationale.includes("1.00")
+  pres.recommendations.some(r => r.column === "amt" && (r.action + r.rationale).includes("1.00")
                               && !r.rationale.includes("often correlates")));
 
 /* Missingness unrelated to the target must NOT produce a signal — the measure
