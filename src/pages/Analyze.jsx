@@ -1,8 +1,8 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { getPendingDataset } from "../lib/datasetHandoff.js";
 import { AnimatePresence, motion } from "framer-motion";
-import { LoaderCircle, TriangleAlert } from "lucide-react";
+import { LoaderCircle, TriangleAlert, X } from "lucide-react";
 
 import Header         from "../components/layout/Header.jsx";
 import TargetStep     from "../components/analyze/TargetStep/TargetStep.jsx";
@@ -39,7 +39,7 @@ const MIN_VISIBLE_MS = 550;
 
    No phase yet means the worker has not started; the label is held back rather
    than guessed. */
-function ProcessingStep({ phase }) {
+function ProcessingStep({ phase, onCancel }) {
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-6">
       <LoaderCircle size={26} className="animate-spin text-gold-ink" />
@@ -53,6 +53,14 @@ function ProcessingStep({ phase }) {
           </div>
         </div>
       )}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="mt-12 inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-soft transition-colors hover:text-ink"
+      >
+        <X size={14} />
+        Cancel
+      </button>
     </div>
   );
 }
@@ -96,6 +104,14 @@ function Analyze() {
   const [phase,          setPhase]          = useState(null);
   const [analysisResult, setAnalysisResult] = useState(entry?.result ?? null);
   const [failure,        setFailure]        = useState(entry?.error  ?? null);
+  // The running analysis's AbortController, so Cancel and unmount can stop it.
+  const runRef = useRef(null);
+
+  /* Leaving the page mid-analysis (back button, header link) would otherwise
+     leave the worker computing a report nobody will see. This is a cleanup on
+     unmount — synchronising with the worker outside React — not an effect
+     watching `step`, which stays forbidden (see CLAUDE.md). */
+  useEffect(() => () => runRef.current?.abort(), []);
 
   if (!entry) return <Navigate to="/" replace />;
 
@@ -110,10 +126,15 @@ function Analyze() {
     setStep("processing");
 
     const startedAt = Date.now();
+    const run = new AbortController();
+    runRef.current = run;
     setPhase(null);
-    runAnalysis(csvData, columns, selectedTarget, setPhase).then(({ result, error }) => {
+    runAnalysis(csvData, columns, selectedTarget, setPhase, run.signal).then(({ result, error }) => {
       const remaining = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt));
       setTimeout(() => {
+        // Cancelled — including during the minimum-visible delay after the
+        // worker had already answered. handleCancel has already moved the step.
+        if (run.signal.aborted) return;
         if (error) {
           setFailure(error);
           setStep("failed");
@@ -123,6 +144,13 @@ function Analyze() {
         setStep("results");
       }, remaining);
     });
+  };
+
+  /* Cancelled is not failed: back to the target picker with the chosen target
+     kept, so the user can start again or pick a different one. */
+  const handleCancel = () => {
+    runRef.current?.abort();
+    setStep("target");
   };
 
   const handleReset = () => navigate("/");
@@ -152,7 +180,7 @@ function Analyze() {
 
           {step === "processing" && (
             <motion.div key="processing" {...stepVariants}>
-              <ProcessingStep phase={phase} />
+              <ProcessingStep phase={phase} onCancel={handleCancel} />
             </motion.div>
           )}
 
