@@ -465,7 +465,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       const [l1, l2] = a.levels;
       if (Math.max(l1, l2) >= UNEVEN_LEVELS * Math.min(l1, l2)) {
         const [fine, fineLevels, coarse, coarseLevels] = l1 > l2 ? [a.col1, l1, a.col2, l2] : [a.col2, l2, a.col1, l1];
-        if (!determines.has(fine)) determines.set(fine, { levels: fineLevels, coarse: [] });
+        if (!determines.has(fine)) determines.set(fine, { levels: fineLevels, rows: a.nPairs, coarse: [] });
         determines.get(fine).coarse.push({ col: coarse, levels: coarseLevels, v: a.cramersV });
         return;
       }
@@ -479,8 +479,28 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       });
     });
 
-  determines.forEach(({ levels, coarse }, fine) => {
+  /* Too fine to be a feature at all. openpowerlifting.csv's lifter "Name" has
+     136,687 levels over 386,414 rows — 2.8 rows each — and determines "Sex"; the
+     advice "if you keep Name, Sex adds little" offered a column no model can learn
+     from as the one to keep. Measured: the fine side of every legitimate grouping in
+     the corpus has more than 5 rows per level (MeetTown 5.6, Society 7, Carpet Area
+     34, team 68), and the two entity columns have under 3 (Name 2.8, MeetName 1.6). */
+  const TOO_FINE_ROWS_PER_LEVEL = 5;
+  determines.forEach(({ levels, rows, coarse }, fine) => {
     const names = coarse.map(c => `"${c.col}"`).join(", ");
+    const perLevel = rows / levels;
+    if (perLevel < TOO_FINE_ROWS_PER_LEVEL) {
+      push({
+        category:  "Feature Selection",
+        priority:  "medium",
+        column:    fine,
+        issue:     `"${fine}" is too fine to learn from (${levels} levels, ~${perLevel.toFixed(1)} rows each) and largely determines ${names}`,
+        action:    `Keep ${names} and do not use "${fine}" as a feature. Use "${fine}" only to group the train/test split, so one entity never lands on both sides.`,
+        rationale: `Association is one-directional: each "${fine}" value maps to mostly one value of ${names} (${coarse.map(c => `V ${fmtV(c.v)}`).join(", ")}), and the reverse cannot hold. `
+                 + `At ~${perLevel.toFixed(1)} rows per level a model can only memorise "${fine}" — the part of it that generalises is already in ${names}.`,
+      });
+      return;
+    }
     push({
       category:  "Feature Selection",
       priority:  "medium",
