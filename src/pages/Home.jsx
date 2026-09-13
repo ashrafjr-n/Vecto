@@ -304,37 +304,21 @@ function Home() {
               ))}
             </div>
 
-            <div className="mt-24 grid gap-x-16 gap-y-20 sm:mt-32 lg:grid-cols-2">
-              <div>
-                <SectionLabel mark="05">Six diagnostic layers</SectionLabel>
-                <h2 className="mt-10 max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
+            {/* Full width now that it no longer shares the row: the headline holds the
+                left column and the list the right, so neither half sits beside a gap. */}
+            <div className="mt-24 sm:mt-32">
+              <SectionLabel mark="05">Six diagnostic layers</SectionLabel>
+              <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
+                <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
                   One dataset, read six ways.
                 </h2>
-                <div className="mt-10 border-t border-line">
+                <div className="border-t border-line">
                   {DIAGNOSTIC_LAYERS.map((layer, i) => (
                     <div key={layer.title} className="flex items-baseline gap-5 border-b border-line py-5 sm:gap-8">
                       <span className="font-mono text-[11px] text-ink-faint">{index2(i)}</span>
                       <div>
                         <div className="text-[15px] font-medium tracking-tight text-ink">{layer.title}</div>
                         <p className="mt-1.5 text-[13.5px] leading-[1.7] text-ink-soft">{layer.text}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <SectionLabel mark="06">Trustworthy by construction</SectionLabel>
-                <h2 className="mt-10 max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
-                  Nothing here is a black box.
-                </h2>
-                <div className="mt-10 border-t border-line">
-                  {TRUST_POINTS.map((point, i) => (
-                    <div key={point.title} className="flex items-baseline gap-5 border-b border-line py-5 sm:gap-8">
-                      <span className="font-mono text-[11px] text-ink-faint">{index2(i)}</span>
-                      <div>
-                        <div className="text-[15px] font-medium tracking-tight text-ink">{point.title}</div>
-                        <p className="mt-1.5 text-[13.5px] leading-[1.7] text-ink-soft">{point.text}</p>
                       </div>
                     </div>
                   ))}
