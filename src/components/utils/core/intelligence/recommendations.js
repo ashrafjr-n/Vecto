@@ -5,6 +5,16 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
 
   const push = (rec) => recs.push(rec);
 
+  /* Columns whose advice is already final: drop it (identifier, constant, empty)
+     or investigate it as leakage first. Any other advice about the same column is
+     either moot or a contradiction — smoking.csv told the reader to BUILD
+     "type_present" two lines below flagging that very indicator as a restatement
+     of the label, and house_prices.csv advised imputing "Status" while telling
+     them to drop it as constant. `settle` records the rec that decides the column;
+     the rest are removed at the end. */
+  const settled = new Map();
+  const settle = (rec) => { push(rec); if (!settled.has(rec.column)) settled.set(rec.column, rec); };
+
   /* Advice was type-blind: every rule keyed off a quality flag or a statistic
      and never asked what KIND of column it was talking about. meta.columnRoles
      has existed all along and was never consulted here. */
@@ -89,6 +99,20 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
 
       const { method, why } = imputationFor(c.col);
 
+      /* Nothing was ever recorded: there is no value to impute and no presence
+         to encode — an indicator built from it would be a constant. */
+      if (count >= meta.rows) {
+        settle({
+          category:  "Feature Selection",
+          priority:  "high",
+          column:    c.col,
+          issue:     "Empty column",
+          action:    `Drop "${c.col}" — it has no values at all.`,
+          rationale: `Every row of "${c.col}" is missing, so neither the value nor its presence carries anything a model could use.`,
+        });
+        return;
+      }
+
       if (pct > 50) {
         /* "Just drop it" throws away the one thing a mostly-empty column still
            reliably carries: WHETHER the value was present. On titanic, Cabin is
@@ -152,7 +176,24 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
   quality.columnsWithIssues
     .filter(c => c.issue === "constant" && c.col !== meta.target)
     .forEach(c => {
-      push({
+      /* Constant where recorded, but not recorded everywhere: the value carries
+         nothing, and WHETHER it was recorded is the only information left. "Drop
+         it" and "impute it with its mode" both threw that away, and they were
+         issued side by side. */
+      const gaps = quality.columnsWithIssues.find(m => m.col === c.col && m.issue === "missing");
+      if (gaps) {
+        settle({
+          category:  "Feature Engineering",
+          priority:  "medium",
+          column:    c.col,
+          issue:     "Constant where recorded",
+          action:    `Replace "${c.col}" with a binary "${c.col}_present" indicator, or drop it — its recorded values are all identical.`,
+          rationale: `Every recorded value of "${c.col}" is the same, so the value itself carries nothing; only its ${gaps.count} missing rows vary. `
+                   + presenceRationale(c.col),
+        });
+        return;
+      }
+      settle({
         category:  "Feature Selection",
         priority:  "high",
         column:    c.col,
@@ -164,7 +205,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
 
   /* ── Identifier columns ── */
   meta.identifierCols.forEach(col => {
-    push({
+    settle({
       category:  "Feature Selection",
       priority:  "high",
       column:    col,
@@ -449,17 +490,27 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       });
     });
 
-  /* ── Target leakage ── */
+  /* ── Target leakage ──
+     Leakage is decided BEFORE the per-column advice it supersedes is filtered,
+     so it is pushed ahead of the filter below. The label follows the metric: a
+     presence leak was printed "r = 1.00", which is a statistic nobody computed. */
+  const LEAK_LABEL = { pearson: "r", cramers_v: "Cramér's V", presence: "Cramér's V of its presence" };
   relationships.leakageSuspects.forEach(leak => {
-    push({
+    settle({
       category:  "Data Integrity",
       priority:  "high",
       column:    leak.col,
-      issue:     `Possible target leakage (${leak.metric === "cramers_v" ? "Cramér's V" : "r"} = ${leak.correlation.toFixed(2)})`,
+      issue:     `Possible target leakage (${LEAK_LABEL[leak.metric] ?? leak.metric} = ${leak.correlation.toFixed(2)})`,
       action:    `Investigate "${leak.col}". ${leak.warning}`,
       rationale: "Target leakage causes models to appear highly accurate during training but fail completely in production.",
     });
   });
+
+  const decided = recs.filter(r => !r.column || r.column === meta.target
+                                 || !settled.has(r.column) || settled.get(r.column) === r
+                                 || r.category === "Data Integrity");
+  recs.length = 0;
+  recs.push(...decided);
 
   /* Sort: high → medium → low, and within one priority put Data Integrity
      first. An integrity problem — an identifier target, a leaking feature —
