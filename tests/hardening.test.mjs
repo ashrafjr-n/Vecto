@@ -1233,5 +1233,25 @@ const skewAdvice = analyzeDataset(
 check("outlier advice quotes the fences it detected with, never a percentile cap",
   !!skewAdvice && !/percentile/.test(skewAdvice.action));
 
+/* ══════════════════════════════════════════
+   The insight cards follow the same decisions
+══════════════════════════════════════════ */
+console.log("\nINSIGHT CARDS — one decision per column, as in the recommendations\n");
+
+/* presRows: "amt" leaks through its presence and is 50% empty. */
+const leakCards = analyzeDataset(presRows, ["amt", "keep", "y"], "y").insights;
+check("a leaking column has its leakage card and no separate missing-values card",
+  leakCards.filter(i => i.text.includes('"amt"')).length === 1
+  && leakCards.some(i => i.title === "Possible Target Leakage"));
+
+/* Two columns carrying the same value and both >50% empty: the advice replaces
+   both with indicators, so no card may tell the reader to drop one of the pair. */
+const cardPairCards = analyzeDataset(pairRows, ["p1", "p2", "f", "y"], "y").insights;
+check("no correlated-pair card for columns the advice already replaces",
+  !cardPairCards.some(i => /Highly Correlated|Strong Feature Correlations|Feature Cluster/.test(i.title) && /"?p1"?/.test(i.text)));
+check("columns sharing one missing-values message share one card",
+  cardPairCards.filter(i => /Critical Missing Values/.test(i.title)).length === 1
+  && cardPairCards.some(i => i.title === "Critical Missing Values in 2 Columns"));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
