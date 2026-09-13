@@ -659,6 +659,11 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     const v = presenceMeasured.get(entry.col);
     if (v === undefined) {
       entry.reason += ` Its presence could not be tested either — one side of the indicator has too few rows.`;
+    } else if (v >= LEAKAGE_MIN) {
+      /* Near-perfect is not advice to build the indicator: it is the same
+         measurement the leakage scan flags, and the two used to disagree. */
+      entry.reason += ` Whether the value was recorded at all separates "${target}" almost perfectly (Cramér's V ${v.toFixed(2)}), `
+                    + `so it is flagged as possible leakage — verify the missingness is not caused by the label before using it.`;
     } else if (v >= PRESENCE_MIN_V) {
       entry.reason += ` What DOES carry signal is whether the value was recorded at all: that indicator alone `
                     + `is associated with "${target}" at Cramér's V ${v.toFixed(2)}. Build "${entry.col}_present".`;
@@ -711,7 +716,14 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           line += `). Across most of the data the strongest is "${broad[0]}" (${(broad[1].absValue ?? 0).toFixed(2)} over ${broad[1].n} rows`;
         }
       }
-      observations.push(`${line}). Consider feature engineering.`);
+      /* The weak verdict covers measured VALUES only. When a presence indicator
+         scores above it, saying "strongest: 0.22" without that qualifier is the
+         report contradicting its own leakage line. */
+      const presenceTop = presenceSignals[0]?.cramersV ?? 0;
+      const qualifier = presenceTop > scVal
+        ? ` This covers the measured values only — whether "${presenceSignals[0].col}" was recorded at all scores ${presenceTop.toFixed(2)}.`
+        : "";
+      observations.push(`${line}). Consider feature engineering.${qualifier}`);
     }
   }
 
@@ -759,7 +771,9 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     observations.unshift(
       `Whether "${top.col}" was recorded at all is associated with "${target}" (Cramér's V ${top.cramersV.toFixed(2)}` +
       `${presenceSignals.length > 1 ? `, and ${presenceSignals.length - 1} other column${presenceSignals.length > 2 ? "s" : ""} likewise` : ""}) — ` +
-      `the missingness carries signal, so build "${top.col}_present" rather than dropping the column.`
+      (top.cramersV >= LEAKAGE_MIN
+        ? `so close to perfect that it is flagged as possible leakage: verify the missingness is not a consequence of the label before building "${top.col}_present".`
+        : `the missingness carries signal, so build "${top.col}_present" rather than dropping the column.`)
     );
   }
 
