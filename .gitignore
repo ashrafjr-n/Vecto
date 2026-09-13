@@ -12,8 +12,10 @@ vecto-docs.md
 # match the real on-disk "reactjs-principles .md" (stray space) and it got tracked.
 *principles*.md
 # Vite dep pre-bundle cache — generated on every dev run, 12MB, never shipped
-# (dist/ is the deployed build and stays tracked on purpose).
 .vite/
+# Production build — Cloudflare Pages runs `npm run build` on every push and deploys
+# dist/ itself, so a committed copy could only ever be stale.
+dist/
 
 # Dataset test reports written by tools/report.mjs — local test artifacts, not build output
 reports/
