@@ -4,6 +4,7 @@
    (buildDossierPayload) and what it BELIEVES (verifyDossier). No network. */
 
 import { buildDossierPayload, verifyDossier } from "../src/lib/ai/dossier.js";
+import { splitDossierPayload, mergeDossierAnswers, askDossier } from "../src/lib/ai/askDossier.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 
@@ -84,6 +85,33 @@ check("unusable and unknown targets are withheld; duplicates dropped",
   v.targets.length === 1 && v.targets[0].column === "label"
   && v.withheld.some((w) => w.column === "empty") && v.withheld.some((w) => w.column === "nope"));
 check("columns the model skipped are listed", JSON.stringify(v.undescribed) === '["empty"]');
+
+console.log("\nPARTS — wide files are asked in pieces and merged back\n");
+
+const wide = { schemaVersion: 1, rows: 10, columns: Array.from({ length: 61 }, (_, i) => ({ name: `c${i}` })) };
+const parts = splitDossierPayload(wide);
+check("a file at or under the part size is one unchanged payload", splitDossierPayload(payload)[0] === payload);
+check("61 columns become 3 parts of at most 25, in order, none lost",
+  parts.length === 3 && parts.every((p) => p.columns.length <= 25)
+  && parts.flatMap((p) => p.columns.map((c) => c.name)).join() === wide.columns.map((c) => c.name).join());
+check("every part names all columns and says which part it is",
+  parts.every((p, i) => p.allColumnNames.length === 61 && p.part.index === i + 1 && p.part.of === 3));
+
+const merged = mergeDossierAnswers([
+  { rowGrain: "one sonar return", columns: [{ name: "c0" }], targetCandidates: [{ column: "R" }, { column: "c1" }] },
+  { rowGrain: "", columns: [{ name: "c25" }], targetCandidates: [{ column: "c30" }] },
+]);
+check("merged columns keep part order", merged.columns.map((c) => c.name).join() === "c0,c25");
+check("targets interleave by rank", merged.targetCandidates.map((t) => t.column).join() === "R,c30,c1");
+check("first non-empty row grain wins", merged.rowGrain === "one sonar return");
+
+let calls = 0;
+const ok = await askDossier(wide, async (p) => { calls++; return { result: { rowGrain: "x", columns: p.columns, targetCandidates: [] }, model: `m${calls % 2}` }; });
+check("askDossier sends each part once and merges", calls === 3 && ok.result.columns.length === 61 && ok.parts === 3);
+check("every model that answered is named once", ok.model === "m1, m0");
+calls = 0;
+const bad = await askDossier(wide, async () => (++calls === 2 ? { error: "busy" } : { result: { columns: [] } }));
+check("a failed part stops the run and returns its error", bad.error === "busy" && calls === 2);
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-dossier checks passed");
 process.exit(failures ? 1 : 0);
