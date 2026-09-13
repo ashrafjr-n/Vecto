@@ -103,5 +103,15 @@ check("dossier requests the strict schema", sent[0].response_format.json_schema.
   && sent[0].response_format.json_schema.strict === true
   && sent[0].response_format.json_schema.schema.required.includes("targetCandidates"));
 
+script(answer('{"rowGrain":"x","columns":[],"targetCandidates":[]}'));
+res = await post({ task: "dossier", payload: { rows: 3, part: { index: 2, of: 3 }, allColumnNames: ["a", "b"], columns: [{ name: "b" }] } });
+check("a part names itself in the prompt and asks for its own column count",
+  res.status === 200 && /part 2 of 3/.test(sent[0].messages[1].content) && /exactly 1 entries/.test(sent[0].messages[1].content));
+script();
+check("allColumnNames must be strings", (await post({ task: "dossier", payload: { rows: 3, allColumnNames: [1], columns: [{ name: "b" }] } })).status === 400);
+script(answer('{"rowGrain":"x","columns":[],"targetCandidates":[]}'));
+await post({ task: "dossier", payload: { rows: 3, columns: [{ name: "b" }] } });
+check("a single-request file carries no part note", !/part \d+ of/.test(sent[0].messages[1].content));
+
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-worker checks passed");
 process.exit(failures ? 1 : 0);
