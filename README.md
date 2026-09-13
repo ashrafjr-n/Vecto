@@ -39,6 +39,13 @@ changes the report only when you accept a suggestion.
   must exist, a suggested role the data contradicts is not offered, the plausible range is
   counted by the engine, and an unusable target is withheld. An accepted role becomes an
   explicit input to the analysis and is marked in the report.
+- **AI leakage review (optional)** — on the Target Signal tab, a language model reads column
+  names, roles and the engine's measured associations (no cell values) and names the
+  columns a model could not use at prediction time: derived from the target, recorded after
+  the outcome, the label under another name, or an entity repeated across rows — plus the
+  split an honest evaluation needs. Every proposed formula is evaluated on the rows, and a
+  total that differs only by a few fixed amounts (an unrecorded surcharge) is recognised as
+  such; group claims are measured; timing claims are shown as questions. Advisory only.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
   behind each decision, the thresholds and estimators it uses, and what it cannot decide
 
@@ -100,7 +107,8 @@ Workers.
 `POST /api/ai` with `{ "task": "<name>", "payload": { ... } }` forwards a server-defined
 prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }`. The
 client only names a task; prompts, JSON schemas and token limits live in the Worker. Tasks:
-`ping` (deployment check) and `dossier` (the column dossier on the target picker). The
+`ping` (deployment check), `dossier` (the column dossier on the target picker) and `leakage`
+(the leakage review on the Target Signal tab). The
 analysis itself still runs entirely in the browser.
 
 - **Models** — `AI_MODELS` in `wrangler.jsonc`, comma-separated, tried in order by
@@ -121,16 +129,18 @@ analysis itself still runs entirely in the browser.
 
 ### AI eval
 
-`tools/ai-eval.mjs` runs the column dossier through the real `/api/ai` endpoint over the
-local test corpus and scores each answer against known answers in
-`tools/ai-eval/expectations.mjs` (targets, roles and subtypes, written before the first run).
+`tools/ai-eval.mjs` runs an AI task through the real `/api/ai` endpoint over the local test
+corpus and scores each answer against known answers written before the first run:
+`--task=dossier` (default) against `tools/ai-eval/expectations.mjs` (targets, roles,
+subtypes), `--task=leakage` against `tools/ai-eval/leakage-expectations.mjs` (known leaks,
+legitimate predictors that must not be flagged, split strategy).
 Answers are verified exactly as the page verifies them, cached by payload hash in
 `reports/ai-eval/`, and summarised in `reports/ai-eval/summary.md`, including the engine's
 own target guess for comparison.
 
 ```bash
 npx wrangler dev                                   # terminal 1, reads .dev.vars
-node --max-old-space-size=8192 tools/ai-eval.mjs   # [--only=titanic] [--fresh] [--rescore]
+node --max-old-space-size=8192 tools/ai-eval.mjs   # [--task=leakage] [--only=titanic] [--fresh] [--rescore]
 ```
 
 One request per file, or one per 25 columns for a wider file (the same parts the page sends);
@@ -146,7 +156,7 @@ The analysis engine has a dependency-free regression suite that runs on plain No
 npm test
 ```
 
-This runs six files:
+This runs seven files:
 
 - **`tests/phase0.test.mjs`** — statistical correctness. Results are asserted against a
   Python reference (pandas/scipy) rather than hand-written expectations.
@@ -172,7 +182,10 @@ This runs six files:
 - **`tests/ai-dossier.test.mjs`** — what the column dossier sends (no rows, no free-text
   values, bounded examples, deterministic), how a wide file is split into parts and merged,
   and how a model's answer is verified against the data before it is shown.
-- **`tests/ai-eval-score.test.mjs`** — the eval's scoring rule on a hand-built dossier.
+- **`tests/ai-leakage.test.mjs`** — what the leakage review sends (no cell values) and how
+  each claim becomes a measurement: formula evaluation including fixed offsets, group
+  measurement, the engine's own association, and timing claims as questions.
+- **`tests/ai-eval-score.test.mjs`** — the eval's scoring rules on hand-built answers.
 
 Run `npm test` after any change under `src/components/utils/core/`.
 
@@ -184,7 +197,8 @@ src/
                               /methodology (how the engine works)
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
-    ai/                       AI client (requestAi), dossier payload + verifier, shared schema
+    ai/                       AI client (requestAi), dossier and leakage payloads, verifiers
+                              and shared schemas
   content/
     methodology.js            copy for /methodology — thresholds quoted from the engine
   pages/
@@ -212,6 +226,7 @@ src/
 tests/                        engine regression suite, output-shape contract, Worker tests
 worker/index.js               Cloudflare Worker entry: POST /api/ai (OpenRouter proxy)
 worker/dossierPrompt.js       the column-dossier prompt
+worker/leakagePrompt.js       the leakage-review prompt
 tools/ai-eval.mjs, ai-eval/   dossier eval over the test corpus, known answers, scoring
 wrangler.jsonc                Worker + static-assets config, AI model list
 ```
