@@ -73,7 +73,7 @@ The analysis engine has a dependency-free regression suite that runs on plain No
 npm test
 ```
 
-This runs two files:
+This runs three files:
 
 - **`tests/phase0.test.mjs`** — statistical correctness. Results are asserted against a
   Python reference (pandas/scipy) rather than hand-written expectations.
@@ -88,6 +88,10 @@ This runs two files:
   against — it exists so a frontend rewrite (or any new consumer) can trust the engine's
   shape without re-deriving it from source, and so a future change to the engine that
   breaks that shape fails here instead of silently.
+- **`tests/hardening.test.mjs`** — proves the engine survives real input: very large
+  columns, malformed CSVs, an identifier picked as the target, and cancelling a running
+  analysis. Known defects can be pinned before they are fixed, and a pinned defect that
+  starts passing fails the suite so it cannot become untested.
 
 Run `npm test` after any change under `src/components/utils/core/`.
 
