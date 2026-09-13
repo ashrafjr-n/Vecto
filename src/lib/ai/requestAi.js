@@ -4,13 +4,14 @@
    network, a cancel — comes back as one shape, because an AI failure must never
    be able to break the page it sits on. The engine report does not depend on it. */
 
-/* Free models are slow, and a 60-column dossier is a long answer. */
-const TIMEOUT_MS = 120_000;
+/* Free models are slow: measured on the eval, nemotron-3-ultra took 24–95 s per
+   dossier (openpowerlifting 95 s), and a 120 s limit would have failed real files. */
+const TIMEOUT_MS = 180_000;
 
 const MESSAGES = {
   ai_disabled:       "The AI assistant is not configured on this deployment (no API key or no model list).",
   rate_limited:      "Every free model is busy, or today's free quota is spent. Nothing else is affected — try again later.",
-  upstream_error:    "The AI provider returned an error.",
+  upstream_error:    "The AI provider returned an error — often a busy free model. Trying again may work.",
   empty_response:    "The model returned an empty answer.",
   invalid_json:      "The model's answer was not valid JSON, even after one retry.",
   truncated:         "The model's answer was cut off before it finished — the file may have too many columns for one request.",
