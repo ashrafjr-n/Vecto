@@ -197,7 +197,7 @@ function Home() {
               onClick={() => !isParsing && inputRef.current?.click()}
               className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-20 text-center transition-colors sm:py-24 ${
                 isDragOver
-                  ? "border-gold bg-gold-tint"
+                  ? "border-accent bg-accent-tint"
                   : "border-line-strong bg-paper-sunken hover:border-ink-faint"
               }`}
             >
@@ -211,7 +211,7 @@ function Home() {
 
               {isParsing ? (
                 <>
-                  <LoaderCircle size={28} className="animate-spin text-gold-ink" />
+                  <LoaderCircle size={28} className="animate-spin text-accent-ink" />
                   <div className="mt-6 text-[17px] text-ink">Parsing file…</div>
                 </>
               ) : (
@@ -353,7 +353,7 @@ function Home() {
                   </div>
                   <div className="mt-4 space-y-2.5 text-[13px] text-ink-soft">
                     <div className="flex items-center gap-2.5">
-                      <TrendingUp size={13} className="shrink-0 text-gold-ink" />
+                      <TrendingUp size={13} className="shrink-0 text-accent-ink" />
                       Top predictor: <span className="font-mono text-ink">eat-well?</span>
                     </div>
                     <div className="flex items-center gap-2.5">
