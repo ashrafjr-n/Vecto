@@ -96,7 +96,7 @@ function CorrelationRanking({ strongRelationships }) {
                   </span>
                 )}
                 {rel.monotonicNotLinear && (
-                  <span className="rounded bg-gold-tint px-1.5 py-0.5 text-[11px] text-gold-ink">
+                  <span className="rounded bg-accent-tint px-1.5 py-0.5 text-[11px] text-accent-ink">
                     Spearman {rel.spearman.toFixed(2)} — monotonic, not linear
                   </span>
                 )}
