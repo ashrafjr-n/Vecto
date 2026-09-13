@@ -300,7 +300,7 @@ function Home() {
             {/* Full width now that it no longer shares the row: the headline holds the
                 left column and the list the right, so neither half sits beside a gap. */}
             <div className="mt-24 sm:mt-32">
-              <SectionLabel mark="05">Six diagnostic layers</SectionLabel>
+              <SectionLabel mark="04">Six diagnostic layers</SectionLabel>
               <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
                 <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
                   One dataset, read six ways.
