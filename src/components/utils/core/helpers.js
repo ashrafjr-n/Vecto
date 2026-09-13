@@ -396,45 +396,21 @@ export function chiSquarePValue(chi2, df) {
   return x < a + 1 ? 1 - gammaSeries(a, x) : gammaCF(a, x);
 }
 
-/* p-value for a correlation ratio eta over k groups and n observations, via the
-   one-way ANOVA F it is equivalent to: F = (eta^2/(k-1)) / ((1-eta^2)/(n-k)).
-   Answers "could this separation be chance?", which eta alone cannot. */
-export function etaPValue(eta, n, k) {
-  if (!Number.isFinite(eta) || k < 2 || n <= k) return null;
-  const e2 = Math.min(1, eta * eta);
-  if (e2 >= 1) return 0;
-  const d1 = k - 1, d2 = n - k;
-  const F  = (e2 / d1) / ((1 - e2) / d2);
-  return betaI(d2 / 2, d1 / 2, d2 / (d2 + d1 * F));
-}
-
-/* η with the degrees-of-freedom correction (epsilon-squared, Kelley 1935), for
-   the same reason Cramér's V carries Bergsma: plug-in η² has expectation
-   (k−1)/(n−1) under independence, so it climbs with the number of groups alone.
-   Harmless with 3 target classes, fatal when the groups are a categorical
-   FEATURE's levels — thousands of Societies against a price. A correction that
-   goes below zero is no association, returned as 0. Needs n > k. */
-export function etaAdjusted(eta, n, k) {
-  if (!Number.isFinite(eta) || k < 2 || n <= k) return null;
-  const e2 = 1 - (1 - eta * eta) * (n - 1) / (n - k);
-  return Math.sqrt(Math.max(0, e2));
-}
-
 /* Rank-based η: Kruskal-Wallis H and its bias-corrected effect size, the measure
    the target scan reports for numeric ↔ categorical pairs.
 
-   Plain η is a ratio of variances, so ONE extreme value decides it. Measured on
-   house_prices.csv, where a single 6.7M price sits among values near 6,000: it
-   swamps the total variance and pushed η to 1.00 for the column that isolates
-   that row (Society) and down to 0.11 for location, whose rank-based η is 0.65.
-   Ranks bound each row's influence, so neither direction survives.
+   Plain η is a ratio of variances, so ONE extreme value can decide it. Measured
+   on house_prices.csv, where a single 6.7M price sits among values near 6,000: it
+   swamps the total variance and pushed location's η down to 0.11, where the
+   rank-based η is 0.65. (Society's 1.00 is real — 0.99 on ranks; the building
+   sets the price per square foot.) Ranks bound each row's influence.
 
    H with scipy's tie correction is exactly (n - 1) · SS_between / SS_total over
    the average ranks, which is how it is computed here. The effect size is
    η²_H = (H - k + 1) / (n - k) (Tomczak & Tomczak 2014): H has expectation k - 1
-   under independence, so subtracting it is the same df correction etaAdjusted
-   applied — a feature with 150 levels of noise scores 0, not 0.45. Reported as
-   sqrt(max(0, η²_H)) so it stays on η's 0-1 scale. Validated against
+   under independence, so subtracting it is a df correction in the same spirit as
+   Bergsma's for V — a feature with 150 levels of noise scores 0, not 0.45. Reported
+   as sqrt(max(0, η²_H)) so it stays on η's 0-1 scale. Validated against
    scipy.stats.kruskal in phase0.test.mjs. Returns null when nothing is testable. */
 export function rankEta(values, labels) {
   const n = values.length;
