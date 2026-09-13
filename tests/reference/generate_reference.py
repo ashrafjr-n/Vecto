@@ -223,8 +223,62 @@ def monotonic_reference(path: str) -> dict:
     return out
 
 
+def medcouple(x) -> float:
+    """Medcouple (Brys, Hubert & Struyf 2004) — the robust skewness the adjusted
+    boxplot is built on. A numpy transcription of statsmodels'
+    stattools._medcouple_1d (statsmodels is not a dependency here), including its
+    kernel for pairs tied AT the median: -1 above the anti-diagonal, 0 on it, +1
+    below. Exact O(n^2); every fixture column is far below the JS sampling cap."""
+    y = np.sort(np.asarray(x, dtype=float))
+    n = y.shape[0]
+    mf = (y[n // 2 - 1] + y[n // 2]) / 2 if n % 2 == 0 else y[(n - 1) // 2]
+    z = y - mf
+    lower = z[z <= 0.0]
+    upper = z[z >= 0.0][:, None]
+    standardization = upper - lower
+    is_zero = np.logical_and(lower == 0.0, upper == 0.0)
+    standardization[is_zero] = np.inf
+    h = (upper + lower) / standardization
+    num_ties = int(np.sum(lower == 0.0))
+    if num_ties:
+        replacements = np.ones((num_ties, num_ties)) - np.eye(num_ties)
+        replacements -= 2 * np.triu(replacements)
+        h[:num_ties, -num_ties:] = np.fliplr(replacements)
+    return float(np.median(h))
+
+
+def outliers_reference(path: str) -> dict:
+    """Skew-adjusted boxplot fences (Hubert & Vandervieren 2008):
+         MC >= 0: [Q1 - 1.5 e^(-4 MC) IQR,  Q3 + 1.5 e^(3 MC) IQR]
+         MC <  0: [Q1 - 1.5 e^(-3 MC) IQR,  Q3 + 1.5 e^(4 MC) IQR]
+    Quartiles are numpy linear (type 7), as everywhere else in this harness.
+    outlier_count counts values strictly outside the fences."""
+    df = pd.read_csv(path)
+    out = {}
+    for col in df.columns:
+        x = df[col].dropna().to_numpy(dtype=float)
+        q1, q3 = np.percentile(x, 25), np.percentile(x, 75)
+        iqr = q3 - q1
+        mc = medcouple(x)
+        if mc >= 0:
+            lo, hi = q1 - 1.5 * np.exp(-4 * mc) * iqr, q3 + 1.5 * np.exp(3 * mc) * iqr
+        else:
+            lo, hi = q1 - 1.5 * np.exp(-3 * mc) * iqr, q3 + 1.5 * np.exp(4 * mc) * iqr
+        out[col] = {
+            "medcouple": mc,
+            "lower_fence": float(lo),
+            "upper_fence": float(hi),
+            "outlier_count": int(np.sum((x < lo) | (x > hi))),
+            "tukey_outlier_count": int(np.sum((x < q1 - 1.5 * iqr) | (x > q3 + 1.5 * iqr))),
+        }
+    return out
+
+
 def main():
     expected = {}
+
+    # outliers.csv — medcouple and the skew-adjusted fences (stage 10d)
+    expected["outliers"] = {"columns": outliers_reference(os.path.join(DATA, "outliers.csv"))}
 
     # a. clean_numeric.csv — numeric stats + all pairwise Pearson r
     expected["clean_numeric"] = {

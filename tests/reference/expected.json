@@ -195,6 +195,45 @@
       }
     }
   },
+  "outliers": {
+    "columns": {
+      "left_skewed": {
+        "lower_fence": 59.65273181689844,
+        "medcouple": -0.3026116578615896,
+        "outlier_count": 15,
+        "tukey_outlier_count": 33,
+        "upper_fence": 98.67694992121687
+      },
+      "right_skewed": {
+        "lower_fence": 2.307370151110824,
+        "medcouple": 0.3671628326567434,
+        "outlier_count": 13,
+        "tukey_outlier_count": 59,
+        "upper_fence": 157.9217982641972
+      },
+      "symmetric": {
+        "lower_fence": 29.394607581407826,
+        "medcouple": 0.061662987650921916,
+        "outlier_count": 15,
+        "tukey_outlier_count": 9,
+        "upper_fence": 78.39929217832244
+      },
+      "tied_median": {
+        "lower_fence": -4.747762565531527,
+        "medcouple": -0.05825242718446607,
+        "outlier_count": 53,
+        "tukey_outlier_count": 36,
+        "upper_fence": 22.279888004052594
+      },
+      "tiny": {
+        "lower_fence": 0.6979361144038823,
+        "medcouple": 0.9480431848852902,
+        "outlier_count": 0,
+        "tukey_outlier_count": 1,
+        "upper_fence": 1033.0256976428782
+      }
+    }
+  },
   "roles_missing": {
     "_note": "missing_count, true_distinct, numeric_count are COMPUTED by pandas/scipy (objective reference). expected_role is INTENDED by fixture design (what detectColumnRoles SHOULD output) \u2014 it is asserted, not computed.",
     "columns": {
