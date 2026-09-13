@@ -725,6 +725,12 @@ const nearlyEmptyLimit = analyzeDataset(nearlyEmpty, ["a", "b", "y"], "y").healt
 check("a column with a few real values is never called 100% empty",
   !!nearlyEmptyLimit && !nearlyEmptyLimit.reason.includes("100%") && nearlyEmptyLimit.reason.includes("99.7%"));
 
+/* Same rule in the advice and the cards — they rounded 99.7 to 100 on their own. */
+const nearlyEmptyRes = analyzeDataset(nearlyEmpty, ["a", "b", "y"], "y");
+check("the recommendations and cards do not call it 100% either",
+  [...nearlyEmptyRes.recommendations.map(r => r.issue + r.action + r.rationale), ...nearlyEmptyRes.insights.map(i => i.title + i.text)]
+    .every(t => !t.includes("100%")) && nearlyEmptyRes.recommendations.some(r => r.issue.includes("99.7%")));
+
 /* ── The presence of a value as its own variable ───────────────────────────
    The engine advised building a "<col>_present" indicator for mostly-empty
    columns and justified it with "often correlates with something meaningful" —
