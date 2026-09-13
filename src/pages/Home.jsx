@@ -387,14 +387,6 @@ function Home() {
               ))}
             </div>
 
-            <div className="mt-24 sm:mt-32">
-              <SectionLabel mark="04">How the analysis works</SectionLabel>
-              <h2 className="mt-10 max-w-[24ch] text-[2rem] font-semibold leading-[1.08] tracking-[-0.03em] text-ink sm:text-5xl">
-                Eight phases, each one documented.
-              </h2>
-              <ProcessTopics />
-            </div>
-
             <div className="mt-24 grid gap-x-16 gap-y-20 sm:mt-32 lg:grid-cols-2">
               <div>
                 <SectionLabel mark="05">Six diagnostic layers</SectionLabel>
