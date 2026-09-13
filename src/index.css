@@ -21,9 +21,12 @@
   --color-line:        #E4E4E2;
   --color-line-strong: #CFCFCC;
 
-  --color-gold:      #C7A233;
-  --color-gold-ink:  #7A5C15;
-  --color-gold-tint: #F7F0DC;
+  /* Accent is monochrome — it was gold until 2026-09-13 and the brand dropped the
+     hue. Emphasis comes from ink-on-surface contrast, never from a colour, so a
+     status colour is always the only coloured thing on screen. */
+  --color-accent:      #111214;
+  --color-accent-ink:  #111214;
+  --color-accent-tint: #E6E6E3;
 
   --color-success:      #1B7A4A;
   --color-success-tint: #E6F4EC;
@@ -57,9 +60,11 @@
   --color-line:        #222529;
   --color-line-strong: #353941;
 
-  --color-gold:      #C9A94A;
-  --color-gold-ink:  #DCBF69;
-  --color-gold-tint: #1E1A0F;
+  /* accent-tint is a lifted neutral wash: 1.33:1 on the panel and 1.46:1 on the
+     canvas, so it reads as a selected surface in both, and ink on it is 12.3:1. */
+  --color-accent:      #F2F3F5;
+  --color-accent-ink:  #F2F3F5;
+  --color-accent-tint: #2A2E36;
 
   --color-success:      #55AF80;
   --color-success-tint: #0F1F18;
@@ -101,7 +106,7 @@ body {
   overflow-x: hidden;
 }
 
-/* ── Scrollbar (gold-tinted, matches the accent rule) ── */
+/* ── Scrollbar (neutral, matches the accent rule) ── */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -113,12 +118,12 @@ body {
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gold);
+  background: var(--color-accent);
 }
 
 /* ── Selection ── */
 ::selection {
-  background: var(--color-gold-tint);
+  background: var(--color-accent-tint);
   color: var(--color-ink);
 }
 
