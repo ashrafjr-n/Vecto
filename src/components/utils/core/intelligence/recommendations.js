@@ -1,3 +1,4 @@
+import { sharePct } from "../helpers.js";
 import { ROLE } from "../roles.constants.js";
 
 /* Which columns the advice has already decided about, and how. ONE function, read
@@ -105,10 +106,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
     .filter(c => c.issue === "missing")
     .forEach(c => {
       const count  = c.count ?? parseInt(c.detail);   // FIX #3: prefer stored count
-      const rawPct = (count / meta.rows) * 100;
-      const pct    = rawPct < 1 && rawPct > 0
-        ? Math.max(0.1, Math.round(rawPct * 10) / 10)
-        : Math.round(rawPct);
+      const pct    = sharePct(count, meta.rows);
 
       /* The target is never imputed. Every rule below is feature advice, and it
          used to reach the target too — "Impute Price with median" invents the
