@@ -139,6 +139,7 @@ function Methodology() {
               </p>
               <Link
                 to="/"
+                onClick={() => window.scrollTo(0, 0)}
                 className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-ink px-6 py-3 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90 lg:self-auto"
               >
                 Analyze a dataset

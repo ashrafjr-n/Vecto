@@ -11,7 +11,7 @@ function Header() {
 
         <button
           type="button"
-          onClick={() => navigate("/")}
+          onClick={() => { window.scrollTo(0, 0); navigate("/"); }}
           aria-label="Vecto home"
           className="flex items-center"
         >
