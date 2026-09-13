@@ -310,8 +310,12 @@ function TargetSignalTab({ result }) {
               these columns as they stand is unlikely to beat the base rate.
             </>
           )}{" "}
-          Each metric below is grouped on its own because they are not directly comparable —
-          they measure different kinds of association and are estimated differently.
+          {entries.length > 0 && (
+            <>
+              Each metric below is grouped on its own because they are not directly comparable —
+              they measure different kinds of association and are estimated differently.
+            </>
+          )}
           {unscored.length > 0 && (
             <>
               {" "}
