@@ -14,7 +14,7 @@ const index2 = (i) => String(i + 1).padStart(2, "0");
    lives in content/methodology.js; this file only lays it out. */
 function Methodology() {
   return (
-    <div className="night dot-grid min-h-screen bg-paper text-ink">
+    <div className="night min-h-screen bg-paper text-ink">
       {/* React 19 hoists this into <head> for the life of the page. */}
       <title>Methodology · Vecto</title>
       <Header />
@@ -41,7 +41,7 @@ function Methodology() {
 
         {/* ── DOTTED CANVAS — the index of stages. Plain anchors: each link jumps
             to the stage below, and the URL hash makes a stage shareable. ── */}
-        <section className="px-6 py-20 sm:px-10 sm:py-28">
+        <section className="dot-grid px-6 py-20 sm:px-10 sm:py-28">
           <nav aria-label="Analysis stages" className="mx-auto max-w-[1400px] rounded-[2rem] border border-line-strong bg-paper-sunken px-6 py-8 sm:px-10 sm:py-10">
             <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
               {PHASES.length} stages, in order
