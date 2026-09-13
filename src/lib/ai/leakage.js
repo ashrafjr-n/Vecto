@@ -71,9 +71,21 @@ export function buildLeakagePayload(result, dossier) {
 const MATCH_REL = 0.01;
 const MATCH_ABS = 0.01;
 
+/* A formula can be right up to a FIXED amount the file does not record. Measured on
+   seaborn's taxis: total = fare + tip + tolls holds exactly on 0.7% of 6,433 rows,
+   because every total also carries a surcharge — the difference is +3.30 on 41% of
+   rows, +3.80 on 23%, +4.30 on 13%, +0.80 on 10%. A wrong formula scatters its
+   differences over many values instead. So the differences are counted, rounded to
+   cents, and the most common few are reported with the share of rows they cover.
+   ponytail: cents rounding assumes currency-like scale; tiny-scale data just lands
+   in the exact-match share instead. The distinct-difference count is capped. */
+const OFFSET_TOP = 5;
+const OFFSET_KEYS_CAP = 1000;
+
 export function evaluateFormula(data, { result, op, terms }) {
   let n = 0;
   let matched = 0;
+  const offsets = new Map();
   const xs = new Array(terms.length);
   for (let i = 0; i < data.length; i++) {
     const y = toNumber(data[i][result]);
@@ -94,8 +106,18 @@ export function evaluateFormula(data, { result, op, terms }) {
     if (!Number.isFinite(rhs)) continue;
     n++;
     if (Math.abs(y - rhs) <= Math.max(MATCH_ABS, MATCH_REL * Math.abs(y))) matched++;
+    const key = (y - rhs).toFixed(2);
+    if (offsets.has(key)) offsets.set(key, offsets.get(key) + 1);
+    else if (offsets.size < OFFSET_KEYS_CAP) offsets.set(key, 1);
   }
-  return { n, matchShare: n ? matched / n : null };
+  const top = [...offsets].sort((a, b) => b[1] - a[1]).slice(0, OFFSET_TOP)
+    .map(([offset, count]) => ({ offset: Number(offset), share: count / n }));
+  return {
+    n,
+    matchShare: n ? matched / n : null,
+    fixedOffsets: top,
+    fixedOffsetShare: top.reduce((sum, o) => sum + o.share, 0),
+  };
 }
 
 /* How an entity column would leak through a random split: how many rows share a
@@ -220,9 +242,20 @@ const CHECKS = {
     const m = evaluateFormula(data, formula);
     const shown = `${formula.result} = ${formula.terms.join(` ${OP_SYMBOL[formula.op]} `)}`;
     if (!m.n) return { formula, measurement: m, verdict: "unchecked", verdictText: `${shown} could not be checked — no row has all of these as numbers.` };
-    const pct = Math.round(m.matchShare * 1000) / 10;
-    const verdict = m.matchShare >= 0.95 ? "confirmed" : m.matchShare >= 0.5 ? "partial" : "contradicted";
-    return { formula, measurement: m, verdict, verdictText: `${shown} holds on ${pct}% of ${m.n.toLocaleString()} rows checked.` };
+    const pct = (share) => `${Math.round(share * 1000) / 10}%`;
+    const rows = m.n.toLocaleString();
+    if (m.matchShare >= 0.95) {
+      return { formula, measurement: m, verdict: "confirmed", verdictText: `${shown} holds on ${pct(m.matchShare)} of ${rows} rows checked.` };
+    }
+    if (m.fixedOffsetShare >= 0.9) {
+      const amounts = m.fixedOffsets.filter((o) => o.offset !== 0).slice(0, 3)
+        .map((o) => `${o.offset > 0 ? "+" : ""}${o.offset} on ${pct(o.share)}`).join(", ");
+      return {
+        formula, measurement: m, verdict: "partial",
+        verdictText: `${shown} holds exactly on only ${pct(m.matchShare)} of ${rows} rows, but on ${pct(m.fixedOffsetShare)} the difference is one of a few fixed amounts (${amounts}) — likely a charge or constant the file does not record.`,
+      };
+    }
+    return { formula, measurement: m, verdict: m.matchShare >= 0.5 ? "partial" : "contradicted", verdictText: `${shown} holds on ${pct(m.matchShare)} of ${rows} rows checked.` };
   },
 
   group_leak: ({ column, data, result }) => {
