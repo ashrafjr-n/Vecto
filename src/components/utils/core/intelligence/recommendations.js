@@ -70,6 +70,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
   };
 
   /* ── Missing values ── */
+  const lightlyMissingAll = [];
   quality.columnsWithIssues
     .filter(c => c.issue === "missing")
     .forEach(c => {
@@ -148,14 +149,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
           rationale: `${pct}% missing is manageable with standard imputation — ${why}.`,
         });
       } else if (count > 0) {
-        push({
-          category:  "Data Cleaning",
-          priority:  "low",
-          column:    c.col,
-          issue:     `Missing values (${pct}%)`,
-          action:    `Drop the ${count} affected row${count === 1 ? "" : "s"}, or impute "${c.col}" with ${method}.`,
-          rationale: `Only ${pct}% of rows are affected, so deleting them costs little${meta.rows > 100 ? "" : " — though with only " + meta.rows + " rows, imputing is safer than losing any"}.`,
-        });
+        lightlyMissingAll.push({ col: c.col, count, pct, method });
       }
     });
 
@@ -501,28 +495,6 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       });
     });
 
-  /* ── Statistically indistinguishable from chance (stage 7) ──
-     Columns already handled by a mostly-missing rule are excluded. Telling the
-     user to keep "Cabin_present" and to drop "Cabin" in the same list reads as
-     the engine contradicting itself, and the missing-value advice is the more
-     specific of the two. */
-  const alreadyHandled = new Set(
-    recs.filter(r => r.priority === "high" && /Missing values/.test(r.issue)).map(r => r.column),
-  );
-  Object.entries(relationships.targetCorrelations ?? {})
-    .filter(([col, e]) => !alreadyHandled.has(col)
-      && e.pValue != null && e.pValue > 0.05 && (e.mi ?? 0) < 0.15)
-    .forEach(([col, e]) => {
-      push({
-        category:  "Feature Selection",
-        priority:  "low",
-        column:    col,
-        issue:     `No detectable relationship with target (p = ${e.pValue.toFixed(2)})`,
-        action:    `Consider dropping "${col}" — or keep it only if domain knowledge says it matters.`,
-        rationale: `The association with "${meta.target}" is ${e.value}, and at ${e.n} rows that is not distinguishable from chance (p = ${e.pValue.toFixed(2)}). This is a statement about THIS sample, not proof the column is useless — a larger dataset could separate it.`,
-      });
-    });
-
   /* ── Target leakage ──
      Leakage is decided BEFORE the per-column advice it supersedes is filtered,
      so it is pushed ahead of the filter below. The label follows the metric: a
@@ -544,6 +516,68 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
                                  || r.category === "Data Integrity");
   recs.length = 0;
   recs.push(...decided);
+
+  /* One item for every lightly-missing column, not one each. The advice is the
+     same for all of them, and house_prices.csv listed six near-identical rows of
+     it — part of how a report reached 37 recommendations that nobody reads to the
+     end. Grouped by imputation method, so the role-aware choice survives. */
+  const lightlyMissing = lightlyMissingAll.filter(m => !settled.has(m.col));
+  if (lightlyMissing.length === 1) {
+    const { col, count, pct, method } = lightlyMissing[0];
+    push({
+      category:  "Data Cleaning",
+      priority:  "low",
+      column:    col,
+      issue:     `Missing values (${pct}%)`,
+      action:    `Drop the ${count} affected row${count === 1 ? "" : "s"}, or impute "${col}" with ${method}.`,
+      rationale: `Only ${pct}% of rows are affected, so deleting them costs little${meta.rows > 100 ? "" : " — though with only " + meta.rows + " rows, imputing is safer than losing any"}.`,
+    });
+  } else if (lightlyMissing.length > 1) {
+    const byMethod = new Map();
+    lightlyMissing.forEach(m => byMethod.set(m.method, [...(byMethod.get(m.method) ?? []), `"${m.col}"`]));
+    push({
+      category:  "Data Cleaning",
+      priority:  "low",
+      column:    null,
+      issue:     `Few missing values in ${lightlyMissing.length} columns (≤ 5% each)`,
+      action:    `Drop the affected rows, or impute: ${[...byMethod].map(([method, cols]) => `${cols.join(", ")} with ${method}`).join("; ")}.`,
+      rationale: `${lightlyMissing.map(m => `"${m.col}" ${m.pct}%`).join(", ")} — each small enough that deleting its rows costs little${meta.rows > 100 ? "" : ", though with only " + meta.rows + " rows imputing is safer than losing any"}.`,
+    });
+  }
+
+  /* ── Statistically indistinguishable from chance (stage 7) ──
+     Columns already handled by a mostly-missing rule are excluded. Telling the
+     user to keep "Cabin_present" and to drop "Cabin" in the same list reads as
+     the engine contradicting itself, and the missing-value advice is the more
+     specific of the two. */
+  const alreadyHandled = new Set(
+    recs.filter(r => r.priority === "high" && /Missing values/.test(r.issue)).map(r => r.column),
+  );
+  const indistinct = Object.entries(relationships.targetCorrelations ?? {})
+    .filter(([col, e]) => !alreadyHandled.has(col) && !settled.has(col)
+      && e.pValue != null && e.pValue > 0.05 && (e.mi ?? 0) < 0.15);
+  if (indistinct.length === 1) {
+    const [col, e] = indistinct[0];
+    push({
+      category:  "Feature Selection",
+      priority:  "low",
+      column:    col,
+      issue:     `No detectable relationship with target (p = ${e.pValue.toFixed(2)})`,
+      action:    `Consider dropping "${col}" — or keep it only if domain knowledge says it matters.`,
+      rationale: `The association with "${meta.target}" is ${e.value}, and at ${e.n} rows that is not distinguishable from chance (p = ${e.pValue.toFixed(2)}). This is a statement about THIS sample, not proof the column is useless — a larger dataset could separate it.`,
+    });
+  } else if (indistinct.length > 1) {
+    // Grouped for the same reason as the lightly-missing columns above.
+    push({
+      category:  "Feature Selection",
+      priority:  "low",
+      column:    null,
+      issue:     `No detectable relationship with target in ${indistinct.length} columns`,
+      action:    `Consider dropping ${indistinct.map(([c]) => `"${c}"`).join(", ")} — or keep any that domain knowledge says matters.`,
+      rationale: `${indistinct.map(([c, e]) => `"${c}" ${e.value} (p = ${e.pValue.toFixed(2)}, n = ${e.n})`).join("; ")}. None is distinguishable from chance in THIS sample, which is not proof a column is useless — a larger dataset could separate it.`,
+    });
+  }
+
 
   /* Sort: high → medium → low, and within one priority put Data Integrity
      first. An integrity problem — an identifier target, a leaking feature —
