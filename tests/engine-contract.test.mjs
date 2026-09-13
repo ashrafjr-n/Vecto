@@ -66,6 +66,7 @@ assertKeysExact(withTarget, [
 assertKeysExact(withTarget.meta, [
   "rows", "columns", "numericCols", "categoricalCols", "identifierCols",
   "temporalCols", "textCols", "columnRoles", "target", "targetIsIdentifier", "targetIsConstant", "datasetType",
+  "roleOverrides",
 ], "meta");
 
 assertKeysExact(withTarget.quality, [

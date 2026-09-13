@@ -38,11 +38,26 @@ export const ANALYSIS_PHASES = [
    and the processing screen was a bare spinner for all of it. frontend.md rules
    out a fake percentage and fake-progress theatre, which this is not — every
    label below is the phase actually executing when it is shown. */
-export function analyzeDataset(data, columns, target, onPhase = () => {}) {
+export function analyzeDataset(data, columns, target, onPhase = () => {}, roleOverrides = {}) {
   const phase = (i) => onPhase({ ...ANALYSIS_PHASES[i], index: i, total: ANALYSIS_PHASES.length });
 
   phase(0);
-  const columnRoles     = detectColumnRoles(data, columns, target);
+  const detectedRoles   = detectColumnRoles(data, columns, target);
+  /* roleOverrides are the USER's decisions ({ column: ROLE }), typically an AI
+     suggestion they accepted on the target picker. They are an explicit input, so
+     the engine is still a pure function of what it is given — it never reads model
+     output. Unknown columns and non-ROLE strings are ignored, and every applied
+     override is recorded in meta.roleOverrides with the role it replaced, so the
+     report can say which roles were user-set rather than detected. */
+  const validRoles      = new Set(Object.values(ROLE));
+  const appliedOverrides = {};
+  for (const [col, role] of Object.entries(roleOverrides ?? {})) {
+    if (columns.includes(col) && validRoles.has(role) && detectedRoles[col] !== role) {
+      appliedOverrides[col] = { from: detectedRoles[col], to: role };
+    }
+  }
+  const columnRoles     = { ...detectedRoles };
+  for (const [col, { to }] of Object.entries(appliedOverrides)) columnRoles[col] = to;
   const identifierCols  = columns.filter(c => columnRoles[c] === ROLE.IDENTIFIER);
   const temporalCols    = columns.filter(c => columnRoles[c] === ROLE.TEMPORAL);
   const textCols        = columns.filter(c => columnRoles[c] === ROLE.TEXT);
@@ -88,7 +103,8 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
      column and to oversample its single class with SMOTE. */
   const targetIsConstant = !!target && targetLevels.length < 2;
 
-  const meta           = getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier, targetIsConstant);
+  const meta           = { ...getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier, targetIsConstant),
+                           roleOverrides: appliedOverrides };
   phase(1);
   // Numeric by ROLE, target included: a near-unique price is a measurement, not an ID.
   const quality        = getQuality(data, columns, identifierCols, temporalCols, textCols,
