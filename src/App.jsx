@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/common/ErrorBoundary.jsx";
    analyzer (PapaParse + the whole results dashboard) never load together. */
 const Home    = lazy(() => import("./pages/Home"));
 const Analyze = lazy(() => import("./pages/Analyze"));
+const Methodology = lazy(() => import("./pages/Methodology"));
 
 /* Painted in the app's own background so a chunk fetch never flashes an unstyled page. */
 function RouteFallback() {
@@ -19,6 +20,7 @@ function App() {
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/"        element={<Home />} />
+          <Route path="/methodology" element={<Methodology />} />
           <Route path="/home"    element={<Navigate to="/" replace />} />
           <Route path="/search"  element={<Navigate to="/" replace />} />
           {/* Boundary sits INSIDE the route so a crash in the analyzer leaves the
