@@ -113,5 +113,18 @@ script(answer('{"rowGrain":"x","columns":[],"targetCandidates":[]}'));
 await post({ task: "dossier", payload: { rows: 3, columns: [{ name: "b" }] } });
 check("a single-request file carries no part note", !/part \d+ of/.test(sent[0].messages[1].content));
 
+// --- leakage task ---
+script();
+check("leakage without a target is 400", (await post({ task: "leakage", payload: { columns: [] } })).status === 400);
+check("leakage with a nameless column is 400", (await post({ task: "leakage", payload: { target: { name: "y" }, columns: [{}] } })).status === 400);
+check("no upstream call for an invalid leakage payload", sent.length === 0);
+script(answer('{"findings":[],"split":{"strategy":"random","column":null,"reason":"x"}}'));
+res = await post({ task: "leakage", payload: { target: { name: "fare" }, columns: [{ name: "total" }] } });
+check("a valid leakage payload is forwarded with its own prompt and strict schema",
+  res.status === 200 && /leakage reviewer/.test(sent[0].messages[0].content)
+  && /target "fare"/.test(sent[0].messages[1].content)
+  && sent[0].response_format.json_schema.name === "leakage"
+  && sent[0].response_format.json_schema.schema.required.includes("split"));
+
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-worker checks passed");
 process.exit(failures ? 1 : 0);
