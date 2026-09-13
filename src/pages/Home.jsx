@@ -320,7 +320,7 @@ function Home() {
             </div>
 
             <div className="mt-24 sm:mt-32">
-              <SectionLabel mark="07">From raw CSV to clear decisions</SectionLabel>
+              <SectionLabel mark="05">From raw CSV to clear decisions</SectionLabel>
               <div className="mt-12 flex flex-col items-center gap-8 rounded-[2rem] border border-line px-6 py-12 sm:flex-row sm:justify-center sm:gap-12 sm:px-12">
 
                 <div className="text-center">
