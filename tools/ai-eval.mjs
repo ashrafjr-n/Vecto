@@ -45,7 +45,7 @@ const CALL_TIMEOUT_MS = 300_000;   // run 1: events.csv passed 240 s on nemotron
 /* The cache key covers the PROMPT as well as the payload. Keyed on the payload
    alone, a prompt change would silently re-score the old prompt's answers. */
 const promptHash = createHash("sha256")
-  .update(readFileSync("worker/index.js", "utf8"))
+  .update(readFileSync("worker/dossierPrompt.js", "utf8"))
   .update(readFileSync("src/lib/ai/dossierSchema.js", "utf8"))
   .digest("hex").slice(0, 8);
 
