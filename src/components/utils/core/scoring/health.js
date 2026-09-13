@@ -114,6 +114,9 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
   // A target that is unique per row has nothing in it to learn. This has to come
   // from meta.targetIsIdentifier: the class-balance test cannot see it, because a
   // legitimate continuous target (price, temperature) is also one row per class.
+  if (meta.targetIsConstant) {
+    caps.push({ max: 25, reason: `The target "${meta.target}" never varies — every row has the same value, so there is nothing for a model to predict.` });
+  }
   if (meta.targetIsIdentifier) {
     caps.push({ max: 40, reason: `The target "${meta.target}" is unique per row — an identifier, not a label. There is nothing in it for a model to predict.` });
   }
