@@ -24,42 +24,42 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
 
   /* ── CRITICAL ── */
 
-  // Target leakage
-  relationships.leakageSuspects.forEach(leak => {
+  // Target leakage — one card per column (meets.csv "MeetState" leaks by value AND by presence)
+  const leakByCol = new Map();
+  relationships.leakageSuspects.forEach(l => leakByCol.set(l.col, [...(leakByCol.get(l.col) ?? []), l.warning]));
+  leakByCol.forEach(warnings => {
     push("critical",
       "Possible Target Leakage",
       /* The warning is composed where the metric is known. Re-writing it here
          printed "r = 0.99" for a Cramér's V, which is a different statistic. */
-      leak.warning,
+      warnings.join(" "),
       100
     );
   });
 
-  // The target is unusable — nothing else on the page matters until it changes.
-  if (meta.targetIsConstant) {
+  /* Missing values, one card per SEVERITY rather than per column: ginf.csv spent
+     four of its eight cards on the same sentence about four odds columns. A
+     leaking or dropped column is left to its own card and advice. */
+  const pctOf = c => {
+    const raw = ((c.count ?? parseInt(c.detail)) / meta.rows) * 100;
+    return raw < 1 && raw > 0 ? Math.max(0.1, Math.round(raw * 10) / 10) : Math.round(raw);
+  };
+  const missingCols = quality.columnsWithIssues.filter(c => c.issue === "missing" && c.col !== meta.target);
+  const sparse = missingCols.filter(c => pctOf(c) > 50 && !leaking.has(c.col) && !dropped.has(c.col));
+  if (sparse.length === 1) {
+    const c = sparse[0];
     push("critical",
-      "Target Never Varies",
-      `Every row of "${meta.target}" has the same value — there is nothing to predict. Pick a different target.`,
-      101
+      `Critical Missing Values in "${c.col}"`,
+      `${pctOf(c)}% of values in "${c.col}" are missing — too sparse to impute. See the recommendations for keeping its presence as an indicator.`,
+      98
+    );
+  } else if (sparse.length > 1) {
+    push("critical",
+      `Critical Missing Values in ${sparse.length} Columns`,
+      `${sparse.map(c => `"${c.col}" (${pctOf(c)}%)`).join(", ")} are more than half empty — too sparse to impute. See the recommendations for keeping their presence as indicators.`,
+      98
     );
   }
-
-  // Massive missing on a column (> 50%)
-  quality.columnsWithIssues
-    .filter(c => c.issue === "missing")
-    .forEach(c => {
-      const rawP2 = ((c.count ?? parseInt(c.detail)) / meta.rows) * 100;
-      const pct   = rawP2 < 1 && rawP2 > 0
-        ? Math.max(0.1, Math.round(rawP2 * 10) / 10)
-        : Math.round(rawP2);
-      if (pct > 50 && !leaking.has(c.col) && !dropped.has(c.col)) {
-        push("critical",
-          `Critical Missing Values in "${c.col}"`,
-          `${pct}% of values in "${c.col}" are missing. This column may not be usable.`,
-          98
-        );
-      }
-    });
 
   // Severe class imbalance — meaningless for a single-valued or per-row-unique target
   const classesMeaningful = !meta.targetIsConstant && !meta.targetIsIdentifier;
@@ -90,20 +90,31 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   }
 
   // Significant missing values (5-50%)
-  quality.columnsWithIssues
-    .filter(c => c.issue === "missing")
-    .forEach(c => {
-      const pct = Math.round(((c.count ?? parseInt(c.detail)) / meta.rows) * 100);
-      if (pct > 5 && pct <= 50 && !notKept.has(c.col)) {
-        push("warning",
-          `Missing Values in "${c.col}"`,
-          c.col === meta.target
-            ? `${pct}% of target values are missing — drop those rows; never impute the target.`
-            : `${pct}% of values in "${c.col}" are missing — imputation recommended.`,
-          70 + pct * 0.3
-        );
-      }
-    });
+  const moderate = missingCols.filter(c => pctOf(c) > 5 && pctOf(c) <= 50 && !notKept.has(c.col));
+  if (moderate.length === 1) {
+    const c = moderate[0];
+    push("warning",
+      `Missing Values in "${c.col}"`,
+      `${pctOf(c)}% of values in "${c.col}" are missing — imputation recommended.`,
+      70 + pctOf(c) * 0.3
+    );
+  } else if (moderate.length > 1) {
+    push("warning",
+      `Missing Values in ${moderate.length} Columns`,
+      `${moderate.map(c => `"${c.col}" (${pctOf(c)}%)`).join(", ")} — imputation recommended; see the recommendations for the method per column.`,
+      70 + moderate.reduce((m, c) => Math.max(m, pctOf(c)), 0) * 0.3
+    );
+  }
+
+  // The target's own missing rows: drop, never impute.
+  const targetMissing = quality.columnsWithIssues.find(c => c.issue === "missing" && c.col === meta.target);
+  if (targetMissing && !meta.targetIsConstant && pctOf(targetMissing) > 5) {
+    push("warning",
+      `Missing Values in the Target "${meta.target}"`,
+      `${pctOf(targetMissing)}% of target values are missing — drop those rows; never impute the target.`,
+      70 + Math.min(50, pctOf(targetMissing)) * 0.3
+    );
+  }
 
   // Multicollinearity
   const keptPairs = relationships.multicollinearPairs.filter(p => bothKept(p.col1, p.col2));
@@ -216,11 +227,12 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
     );
   }
 
-  // Cluster detected
-  if (relationships.clusterDetected) {
+  // Cluster detected — only over columns the advice keeps
+  const keptCluster = (relationships.clusterCols ?? []).filter(kept);
+  if (relationships.clusterDetected && keptCluster.length >= 3) {
     push("info",
       "Feature Cluster Detected",
-      relationships.observations.find(o => o.includes("cluster")) || "Multiple features are heavily intercorrelated.",
+      `Feature cluster detected: ${keptCluster.join(", ")} are heavily intercorrelated. Consider dimensionality reduction within this group.`,
       48
     );
   }
