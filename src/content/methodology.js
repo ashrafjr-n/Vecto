@@ -51,4 +51,16 @@ export const PHASES = [
       { label: "Quality score", text: "A weighted sum: missing values 45%, duplicates 25%, constant columns 15%, identifier columns 15%. When duplicates were not measured their weight is redistributed (60 / 20 / 20) rather than scored as clean. The missing-value component charges overall emptiness, the single worst column, and every column more than 20% empty." },
     ],
   },
+  {
+    id: "statistics",
+    title: "Column statistics",
+    lead: "Each numeric column is parsed once and sorted once; every order statistic reads from that single sorted array. The definitions are the ones pandas and scipy use, so a figure here can be checked against a notebook.",
+    points: [
+      { label: "Location and spread", text: "Mean, median, sample standard deviation (ddof = 1), minimum and maximum. Quartiles use linear interpolation — numpy's default, type 7." },
+      { label: "Shape", text: "Skewness is the bias-corrected moment estimator (scipy.stats.skew, bias=False); kurtosis is bias-corrected excess kurtosis (Fisher, normal = 0). |skew| under 0.5 is labelled symmetric, up to 1 moderate, above 1 high." },
+      { label: "Outliers", text: "Tukey fences at 1.5 × IQR beyond the quartiles. Skipped for columns with ten or fewer distinct values, where a concentrated count would otherwise mark a large share of rows as outliers." },
+      { label: "Distributions", text: "Numeric columns get a ten-bin equal-width histogram; categorical columns get level frequencies grouped by the normalised key. The distribution view reads the same statistics rows, so the chart and the table cannot disagree." },
+      { label: "One parsing rule", text: "A value is a number only if the whole string is numeric. Bare parseFloat would read \"12kg\" as 12 and \"1,234\" as 1; those values are instead missing for the column and reported under data quality." },
+    ],
+  },
 ];
