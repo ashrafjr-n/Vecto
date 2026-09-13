@@ -15,9 +15,10 @@ never leaves your machine.
 - **Statistics** — mean, median, sample standard deviation, skewness, excess kurtosis,
   quartiles and outlier counts for every numeric column
 - **Column roles** — automatic classification into numeric, categorical, binary,
-  identifier, and temporal, with identifier-vs-numeric and date-detection heuristics
-- **Relationships** — Pearson correlation matrix, Cramér's V for categorical pairs,
-  correlation ratio (η), multicollinearity and target-leakage warnings, feature clusters
+  identifier, temporal, and free text, read from whole columns rather than a head sample
+- **Relationships** — Pearson and Spearman with two-sided p-values, bias-corrected
+  Cramér's V for categorical pairs, correlation ratio (η), mutual information for
+  non-monotonic signal, multicollinearity and target-leakage warnings, feature clusters
 - **Missingness as signal** — whether a column was recorded at all is measured against
   the target, so a mostly-empty column whose absence tracks the label is reported rather
   than discarded
