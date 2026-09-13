@@ -16,7 +16,7 @@ import { getValues, isMissing, valueFrequencies, isIdentifierCol } from "./helpe
 import { ROLE } from "./roles.constants.js";
 
 export { detectColumnRoles }       from "./detectors/roles.js";
-export { detectTarget }            from "./detectors/target.js";
+export { detectTarget, usableTargetColumns } from "./detectors/target.js";
 
 /* The phases, in the order they run, with the label the UI shows. Exported so the
    processing screen can say "3 of 6" without hardcoding a count that would go

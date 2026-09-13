@@ -31,6 +31,30 @@ const LOW_CARDINALITY_SHARE = 0.05;
    the old rules never asked whether a candidate was an identifier, a date, free
    text or mostly empty. Every rule below now picks only from usable columns, and
    the roles come from detectColumnRoles — not from a second guesser. */
+/* Whether a column can be a target at all: a role with something to predict, at
+   least two levels, and present on at least half the rows. Shared with the AI
+   dossier verifier, so a model-suggested target passes the same bar as the
+   engine's own guess — never a second, looser one. */
+function isUsableTarget(role, { present, levels }, rows) {
+  return [ROLE.BINARY, ROLE.CATEGORICAL, ROLE.NUMERIC].includes(role)
+    && levels.size >= 2
+    && rows > 0 && present / rows >= 0.5;
+}
+
+export function usableTargetColumns(columns, data, roles = detectColumnRoles(data, columns, null)) {
+  return columns.filter(col => {
+    const levels = new Set();
+    let present = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i][col];
+      if (isMissing(v)) continue;
+      present++;
+      if (levels.size < 2) levels.add(normalizeValue(v));
+    }
+    return isUsableTarget(roles[col], { present, levels }, data.length);
+  });
+}
+
 export function detectTarget(columns, data) {
   if (!columns.length) return undefined;
   const roles = detectColumnRoles(data, columns, null);
@@ -49,12 +73,7 @@ export function detectTarget(columns, data) {
     return [col, { present, levels }];
   }));
 
-  const usable = columns.filter(col => {
-    const { present, levels } = profile.get(col);
-    return [ROLE.BINARY, ROLE.CATEGORICAL, ROLE.NUMERIC].includes(roles[col])
-      && levels.size >= 2
-      && data.length > 0 && present / data.length >= 0.5;
-  });
+  const usable = columns.filter(col => isUsableTarget(roles[col], profile.get(col), data.length));
   if (!usable.length) return columns[columns.length - 1];
   const last = arr => arr[arr.length - 1];
 
