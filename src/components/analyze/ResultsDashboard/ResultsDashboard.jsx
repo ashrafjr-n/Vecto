@@ -16,7 +16,7 @@ const BASE_TABS = [
   { id: "visualizations", label: "Visualizations"                      },
   { id: "targetsignal",   label: "Target Signal", requiresTarget: true },
   { id: "relationships",  label: "Relationships"                       },
-  { id: "classbalance",   label: "Class Balance", requiresTarget: true },
+  { id: "classbalance",   label: "Class Balance", requiresClasses: true },
 ];
 
 function ResultsDashboard({ result, onReset }) {
@@ -25,7 +25,9 @@ function ResultsDashboard({ result, onReset }) {
   if (!result) return null;
 
   const { meta, quality, healthScore } = result;
-  const tabs = BASE_TABS.filter((t) => !t.requiresTarget || !!meta.target);
+  // classBalance is null for a regression target — there are no classes to show.
+  const tabs = BASE_TABS.filter((t) => (!t.requiresTarget || !!meta.target)
+                                    && (!t.requiresClasses || !!result.classBalance));
   const healthTone = healthScore
     ? healthScore.score >= 80 ? "success" : healthScore.score >= 60 ? "warning" : "critical"
     : "ink";
