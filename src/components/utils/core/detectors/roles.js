@@ -72,7 +72,7 @@ const TEXT_MIN_DISTINCT = 50;
    Measured: meets' MeetPath and ginf's id_odsp/link_odsp all sit at exactly 1.000,
    while the highest non-identifier is MeetName at 0.615 — nothing in the corpus
    falls between 0.62 and 1.00, so the threshold is not near anything real. */
-const IDENTIFIER_MIN_DISTINCT_SHARE = 0.95;
+export const IDENTIFIER_MIN_DISTINCT_SHARE = 0.95;
 
 /* One full-column pass: cardinality, numeric share, and integrality.
 
