@@ -37,8 +37,8 @@ const VERDICT_ORDER = ["confirmed", "partial", "question", "unchecked", "contrad
 
 const SPLIT_LABEL = {
   random:       "A random split is appropriate",
-  grouped:      "Split by group",
-  time_ordered: "Split by time",
+  grouped:      "Split by group, on",
+  time_ordered: "Split by time, on",
 };
 
 function AiLeakageReview({ result, data, dossier, review, onReview }) {
@@ -130,7 +130,7 @@ function ReviewResult({ review, target, onAskAgain }) {
           <h3 className="text-[11px] font-medium text-ink-faint">How to split for evaluation</h3>
           <div className="mt-1.5 text-[13.5px] text-ink">
             {SPLIT_LABEL[review.split.strategy]}
-            {review.split.column && <> by <span className="font-mono">{review.split.column}</span></>}
+            {review.split.column && <> <span className="font-mono">{review.split.column}</span></>}
           </div>
           {review.split.reason && <p className="mt-1 text-[12.5px] leading-relaxed text-ink-soft">{review.split.reason}</p>}
           {review.split.note && <p className="mt-1 font-mono text-[11.5px] text-ink-faint">Measured: {review.split.note}</p>}
@@ -152,7 +152,7 @@ function ReviewResult({ review, target, onAskAgain }) {
                 </div>
                 {f.reason && <p className="mt-1.5 text-[13px] leading-relaxed text-ink-soft">{f.reason}</p>}
                 <p className="mt-1.5 text-[12px] leading-relaxed text-ink">
-                  <span className="text-ink-faint">{f.verdict === "question" ? "" : "Checked: "}</span>{f.verdictText}
+                  <span className="text-ink-faint">{f.measurement ? "Checked: " : ""}</span>{f.verdictText}
                 </p>
                 {f.engineFlagged && <p className="mt-1 text-[11.5px] text-ink-faint">The engine&apos;s own leakage check flags this column too.</p>}
               </li>
