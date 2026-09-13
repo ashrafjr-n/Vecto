@@ -564,7 +564,12 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         pValue:   res.pValue,
         nPairs:   res.n,
         levels:   res.levels,
-        statement: `"${a}" and "${b}" are associated (Cramér's V ${r2(res.v).toFixed(2)}) — they may encode overlapping information.`,
+        /* V is symmetric; the statement must not be. With very uneven level counts
+           the finer column determines the coarser one and not the reverse — "Name"
+           and "Sex" do not "encode overlapping information". */
+        statement: Math.max(...res.levels) >= 3 * Math.min(...res.levels)
+          ? `"${res.levels[0] > res.levels[1] ? a : b}" largely determines "${res.levels[0] > res.levels[1] ? b : a}" (Cramér's V ${r2(res.v).toFixed(2)}) — not the other way round.`
+          : `"${a}" and "${b}" are associated (Cramér's V ${r2(res.v).toFixed(2)}) — they may encode overlapping information.`,
       });
     }
   }
@@ -780,8 +785,7 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
   if (categoricalAssociations.length > 0) {
     observations.push(
       `${categoricalAssociations.length} categorical feature pair${categoricalAssociations.length > 1 ? "s are" : " is"} ` +
-      `associated (strongest: "${categoricalAssociations[0].col1}"~"${categoricalAssociations[0].col2}", ` +
-      `V=${categoricalAssociations[0].cramersV.toFixed(2)}) — possible redundancy.`
+      `associated. Strongest: ${categoricalAssociations[0].statement}`
     );
   }
 
