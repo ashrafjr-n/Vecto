@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   Datassert HELPERS — shared pure utilities
+   Vecto HELPERS — shared pure utilities
    No imports. Used by all other modules.
 ───────────────────────────────────────────── */
 
