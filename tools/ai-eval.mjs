@@ -29,6 +29,7 @@ import Papa from "papaparse";
 import { detectColumnRoles, detectTarget } from "../src/components/utils/core/index.js";
 import { transformHeader } from "../src/lib/csvIntake.js";
 import { buildDossierPayload, verifyDossier } from "../src/lib/ai/dossier.js";
+import { askDossier } from "../src/lib/ai/askDossier.js";
 import { EXPECTATIONS } from "./ai-eval/expectations.mjs";
 import { scoreDossier } from "./ai-eval/score.mjs";
 
@@ -95,21 +96,28 @@ for (const expect of selected) {
     rows.push({ file: expect.file, error: "not cached" });
     continue;
   } else {
-    const wait = lastCallAt + delayMs - Date.now();
-    if (wait > 0) await sleep(wait);
-    lastCallAt = Date.now();
     const t0 = Date.now();
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task: "dossier", payload }),
-        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-      });
-      response = { status: res.status, ...(await res.json().catch(() => ({ error: "non_json_response" }))) };
-    } catch (err) {
-      response = { status: 0, error: "request_failed", message: err.message };
-    }
+    // Through askDossier, as the page does — a wide file is measured in the same parts the user gets.
+    const reply = await askDossier(payload, async (part) => {
+      const wait = lastCallAt + delayMs - Date.now();
+      if (wait > 0) await sleep(wait);
+      lastCallAt = Date.now();
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task: "dossier", payload: part }),
+          signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+        });
+        const body = await res.json().catch(() => ({ error: "non_json_response" }));
+        return body.result ? { result: body.result, model: body.model } : { error: body.error, message: body.message, status: res.status };
+      } catch (err) {
+        return { error: "request_failed", message: err.message, status: 0 };
+      }
+    });
+    response = reply.error
+      ? { error: reply.error, message: reply.message ?? null, status: reply.status }
+      : { result: reply.result, model: reply.model, parts: reply.parts };
     ms = Date.now() - t0;
     source = "live";
   }
