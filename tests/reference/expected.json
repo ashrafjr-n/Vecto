@@ -234,6 +234,42 @@
       }
     }
   },
+  "rank_eta": {
+    "pairs": {
+      "grp|noise": {
+        "H": 6.4855790171641985,
+        "k": 6,
+        "n": 600,
+        "p": 0.2617930934196798,
+        "rank_eta": 0.05000974681370327,
+        "raw_eta": 0.10652184877221188
+      },
+      "grp|val": {
+        "H": 386.81676694576254,
+        "k": 6,
+        "n": 600,
+        "p": 2.057059669415952e-81,
+        "rank_eta": 0.8017413360569362,
+        "raw_eta": 0.09137558189701805
+      },
+      "many|noise": {
+        "H": 166.4314917711125,
+        "k": 150,
+        "n": 600,
+        "p": 0.1559708563735284,
+        "rank_eta": 0.19681628078045266,
+        "raw_eta": 0.5145537487535122
+      },
+      "many|val": {
+        "H": 146.64223220334873,
+        "k": 150,
+        "n": 600,
+        "p": 0.5392825865217297,
+        "rank_eta": 0.0,
+        "raw_eta": 0.44571788461955897
+      }
+    }
+  },
   "roles_missing": {
     "_note": "missing_count, true_distinct, numeric_count are COMPUTED by pandas/scipy (objective reference). expected_role is INTENDED by fixture design (what detectColumnRoles SHOULD output) \u2014 it is asserted, not computed.",
     "columns": {
