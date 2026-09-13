@@ -54,6 +54,7 @@ required — the app is fully static.
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve the built output locally |
 | `npm run lint` | Run ESLint over the project |
+| `npm test` | Engine and Worker regression suites (plain Node) |
 
 Ad-hoc dataset reports (no npm script — it takes file arguments):
 
@@ -77,14 +78,36 @@ upload by hand and no build output in the repository.
 | Build command | `npm run build` |
 | Deploy command | `npx wrangler deploy` (the default) |
 | Static assets | `dist` |
-| Environment variables | none |
+| Worker config | `wrangler.jsonc` (entry script `worker/index.js`) |
+| Secret | `OPENROUTER_API_KEY` |
 
 The app is a static single-page application; Cloudflare serves `index.html` for client-side
-routes such as `/methodology` and `/analyze`.
+routes such as `/methodology` and `/analyze`. Only `/api/*` requests run the Worker script —
+everything else is served straight from `dist`. Server-side code lives in `worker/index.js`,
+not in a `functions/` directory, which is a Cloudflare Pages feature and does not run on
+Workers.
 
-Server-side code, when it is added, belongs in the Worker's entry script configured in a
-Wrangler config file — not in a `functions/` directory, which is a Cloudflare Pages feature
-and does not run on Workers.
+### AI endpoint
+
+`POST /api/ai` with `{ "task": "<name>", "payload": { ... } }` forwards a server-defined
+prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }`. The
+client only names a task; prompts, JSON schemas and token limits live in the Worker. No part
+of the app calls it yet — the analysis itself still runs entirely in the browser.
+
+- **Models** — `AI_MODELS` in `wrangler.jsonc`, comma-separated, tried in order by
+  OpenRouter's fallback. An empty value switches the endpoint off.
+- **Key in production** — Cloudflare dashboard → the `vecto` Worker → Settings → Variables
+  and Secrets → Add, type **Secret**, name `OPENROUTER_API_KEY`. Or
+  `npx wrangler secret put OPENROUTER_API_KEY`. Never a build variable, never `VITE_*`.
+- **Key locally** — a `.dev.vars` file in the repository root (gitignored) containing
+  `OPENROUTER_API_KEY=...`, then `npm run build && npx wrangler dev`.
+
+| Response | Meaning |
+| --- | --- |
+| `503 ai_disabled` | no key or no models configured |
+| `400 unknown_task` / `invalid_body`, `413 payload_too_large` | rejected before any model call |
+| `429 rate_limited` | every model in the list is rate-limited, or the daily quota is spent |
+| `502 upstream_error` / `empty_response` / `invalid_json` | OpenRouter failed, or the model's reply was not valid JSON after one repair attempt |
 
 ## Tests
 
@@ -94,7 +117,7 @@ The analysis engine has a dependency-free regression suite that runs on plain No
 npm test
 ```
 
-This runs three files:
+This runs four files:
 
 - **`tests/phase0.test.mjs`** — statistical correctness. Results are asserted against a
   Python reference (pandas/scipy) rather than hand-written expectations.
@@ -113,6 +136,10 @@ This runs three files:
   columns, malformed CSVs, an identifier picked as the target, and cancelling a running
   analysis. Known defects can be pinned before they are fixed, and a pinned defect that
   starts passing fails the suite so it cannot become untested.
+
+- **`tests/ai-worker.test.mjs`** — the `/api/ai` Worker handler with OpenRouter replaced by a
+  scripted `fetch`: request validation, that client-sent prompts are ignored, the
+  rate-limit response, and the single repair round for invalid JSON. No key or network.
 
 Run `npm test` after any change under `src/components/utils/core/`.
 
@@ -148,7 +175,9 @@ src/
       scoring/                health score
       intelligence/           insights and recommendations
       helpers.js              shared numeric utilities
-tests/                        analysis-engine regression suite + output-shape contract
+tests/                        engine regression suite, output-shape contract, Worker tests
+worker/index.js               Cloudflare Worker entry: POST /api/ai (OpenRouter proxy)
+wrangler.jsonc                Worker + static-assets config, AI model list
 ```
 
 ## Tech stack
