@@ -9,6 +9,7 @@ import {
 
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
+import SectionLabel from "../components/common/SectionLabel.jsx";
 import { setPendingDataset } from "../lib/datasetHandoff.js";
 import { validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader } from "../lib/csvIntake.js";
 
@@ -125,18 +126,6 @@ const TRUST_POINTS = [
 ];
 
 const index2 = (i) => String(i + 1).padStart(2, "0");
-
-/* Mono index + label above every editorial block — the section marker doing the
-   work an icon or a card border would do in a denser layout. */
-function SectionLabel({ mark, children }) {
-  return (
-    <div className="flex items-baseline gap-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
-      <span>{mark}</span>
-      <span className="h-px flex-1 bg-line" />
-      <span>{children}</span>
-    </div>
-  );
-}
 
 /* Exactly one topic open at all times (never collapses to nothing) — clicking a
    row switches which one is open rather than toggling it closed. */
