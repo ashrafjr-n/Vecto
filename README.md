@@ -6,8 +6,10 @@ Vecto is a browser-based CSV dataset analyzer. Upload a CSV, pick a target colum
 get a full readiness report: data quality, per-column statistics, correlations, class
 balance, a 0–100 health score, and prioritized recommendations.
 
-**Every byte of analysis runs in your browser.** No upload, no server, no AI — your data 
-never leaves your machine.
+**Every byte of analysis runs in your browser.** No file is uploaded and no model computes
+any part of the report. An optional AI assistant on the target picker can suggest what each
+column means — it runs only when asked, sends a column summary you can inspect first, and
+changes the report only when you accept a suggestion.
 
 ## Features
 
@@ -31,6 +33,12 @@ never leaves your machine.
   target readiness, with a letter grade and per-dimension breakdown
 - **Recommendations** — prioritized, human-readable next steps for making the dataset
   ML-ready
+- **AI column dossier (optional)** — a language model reads a per-column summary and
+  suggests what each column records, a finer subtype, a unit, a plausible range and the
+  likely target. Every claim is checked against the file before it is shown: quoted values
+  must exist, a suggested role the data contradicts is not offered, the plausible range is
+  counted by the engine, and an unusable target is withheld. An accepted role becomes an
+  explicit input to the analysis and is marked in the report.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
   behind each decision, the thresholds and estimators it uses, and what it cannot decide
 
@@ -91,8 +99,9 @@ Workers.
 
 `POST /api/ai` with `{ "task": "<name>", "payload": { ... } }` forwards a server-defined
 prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }`. The
-client only names a task; prompts, JSON schemas and token limits live in the Worker. No part
-of the app calls it yet — the analysis itself still runs entirely in the browser.
+client only names a task; prompts, JSON schemas and token limits live in the Worker. Tasks:
+`ping` (deployment check) and `dossier` (the column dossier on the target picker). The
+analysis itself still runs entirely in the browser.
 
 - **Models** — `AI_MODELS` in `wrangler.jsonc`, comma-separated, tried in order by
   OpenRouter's fallback. An empty value switches the endpoint off.
@@ -100,7 +109,8 @@ of the app calls it yet — the analysis itself still runs entirely in the brows
   and Secrets → Add, type **Secret**, name `OPENROUTER_API_KEY`. Or
   `npx wrangler secret put OPENROUTER_API_KEY`. Never a build variable, never `VITE_*`.
 - **Key locally** — a `.dev.vars` file in the repository root (gitignored) containing
-  `OPENROUTER_API_KEY=...`, then `npm run build && npx wrangler dev`.
+  `OPENROUTER_API_KEY=...`. Run `npx wrangler dev` (needs one `npm run build` so `dist/`
+  exists) beside `npm run dev`; the Vite dev server proxies `/api` to wrangler on port 8787.
 
 | Response | Meaning |
 | --- | --- |
@@ -117,7 +127,7 @@ The analysis engine has a dependency-free regression suite that runs on plain No
 npm test
 ```
 
-This runs four files:
+This runs five files:
 
 - **`tests/phase0.test.mjs`** — statistical correctness. Results are asserted against a
   Python reference (pandas/scipy) rather than hand-written expectations.
@@ -140,6 +150,9 @@ This runs four files:
 - **`tests/ai-worker.test.mjs`** — the `/api/ai` Worker handler with OpenRouter replaced by a
   scripted `fetch`: request validation, that client-sent prompts are ignored, the
   rate-limit response, and the single repair round for invalid JSON. No key or network.
+- **`tests/ai-dossier.test.mjs`** — what the column dossier sends (no rows, no free-text
+  values, bounded examples, deterministic) and how a model's answer is verified against the
+  data before it is shown.
 
 Run `npm test` after any change under `src/components/utils/core/`.
 
@@ -151,6 +164,7 @@ src/
                               /methodology (how the engine works)
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
+    ai/                       AI client (requestAi), dossier payload + verifier, shared schema
   content/
     methodology.js            copy for /methodology — thresholds quoted from the engine
   pages/
