@@ -12,12 +12,12 @@ function Header() {
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="flex items-center gap-2.5"
+          aria-label="Vecto home"
+          className="flex items-center"
         >
-          <img src="/datassert-logo.png" alt="Datassert" className="h-8 w-8 object-contain" />
-          <span className="text-[15px] font-semibold tracking-tight text-ink">
-            Datassert
-          </span>
+          {/* Wordmark, not a symbol — it carries the name, so no text sits beside it.
+              White artwork: legible only because every page renders in `.night`. */}
+          <img src="/vecto-logo.png" alt="Vecto" width={538} height={238} className="h-8 w-auto" />
         </button>
 
         <button
