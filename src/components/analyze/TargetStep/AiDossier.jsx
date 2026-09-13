@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle, TriangleAlert, X, RotateCcw, Sparkles } from "lucide-react";
+import { TriangleAlert, RotateCcw, Sparkles } from "lucide-react";
 
 import { buildDossierPayload, verifyDossier } from "../../../lib/ai/dossier.js";
 import { requestAi } from "../../../lib/ai/requestAi.js";
 import { askDossier } from "../../../lib/ai/askDossier.js";
-import AiBadge  from "../shared/AiBadge.jsx";
+import AiPanel  from "../shared/AiPanel.jsx";
+import AiPayloadPreview from "../shared/AiPayloadPreview.jsx";
 import RolePill from "../shared/RolePill.jsx";
 
 /* AI phase B on the target picker: what each column is, and which column is the
@@ -18,7 +19,6 @@ import RolePill from "../shared/RolePill.jsx";
 function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOverridesChange, onUseTarget, currentTarget }) {
   const [status, setStatus]   = useState("idle");   // idle | loading | error
   const [failure, setFailure] = useState(null);
-  const [preview, setPreview] = useState(null);
   const runRef = useRef(null);
 
   // Leaving the picker mid-request: stop waiting for an answer nobody will see.
@@ -57,37 +57,15 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
   };
 
   return (
-    <div className="mt-6 rounded-[2rem] border border-dashed border-line-strong bg-paper-sunken p-6 sm:p-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">AI assistant</h2>
-        <span className="h-px min-w-4 flex-1 bg-line" />
-        <AiBadge>Optional · not measured</AiBadge>
-      </div>
-
-      {status === "loading" && (
-        <div className="mt-6 flex flex-wrap items-center gap-3 text-[13px] text-ink-soft">
-          <LoaderCircle size={16} className="animate-spin text-accent-ink" />
-          Waiting for the model. Free models can take a minute, and a file over 25 columns is asked in parts.
-          <button type="button" onClick={handleCancel} className="inline-flex items-center gap-1 font-medium text-ink-soft hover:text-ink">
-            <X size={13} /> Cancel
-          </button>
-        </div>
-      )}
-
-      {status === "error" && (
-        <div className="mt-6 rounded-xl border border-line bg-paper px-4 py-3.5">
-          <div className="flex items-start gap-2.5 text-[13px] leading-relaxed text-ink">
-            <TriangleAlert size={14} className="mt-0.5 shrink-0 text-warning" />
-            <div>
-              {failure?.error}
-              {failure?.detail && <div className="mt-1 font-mono text-[11.5px] text-ink-faint">{failure.detail}</div>}
-              <div className="mt-1 text-[12.5px] text-ink-soft">The analysis itself does not depend on this — you can start it now.</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {status !== "loading" && !dossier && (
+    <AiPanel
+      title="AI assistant"
+      className="mt-6"
+      status={status}
+      failure={failure}
+      onCancel={handleCancel}
+      loadingText="Waiting for the model. Free models can take a minute, and a file over 25 columns is asked in parts."
+    >
+      {!dossier && (
         <>
           <p className="mt-6 text-[13.5px] leading-[1.7] text-ink-soft">
             Ask a language model what each column records and which one is most likely the
@@ -99,19 +77,7 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
             names, per-column counts and summary statistics, up to 8 frequent values and 5
             example values per column. No rows, and no values from free-text columns.
           </p>
-          <details
-            className="mt-3 text-[12.5px] text-ink-soft"
-            onToggle={(e) => { if (e.currentTarget.open && !preview) setPreview(JSON.stringify(payload(), null, 2)); }}
-          >
-            <summary className="cursor-pointer font-medium hover:text-ink">
-              Show exactly what is sent{preview && ` (${(preview.length / 1024).toFixed(1)} KB)`}
-            </summary>
-            {preview && (
-              <pre className="mt-3 max-h-72 overflow-auto rounded-xl border border-line bg-paper p-4 font-mono text-[11px] leading-relaxed text-ink-soft">
-                {preview}
-              </pre>
-            )}
-          </details>
+          <AiPayloadPreview build={payload} />
           <button
             type="button"
             onClick={handleAsk}
@@ -123,7 +89,7 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
         </>
       )}
 
-      {status !== "loading" && dossier && (
+      {dossier && (
         <DossierResult
           dossier={dossier}
           overrides={overrides}
@@ -133,7 +99,7 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
           onAskAgain={handleAsk}
         />
       )}
-    </div>
+    </AiPanel>
   );
 }
 
