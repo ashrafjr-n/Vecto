@@ -40,7 +40,14 @@ const delayMs  = Number(flag("delay") ?? 4000);   // free tier: 20 requests/minu
 const only     = flag("only")?.split(",");
 const fresh    = args.includes("--fresh");
 const rescore  = args.includes("--rescore");
-const CALL_TIMEOUT_MS = 240_000;
+const CALL_TIMEOUT_MS = 300_000;   // run 1: events.csv passed 240 s on nemotron-3-ultra
+
+/* The cache key covers the PROMPT as well as the payload. Keyed on the payload
+   alone, a prompt change would silently re-score the old prompt's answers. */
+const promptHash = createHash("sha256")
+  .update(readFileSync("worker/index.js", "utf8"))
+  .update(readFileSync("src/lib/ai/dossierSchema.js", "utf8"))
+  .digest("hex").slice(0, 8);
 
 const slug = (file) => file.replace(/\.csv$/, "").replace(/[^a-z0-9]+/gi, "_");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -72,7 +79,7 @@ for (const expect of selected) {
 
   const payload = buildDossierPayload(data, columns, roles);
   const payloadJson = JSON.stringify(payload);
-  const payloadHash = createHash("sha256").update(payloadJson).digest("hex").slice(0, 16);
+  const payloadHash = createHash("sha256").update(payloadJson).update(promptHash).digest("hex").slice(0, 16);
 
   const cached = existsSync(outPath) ? JSON.parse(readFileSync(outPath, "utf8")) : null;
   const reusable = cached?.payloadHash === payloadHash && cached.response?.result;
@@ -113,7 +120,7 @@ for (const expect of selected) {
 
   writeFileSync(outPath, JSON.stringify({
     file: expect.file, rows: data.length, columns: columns.length, engineTargetGuess,
-    model: response.model ?? null, ms, payloadChars: payloadJson.length, payloadHash,
+    model: response.model ?? null, ms, payloadChars: payloadJson.length, payloadHash, promptHash,
     error, score, verified, response,
   }, null, 2));
 
@@ -145,7 +152,7 @@ function summarize(results) {
   const lines = [
     `# Column dossier eval — ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`,
     "",
-    `Endpoint \`${endpoint}\` · ${ok.length}/${results.length} files answered · models: ${models.join(", ") || "none"}`,
+    `Endpoint \`${endpoint}\` · prompt \`${promptHash}\` · ${ok.length}/${results.length} files answered · models: ${models.join(", ") || "none"}`,
     "",
     "| Measure | Score |",
     "| --- | --- |",
