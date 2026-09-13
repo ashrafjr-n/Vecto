@@ -68,17 +68,23 @@ engine against many datasets; it is not part of the shipped app.
 
 ## Deployment
 
-Deployed on **Cloudflare Pages**, connected to the GitHub repository. Every push triggers a
-build — there is nothing to upload by hand and no build output in the repository.
+Deployed on **Cloudflare Workers** with static assets, connected to the GitHub repository
+through Workers Builds. Every push triggers a build and a deploy — there is nothing to
+upload by hand and no build output in the repository.
 
 | Setting | Value |
 | --- | --- |
 | Build command | `npm run build` |
-| Output directory | `dist` |
+| Deploy command | `npx wrangler deploy` (the default) |
+| Static assets | `dist` |
 | Environment variables | none |
 
 The app is a static single-page application; Cloudflare serves `index.html` for client-side
 routes such as `/methodology` and `/analyze`.
+
+Server-side code, when it is added, belongs in the Worker's entry script configured in a
+Wrangler config file — not in a `functions/` directory, which is a Cloudflare Pages feature
+and does not run on Workers.
 
 ## Tests
 
