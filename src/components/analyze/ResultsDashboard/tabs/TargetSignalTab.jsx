@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import SectionCard from "../../shared/SectionCard.jsx";
 import StatusBadge from "../../shared/StatusBadge.jsx";
 import { correlationFill } from "../../shared/correlationColor.js";
+import AiLeakageReview from "./AiLeakageReview.jsx";
 
 /* ─────────────────────────────────────────────
    TARGET SIGNAL — which columns actually relate to the target.
@@ -207,7 +208,8 @@ function UnscoredColumns({ columns, target }) {
   );
 }
 
-function TargetSignalTab({ result }) {
+/* `ai` = { data, dossier, leakageReview, onLeakageReview }, owned by Analyze.jsx. */
+function TargetSignalTab({ result, ai }) {
   const { meta, relationships } = result;
   const entries = Object.entries(relationships.targetCorrelations ?? {});
 
@@ -327,6 +329,17 @@ function TargetSignalTab({ result }) {
           )}
         </p>
       </SectionCard>
+
+      {/* An unusable target has no timing to reason about, and no rows means nothing to measure a claim on. */}
+      {!targetProblem && ai?.data && (
+        <AiLeakageReview
+          result={result}
+          data={ai.data}
+          dossier={ai.dossier}
+          review={ai.leakageReview}
+          onReview={ai.onLeakageReview}
+        />
+      )}
 
       <PresenceSignals signals={relationships.presenceSignals ?? []} target={meta.target} />
 
