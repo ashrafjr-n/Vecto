@@ -165,6 +165,67 @@ export function etaCorrelation(numericValues, categoryLabels) {
   return Math.sqrt(ssBetween / ssTotal);
 }
 
+/* Medcouple (Brys, Hubert & Struyf 2004): a robust skewness in [-1, 1], the input
+   to the skew-adjusted boxplot below. For every pair straddling the median it
+   compares the two distances from the median; the median of those comparisons is
+   0 for a symmetric sample and grows toward +1 as the right tail stretches.
+
+   Same kernel as statsmodels' _medcouple_1d, including pairs tied AT the median
+   (-1 above the anti-diagonal of the tie block, 0 on it, +1 below), validated in
+   phase0.test.mjs against a numpy transcription of it.
+
+   ponytail: O(m^2) kernel. Above MC_SAMPLE values it runs on MC_SAMPLE evenly
+   spaced order statistics of the column — a shape ESTIMATOR, which a quantile
+   sample estimates well (the COUNT of outliers is still taken over every value).
+   The O(n log n) Johnson–Mizoguchi algorithm is the upgrade if exactness on huge
+   columns ever matters. Takes an ascending array. */
+const MC_SAMPLE = 1500;
+export function medcouple(sorted) {
+  const n0 = sorted.length;
+  if (n0 < 3) return 0;
+  const xs = n0 > MC_SAMPLE
+    ? Array.from({ length: MC_SAMPLE }, (_, k) => sorted[Math.round(k * (n0 - 1) / (MC_SAMPLE - 1))])
+    : sorted;
+  const med = medianSorted(xs);
+  const lower = [], upper = [];                 // both ascending, as xs is
+  for (const x of xs) {
+    const z = x - med;
+    if (z <= 0) lower.push(z);
+    if (z >= 0) upper.push(z);
+  }
+  let ties = 0;
+  for (const z of lower) if (z === 0) ties++;
+
+  const L = lower.length, U = upper.length;
+  const h = new Float64Array(U * L);
+  let k = 0;
+  for (let i = 0; i < U; i++) {
+    const zu = upper[i];
+    for (let j = 0; j < L; j++) {
+      const zl = lower[j];
+      h[k++] = (zu === 0 && zl === 0)
+        ? Math.sign(i + (j - (L - ties)) - (ties - 1))   // tie block: zeros lead upper, end lower
+        : (zu + zl) / (zu - zl);
+    }
+  }
+  h.sort();
+  const m = h.length;
+  return m % 2 ? h[(m - 1) / 2] : (h[m / 2 - 1] + h[m / 2]) / 2;
+}
+
+/* Skew-adjusted boxplot fences (Hubert & Vandervieren 2008). Plain Tukey fences
+   assume symmetry, so on a long right tail they call the tail itself "outliers":
+   titanic Fare 13%, ginf's betting odds ~10%, and house_prices' price cut off at
+   17k — 7,932 values flagged while the one real error (6.7M) disappeared among
+   them. The medcouple stretches the fence on the long side and tightens it on the
+   short side; at MC = 0 it IS Tukey's 1.5 x IQR. */
+export function adjustedFences(q1, q3, mc) {
+  const iqr = q3 - q1;
+  return mc >= 0
+    ? { lower: q1 - 1.5 * Math.exp(-4 * mc) * iqr, upper: q3 + 1.5 * Math.exp(3 * mc) * iqr }
+    : { lower: q1 - 1.5 * Math.exp(-3 * mc) * iqr, upper: q3 + 1.5 * Math.exp(4 * mc) * iqr };
+}
+
 export function quantileSorted(sorted, q) {
   const pos  = (sorted.length - 1) * q;
   const base = Math.floor(pos);

@@ -2,7 +2,7 @@ import {
   getNumericValues,
   mean, medianSorted, stdDev, quantileSorted,
   skewness as computeSkewness, kurtosis as computeKurtosis,
-  buildHistogram, valueFrequencies,
+  buildHistogram, valueFrequencies, medcouple, adjustedFences,
 } from "../helpers.js";
 
 export function getStatistics(data, numericCols) {
@@ -27,8 +27,9 @@ export function getStatistics(data, numericCols) {
       absSkew < 0.5 ? "Symmetric" :
       absSkew <= 1  ? "Moderate"  : "High";
 
-    const lowerFence  = q1 - 1.5 * iqr;
-    const upperFence  = q3 + 1.5 * iqr;
+    // Skew-adjusted, not plain Tukey — see adjustedFences() in helpers.js.
+    const mc = medcouple(sorted);
+    const { lower: lowerFence, upper: upperFence } = adjustedFences(q1, q3, mc);
 
     // FIX #4: Skip IQR outlier detection for discrete/count features.
     // When unique values ≤ 10, IQR classifies a huge fraction as "outliers"
@@ -59,6 +60,7 @@ export function getStatistics(data, numericCols) {
       kurtosis,
       skewnessLabel,
       outlierCount: outliers.length,
+      medcouple:    Math.round(mc * 100) / 100,
       lowerFence:   Math.round(lowerFence * 100) / 100,
       upperFence:   Math.round(upperFence * 100) / 100,
       count:        vals.length,
