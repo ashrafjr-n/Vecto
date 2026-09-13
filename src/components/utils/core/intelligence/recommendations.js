@@ -13,7 +13,11 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      them to drop it as constant. `settle` records the rec that decides the column;
      the rest are removed at the end. */
   const settled = new Map();
-  const settle = (rec) => { push(rec); if (!settled.has(rec.column)) settled.set(rec.column, rec); };
+  const settle = (rec) => {
+    push(rec);
+    // Leakage outranks any other decision about a column — investigate it first.
+    if (!settled.has(rec.column) || rec.category === "Data Integrity") settled.set(rec.column, rec);
+  };
 
   /* Advice was type-blind: every rule keyed off a quality flag or a statistic
      and never asked what KIND of column it was talking about. meta.columnRoles
@@ -71,6 +75,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
 
   /* ── Missing values ── */
   const lightlyMissingAll = [];
+  const replacedByIndicator = new Set();   // advised away: the original column is dropped
   quality.columnsWithIssues
     .filter(c => c.issue === "missing")
     .forEach(c => {
@@ -115,11 +120,14 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       }
 
       if (pct > 50) {
+        replacedByIndicator.add(c.col);
         /* "Just drop it" throws away the one thing a mostly-empty column still
            reliably carries: WHETHER the value was present. On titanic, Cabin is
            77% missing and its missingness tracks passenger class closely — the
-           presence flag survives even though the value does not. */
-        push({
+           presence flag survives even though the value does not.
+           It settles the column: outlier, skew or pair advice about a column
+           being replaced is moot. */
+        settle({
           category:  "Data Cleaning",
           priority:  "high",
           column:    c.col,
@@ -152,6 +160,12 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
         lightlyMissingAll.push({ col: c.col, count, pct, method });
       }
     });
+
+  /* Pair advice ("drop one of", "use a non-linear model for both") assumes both
+     columns stay. ginf.csv advised dropping one of odd_bts / odd_bts_n two lines
+     after replacing both with presence indicators. */
+  const notKept = new Set([...meta.identifierCols, ...relationships.leakageSuspects.map(l => l.col), ...replacedByIndicator]);
+  const bothKept = (a, b) => !notKept.has(a) && !notKept.has(b);
 
   /* ── Duplicate rows ── */
   if (quality.duplicateRows > 0) {
@@ -397,7 +411,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
   }
 
   /* ── Multicollinearity ── */
-  relationships.multicollinearPairs.forEach(pair => {
+  relationships.multicollinearPairs.filter(pair => bothKept(pair.col1, pair.col2)).forEach(pair => {
     push({
       category:  "Feature Selection",
       priority:  "medium",
@@ -417,7 +431,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      on it. A pair the linear scan calls weak while the rank scan calls it strong
      is a relationship a linear model will underfit. */
   relationships.strongRelationships
-    .filter(sr => sr.monotonicNotLinear)
+    .filter(sr => sr.monotonicNotLinear && bothKept(sr.col1, sr.col2))
     .forEach(sr => {
       push({
         category:  "Modeling",
@@ -439,14 +453,14 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      the two" was wrong for every such pair (drop Society and its detail is gone),
      and house_prices.csv issued it 15 times, once per pair. Uneven pairs are now
      grouped under the column that determines the others; only pairs of similar
-     grain keep the "one of the two" advice. Columns already settled (dropped or
-     under leakage investigation) are left out — advising on them is moot. */
+     grain keep the "one of the two" advice. Columns already settled (dropped,
+     replaced by a presence indicator, or under leakage investigation) are left
+     out — "if you keep Society" beside "replace Society" was one more contradiction. */
   const UNEVEN_LEVELS = 3;
-  const skipRedundancy = new Set([...meta.identifierCols, ...relationships.leakageSuspects.map(l => l.col)]);
   const fmtV = v => v.toFixed(2);
   const determines = new Map();
   (relationships.categoricalAssociations ?? [])
-    .filter(a => a.cramersV >= 0.6 && !skipRedundancy.has(a.col1) && !skipRedundancy.has(a.col2))
+    .filter(a => a.cramersV >= 0.6 && bothKept(a.col1, a.col2))
     .forEach(a => {
       const [l1, l2] = a.levels;
       if (Math.max(l1, l2) >= UNEVEN_LEVELS * Math.min(l1, l2)) {
@@ -500,13 +514,16 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      so it is pushed ahead of the filter below. The label follows the metric: a
      presence leak was printed "r = 1.00", which is a statistic nobody computed. */
   const LEAK_LABEL = { pearson: "r", cramers_v: "Cramér's V", presence: "Cramér's V of its presence" };
-  relationships.leakageSuspects.forEach(leak => {
+  // One item per column: meets.csv "MeetState" leaks through its value AND its presence.
+  const leaksByCol = new Map();
+  relationships.leakageSuspects.forEach(leak => leaksByCol.set(leak.col, [...(leaksByCol.get(leak.col) ?? []), leak]));
+  leaksByCol.forEach((leaks, col) => {
     settle({
       category:  "Data Integrity",
       priority:  "high",
-      column:    leak.col,
-      issue:     `Possible target leakage (${LEAK_LABEL[leak.metric] ?? leak.metric} = ${leak.correlation.toFixed(2)})`,
-      action:    `Investigate "${leak.col}". ${leak.warning}`,
+      column:    col,
+      issue:     `Possible target leakage (${leaks.map(l => `${LEAK_LABEL[l.metric] ?? l.metric} = ${l.correlation.toFixed(2)}`).join(", ")})`,
+      action:    `Investigate "${col}". ${leaks.map(l => l.warning).join(" ")}`,
       rationale: "Target leakage causes models to appear highly accurate during training but fail completely in production.",
     });
   });
