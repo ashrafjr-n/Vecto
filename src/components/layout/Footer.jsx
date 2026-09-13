@@ -6,7 +6,7 @@ function Footer() {
   return (
     <footer className="border-t border-line px-6 py-6 sm:px-10">
       <div className="mx-auto flex max-w-[1500px] items-center justify-between">
-        <span className="text-[12px] text-ink-faint">&copy; {year} Datassert. All rights reserved.</span>
+        <span className="text-[12px] text-ink-faint">&copy; {year} Vecto. All rights reserved.</span>
         <a
           href="https://github.com/ashrafjr-n/datassert"
           target="_blank"
