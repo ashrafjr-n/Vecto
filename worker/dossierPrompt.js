@@ -13,7 +13,7 @@ For EVERY column in the profile return exactly one entry — never stop early, e
 - name: the column name exactly as given.
 - meaning: what the column most likely records, one plain sentence.
 - role: one of ${DOSSIER_ROLES.join(", ")}. Keep engineRole unless the name and values give a clear reason it is wrong — for example integers that stand for categories are categorical, a key into another table is identifier. A column with exactly 2 distinct values is binary, whatever the values are.
-- subtype: one of ${DOSSIER_SUBTYPES.join(", ")}.
+- subtype: one of ${DOSSIER_SUBTYPES.join(", ")}. A quantity written with a unit or scale word inside the value ("42 Lac", "500 sqft", "1.2 Cr") is a measurement, even though the engine reads it as text.
 - unit: the unit of measure if the name or values show one, otherwise null.
 - validRange: for a numeric column, the plausible range {min, max} a correct value could take (either may be null); null for any other column.
 - confidence: low, medium or high.
