@@ -38,7 +38,7 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
           <select
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
-            className="w-full appearance-none rounded-xl border border-line-strong bg-paper px-4 py-3 font-mono text-[13px] text-ink focus:border-gold focus:outline-none"
+            className="w-full appearance-none rounded-xl border border-line-strong bg-paper px-4 py-3 font-mono text-[13px] text-ink focus:border-accent focus:outline-none"
           >
             {columns.map((col) => (
               <option key={col} value={col}>{col} — {colTypes[col]}</option>
@@ -130,7 +130,7 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack }) {
         <div className="mx-auto max-w-2xl">
           <div className="rounded-[2rem] border border-line bg-paper-sunken p-6 sm:p-8">
 
-            {/* Segmented control. The active segment wears the gold wash rather
+            {/* Segmented control. The active segment wears the accent wash rather
                 than a raised `bg-paper` tile: on a dark surface the page color
                 is the DARKEST value, so the old lifted-tile treatment made the
                 selected mode read as recessed. Same active token as the report's
@@ -142,7 +142,7 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack }) {
                   type="button"
                   onClick={() => setMode(opt.id)}
                   className={`flex-1 rounded-lg px-3 py-2 text-[12.5px] font-medium transition-colors ${
-                    mode === opt.id ? "bg-gold-tint text-gold-ink" : "text-ink-soft hover:text-ink"
+                    mode === opt.id ? "bg-accent-tint text-accent-ink" : "text-ink-soft hover:text-ink"
                   }`}
                 >
                   {opt.label}
