@@ -249,6 +249,16 @@ function TargetSignalTab({ result }) {
   const topPresence = presence[0] ?? null;
   const presenceLeads = topPresence && topPresence.cramersV > (strongest?.[1]?.absValue ?? 0);
 
+  /* An unusable target is the finding, not "no signal": the scan did not fail to
+     find an association, there was nothing to associate with. Found in the
+     browser — a single-valued target read "unlikely to beat the base rate" beside
+     a recommendation to pick a different target. */
+  const targetProblem = meta.targetIsConstant
+    ? { badge: "Target never varies", text: "has the same value on every row, so no column can be associated with it. Pick a different target and re-run." }
+    : meta.targetIsIdentifier
+      ? { badge: "Target is an identifier", text: "is unique per row — an identifier, not a label — so any association with it would be memorisation. Pick a different target and re-run." }
+      : null;
+
   return (
     <div className="space-y-4">
       <SectionCard
@@ -256,13 +266,19 @@ function TargetSignalTab({ result }) {
         action={
           /* Presence counts as signal. Without it the badge could read "No
              detectable signal" directly above a presence indicator scoring 1.00. */
-          anySignificant || presence.length > 0
-            ? <StatusBadge severity="success">Signal found</StatusBadge>
-            : <StatusBadge severity="warning">No detectable signal</StatusBadge>
+          targetProblem
+            ? <StatusBadge severity="critical">{targetProblem.badge}</StatusBadge>
+            : anySignificant || presence.length > 0
+              ? <StatusBadge severity="success">Signal found</StatusBadge>
+              : <StatusBadge severity="warning">No detectable signal</StatusBadge>
         }
       >
         <p className="text-[12.5px] leading-relaxed text-ink-soft">
-          {presenceLeads ? (
+          {targetProblem ? (
+            <>
+              <span className="font-mono text-ink">{meta.target}</span> {targetProblem.text}
+            </>
+          ) : presenceLeads ? (
             <>
               The strongest association with{" "}
               <span className="font-mono text-ink">{meta.target}</span> is not a column&apos;s
