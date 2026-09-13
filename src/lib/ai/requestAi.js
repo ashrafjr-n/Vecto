@@ -13,6 +13,7 @@ const MESSAGES = {
   upstream_error:    "The AI provider returned an error.",
   empty_response:    "The model returned an empty answer.",
   invalid_json:      "The model's answer was not valid JSON, even after one retry.",
+  truncated:         "The model's answer was cut off before it finished — the file may have too many columns for one request.",
   invalid_payload:   "The request was rejected as malformed.",
   payload_too_large: "This dataset's profile is too large to send in one request.",
 };
