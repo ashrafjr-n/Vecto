@@ -1,4 +1,5 @@
 import { columnDecisions } from "./recommendations.js";
+import { sharePct } from "../helpers.js";
 
 export function getPriorityInsights({ meta, quality, statistics, relationships, classBalance }) {
   const insights = [];
@@ -49,10 +50,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   /* Missing values, one card per SEVERITY rather than per column: ginf.csv spent
      four of its eight cards on the same sentence about four odds columns. A
      leaking or dropped column is left to its own card and advice. */
-  const pctOf = c => {
-    const raw = ((c.count ?? parseInt(c.detail)) / meta.rows) * 100;
-    return raw < 1 && raw > 0 ? Math.max(0.1, Math.round(raw * 10) / 10) : Math.round(raw);
-  };
+  const pctOf = c => sharePct(c.count ?? parseInt(c.detail), meta.rows);
   const missingCols = quality.columnsWithIssues.filter(c => c.issue === "missing" && c.col !== meta.target);
   const sparse = missingCols.filter(c => pctOf(c) > 50 && !leaking.has(c.col) && !dropped.has(c.col));
   if (sparse.length === 1) {
