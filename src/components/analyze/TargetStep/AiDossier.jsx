@@ -3,6 +3,7 @@ import { LoaderCircle, TriangleAlert, X, RotateCcw, Sparkles } from "lucide-reac
 
 import { buildDossierPayload, verifyDossier } from "../../../lib/ai/dossier.js";
 import { requestAi } from "../../../lib/ai/requestAi.js";
+import { askDossier } from "../../../lib/ai/askDossier.js";
 import AiBadge  from "../shared/AiBadge.jsx";
 import RolePill from "../shared/RolePill.jsx";
 
@@ -31,7 +32,7 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
     setStatus("loading");
     setFailure(null);
 
-    const { result, model, error, detail, aborted } = await requestAi("dossier", payload(), run.signal);
+    const { result, model, error, detail, aborted } = await askDossier(payload(), (part) => requestAi("dossier", part, run.signal));
     if (aborted) return;
     const verified = error ? null : verifyDossier(result, { data, columns, roles });
     if (error || verified.error) {
@@ -66,7 +67,7 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
       {status === "loading" && (
         <div className="mt-6 flex flex-wrap items-center gap-3 text-[13px] text-ink-soft">
           <LoaderCircle size={16} className="animate-spin text-accent-ink" />
-          Waiting for the model. Free models can take a minute on a wide file.
+          Waiting for the model. Free models can take a minute, and a file over 25 columns is asked in parts.
           <button type="button" onClick={handleCancel} className="inline-flex items-center gap-1 font-medium text-ink-soft hover:text-ink">
             <X size={13} /> Cancel
           </button>
