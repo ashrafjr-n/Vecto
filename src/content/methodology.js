@@ -35,7 +35,7 @@ export const PHASES = [
       { label: "Numeric", text: "At least 80% of non-missing values are numbers. An all-integer column with four or fewer distinct values is read as an encoded category instead." },
       { label: "Free text", text: "Average length of at least 40 characters, a space in at least half the values, and more than 50 distinct values. All three must hold: length alone would call a URL free text, spacing alone would call a person's name free text." },
       { label: "String identifiers", text: "A non-numeric column that is more than 95% distinct across the whole column. This rule runs after the free-text rule, and declines to fire when the distinct count exceeds 20,000 rather than estimating a ratio it cannot measure." },
-      { label: "Everything else", text: "Categorical. Values are normalised to one grouping key — trimmed, case-folded, numbers by parsed value — so \" Male \", \"MALE\" and \"male\" are one level, displayed with an original spelling." },
+      { label: "Everything else", text: "Categorical. Values are normalised to one grouping key — trimmed, case-folded, numbers by parsed value — so MALE, male and Male with stray spaces are one level, displayed with an original spelling." },
     ],
   },
   {
