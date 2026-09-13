@@ -1,7 +1,7 @@
 /* ai-eval-score.test.mjs — the eval's scoring rule, on a hand-built dossier.
    Plain Node, no framework. */
 
-import { scoreDossier } from "../tools/ai-eval/score.mjs";
+import { scoreDossier, scoreLeakage } from "../tools/ai-eval/score.mjs";
 
 let failures = 0;
 function check(name, ok) {
@@ -34,6 +34,25 @@ check("hygiene counts contradicted roles and offered changes separately",
 check("engine guess is judged against the same targets", s.engineTargetOk === true);
 check("a file with no target scores no target checks and no engine verdict",
   scoreDossier({ roles: {} }, verified, "x").total === 0 && scoreDossier({ roles: {} }, verified, "x").engineTargetOk === null);
+
+const leakExpect = { leaks: { total: ["derived_from_target"], alive: ["restates_label"] }, clean: ["sex", "fare"], split: ["random"] };
+const leakVerified = {
+  findings: [
+    { column: "total", category: "derived_from_target", verdict: "partial" },
+    { column: "alive", category: "recorded_after_outcome", verdict: "question" },
+    { column: "fare", category: "group_leak", verdict: "question" },
+  ],
+  split: { strategy: "grouped" },
+  withheld: [{ column: "ghost" }],
+  engineOnly: [],
+};
+const ls = scoreLeakage(leakExpect, leakVerified);
+const lc = Object.fromEntries(ls.checks.map((c) => [`${c.kind}:${c.name}`, c]));
+check("a leak raised in an accepted category is found", lc["leak:total"].ok);
+check("a leak raised only in the wrong category is not found", !lc["leak:alive"].ok);
+check("a clean column raised in ANY category fails; one never raised passes", !lc["clean:fare"].ok && lc["clean:sex"].ok);
+check("a wrong split strategy fails", !lc["split:split strategy"].ok);
+check("leakage hygiene counts verdicts", ls.hygiene.verdicts.partial === 1 && ls.hygiene.verdicts.question === 2 && ls.passed === 2 && ls.total === 5);
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-eval-score checks passed");
 process.exit(failures ? 1 : 0);
