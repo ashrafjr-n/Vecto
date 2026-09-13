@@ -118,7 +118,7 @@ export const PHASES = [
 export const PRINCIPLES = [
   {
     title: "Validated against scipy",
-    text: "The statistical core is tested against a reference generated with pandas and scipy — sample variance and standard deviation, type-7 quartiles, bias-corrected skewness and kurtosis, Pearson's r and its p-value, Spearman's ρ — to a tolerance of 1e-6. The suite runs on every engine change.",
+    text: "The statistical core is tested against a reference generated with pandas and scipy — sample variance and standard deviation, type-7 quartiles, bias-corrected skewness and kurtosis, Pearson's r and its p-value, Spearman's ρ — to a tolerance of 1e\u20116 (p-values to 1e\u201112). The comparison is an automated test in the repository, not a one-off check.",
   },
   {
     title: "Roles come from the data",
