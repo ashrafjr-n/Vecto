@@ -1,9 +1,11 @@
 import {
-  getValues, getNumericValues,
+  getNumericValues,
   mean, isNumeric, isMissing, etaCorrelation, normalizeValue, toNumber,
-  spearmanOf, correlationPValue, etaPValue,
+  spearmanOf, correlationPValue, etaPValue, etaAdjusted,
   cramersV, mutualInformation, discretize, sampleIndices, rankColumn, pearsonOf,
 } from "../helpers.js";
+import { detectColumnRoles } from "../detectors/roles.js";
+import { ROLE } from "../roles.constants.js";
 
 /* Display rounding lives at the call site now, never inside a numeric helper —
    a p-value computed from an already-rounded r is wrong by enough to flip a
@@ -21,7 +23,10 @@ function confidenceFrom(pValue) {
   return "unreliable";
 }
 
-export function getRelationshipsV3(data, numericCols, target, skipCols = new Set(), categoricalCols = []) {
+/* `columnRoles` is what index.js already computed. The default exists for direct
+   callers (the tests) and runs the SAME detector — never a second guesser. */
+export function getRelationshipsV3(data, numericCols, target, skipCols = new Set(), categoricalCols = [],
+                                   columnRoles = detectColumnRoles(data, Object.keys(data[0] || {}), target)) {
 
   /* ── Column selection for the correlation scan (FIX #5b) ──
      The pairwise scan is O(k²·n) in the number of numeric columns k. Below the
@@ -84,9 +89,11 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
   const presenceCandidates = new Set();
 
   if (target) {
-    // Determine target type — guard against empty target column
-    const targetVals = getValues(data, target);
-    if (!targetVals.length) {
+    /* Missing means the engine-wide MISSING_TOKENS, here as everywhere. This
+       scan used to drop only "" and null, so "NA", "?" and "null" were VALUES of
+       the target — enough of them pushed a numeric target under the 80% numeric
+       share and the whole scan ran as if it were categorical. */
+    if (!data.some(row => !isMissing(row[target]))) {
       // No target data — return empty correlation structure
       return { cols: [], correlationMatrix: {}, strongRelationships: [],
                multicollinearPairs: [], clusterDetected: false, clusterCols: [],
@@ -103,12 +110,31 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     const byLevel = (a, b) => (isNumeric(a) && isNumeric(b))
       ? parseFloat(a) - parseFloat(b)
       : (a < b ? -1 : a > b ? 1 : 0);
+    const levelsOf = col => {
+      const set = new Set();
+      for (let i = 0; i < data.length; i++) if (!isMissing(data[i][col])) set.add(normalizeValue(data[i][col]));
+      return [...set].sort(byLevel);
+    };
 
-    const targetUnique  = [...new Set(targetVals.map(normalizeValue))].sort(byLevel);
-    const targetNumeric = targetVals.filter(v => isNumeric(v));
-    const isNumericTarget     = targetVals.length > 0 && targetNumeric.length / targetVals.length > 0.8;
-    const isBinaryTarget      = targetUnique.length === 2;
-    const isCategoricalTarget = !isNumericTarget && targetUnique.length > 2;
+    /* Types come from the ROLES, not from the raw values. This scan used to
+       re-derive "numeric / binary / categorical" on its own, with a different
+       missing policy and no encoded-categorical or free-text rule, so the report
+       could call a column one thing and measure it as another. Worst case,
+       measured on house_prices.csv: a numeric price target with 10,959 distinct
+       values was used as the columns of a Cramér's V table, and Furnishing (3
+       levels) scored 0.73 against it — the true η is ~0.005. */
+    const targetRole      = columnRoles[target];
+    const isNumericTarget = targetRole === ROLE.NUMERIC;
+    const isBinaryTarget  = targetRole === ROLE.BINARY;
+    const targetUnique    = isBinaryTarget ? levelsOf(target) : [];
+
+    /* A date or free-text target has no statistic here that means anything: V
+       over timestamps or sentences measures how unique they are. Every column is
+       recorded with that reason rather than scored with a number that looks real. */
+    const unscorableTarget =
+        targetRole === ROLE.TEMPORAL ? `"${target}" is a date — no association statistic here applies to a raw timestamp target; derive the quantity to predict (a duration, a month, a flag) and pick that as the target.`
+      : targetRole === ROLE.TEXT     ? `"${target}" is free text — no association statistic here applies to sentences as a target.`
+      : null;
 
     // ── Use all columns for target correlation ──
     // FIX: removed dead targetEncoded block (keyed by object → "[object Object]" bug)
@@ -120,12 +146,53 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
     const miIdx        = sampleIndices(data.length);
     const targetLevels = discretize(miIdx.map(k => data[k][target]));
 
+    /* η for a numeric variable grouped by a nominal one — either direction. The
+       grouping side can be a categorical FEATURE with thousands of levels, so the
+       value is the df-corrected η (etaAdjusted); the p-value is the ANOVA F-test,
+       which is exact from the raw η. */
+    const scoreEta = (col, numericSide, groupSide) => {
+      const values = [], labels = [];
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        if (isMissing(row[groupSide])) continue;
+        const v = toNumber(row[numericSide]);
+        if (isNaN(v)) continue;
+        values.push(v);
+        labels.push(normalizeValue(row[groupSide]));
+      }
+      const n = values.length;
+      const k = new Set(labels).size;
+      if (n < 3) {
+        unscored(col, `only ${n} row${n === 1 ? "" : "s"} have both "${col}" and a usable "${target}" — too few to measure against.`);
+        return;
+      }
+      if (k < 2) {
+        if (groupSide === target) presenceCandidates.add(col);
+        unscored(col, groupSide === target
+          ? `every row where "${col}" is present has the same "${target}" value, so there is nothing varying to correlate against.`
+          : `"${col}" has a single value on the rows where "${target}" is also present — a constant cannot be correlated.`);
+        return;
+      }
+      if (n <= k) {
+        unscored(col, `"${col}" has a different value on nearly every shared row (${k} levels over ${n} rows) — there are no groups to compare "${target}" across.`);
+        return;
+      }
+      const eta = etaCorrelation(values, labels);
+      const adj = etaAdjusted(eta, n, k);
+      targetCorrelations[col] = {
+        metric:   "eta",
+        value:    r2(adj),
+        absValue: r2(adj),
+        spearman: null,           // undefined against a nominal side
+        pValue:   etaPValue(eta, n, k),
+        n,
+      };
+    };
+
     const allCols = Object.keys(data[0] || {});
     allCols.forEach(col => {
       if (col === target) return;
-      /* Skip non-feature columns (identifiers ∪ temporals ∪ free text). This loop
-         re-derives types from raw values ignoring roles, so without this an ID, a
-         date or a commentary field leaks back in as a spurious predictor.
+      /* Skip non-feature columns (identifiers ∪ temporals ∪ free text).
 
          Recorded rather than dropped: these were leaving the report with no trace
          at all, the same silence unscoredColumns was built to end. ginf.csv's
@@ -136,45 +203,23 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         unscored(col, skipCols.get?.(col) ?? `"${col}" is not a feature column and was left out of the scan.`);
         return;
       }
-
-      /* One pass, three allocations fewer. This was getValues() (an array of n),
-         .map(normalizeValue) (a second array of n) and .filter(isNumeric) (a
-         third), per column — 48 full-length arrays on a 386k-row, 16-column file,
-         to answer two questions: what share of the values are numbers, and are
-         there exactly two levels.
-
-         The level set stops at 3. No rule below distinguishes 5 levels from 500,
-         only "two" from "more than two", so the Set is O(1) rather than one entry
-         per distinct value. getValues()' own filter is inlined verbatim — it
-         keeps "NA" as a level, unlike isMissing, and that must not change here. */
-      let colTotal = 0, colNumericCount = 0, colOverflowed = false;
-      const colLevels = new Set();
-      for (let i = 0; i < data.length; i++) {
-        const v = data[i][col];
-        if (v === "" || v == null) continue;
-        colTotal++;
-        if (isNumeric(v)) colNumericCount++;
-        if (!colOverflowed) {
-          colLevels.add(normalizeValue(v));
-          if (colLevels.size > 2) colOverflowed = true;
-        }
-      }
-      if (colTotal === 0) {
+      if (!data.some(row => !isMissing(row[col]))) {
         unscored(col, `"${col}" is empty — there is nothing to compare against "${target}".`);
         return;
       }
+      if (unscorableTarget) {
+        unscored(col, unscorableTarget);
+        return;
+      }
 
-      const colUnique = [...colLevels].sort(byLevel);
-      const colIsNumeric = colNumericCount / colTotal > 0.8;
-      const colIsBinary  = !colOverflowed && colLevels.size === 2;
-      const colIsCategorical = !colIsNumeric && !colIsBinary && (colOverflowed || colLevels.size > 1);
+      const role = columnRoles[col];
+      const colIsNumeric = role === ROLE.NUMERIC;
+      const colIsBinary  = role === ROLE.BINARY;
+      // Anything else the caller did not skip is measured as nominal.
 
       if ((colIsNumeric || colIsBinary) && (isNumericTarget || isBinaryTarget)) {
-        // Pearson / Point-Biserial: encode col as numbers
-        let colMap = null;
-        if (colIsBinary && !colIsNumeric) {
-          colMap = { [colUnique[0]]: 0, [colUnique[1]]: 1 };
-        }
+        // Pearson / Point-Biserial: encode binary sides as sorted 0/1
+        const colUnique = colIsBinary ? levelsOf(col) : null;
 
         /* Two flat arrays, not an array of two-element arrays. `pairs.push([a, b])`
            allocated one small array PER ROW — 386,414 of them per numeric column —
@@ -185,12 +230,11 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
         const xs = [], ys = [];
         for (let i = 0; i < data.length; i++) {
           const row = data[i];
-          const a = colIsNumeric ? toNumber(row[col]) : (colMap ? colMap[normalizeValue(row[col])] : null);
-          const bRaw = row[target];
-          const bIdx = isBinaryTarget ? targetUnique.indexOf(normalizeValue(bRaw)) : -1;
-          const b = isNumericTarget ? toNumber(bRaw) : (bIdx >= 0 ? bIdx : null);
-
-          if (a == null || b == null || isNaN(a) || isNaN(b)) continue;
+          const aRaw = row[col], bRaw = row[target];
+          if (isMissing(aRaw) || isMissing(bRaw)) continue;
+          const a = colIsNumeric ? toNumber(aRaw) : colUnique.indexOf(normalizeValue(aRaw));
+          const b = isNumericTarget ? toNumber(bRaw) : targetUnique.indexOf(normalizeValue(bRaw));
+          if (isNaN(a) || isNaN(b) || a < 0 && !colIsNumeric || b < 0 && !isNumericTarget) continue;
           xs.push(a); ys.push(b);
         }
         const pairCount = xs.length;
@@ -252,8 +296,18 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           mi:       mi ? r2(mi.normalized) : null,
         };
 
-      } else if (colIsCategorical) {
-        /* Cramer's V between a categorical column and the target, via the SHARED
+      } else if (colIsNumeric) {
+        // FIX #5a: numeric feature vs categorical (>2-class) target — correlation ratio η.
+        scoreEta(col, col, target);
+
+      } else if (isNumericTarget) {
+        /* Nominal feature vs numeric target — η of the TARGET grouped by the
+           feature's levels. This pairing used to fall into Cramér's V, which
+           treated every distinct price as its own class. */
+        scoreEta(col, target, col);
+
+      } else {
+        /* Cramer's V between a nominal column and a nominal target, via the SHARED
            estimator. This branch used to carry its own copy of the whole
            calculation — contingency table, chi-square, Bergsma correction — which
            is how the two drifted: the fix for empty contingency cells landed in
@@ -297,36 +351,6 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           pValue:   cv.pValue,
           n:        cv.n,
         };
-
-      } else if (colIsNumeric && isCategoricalTarget) {
-        // FIX #5a: numeric feature vs categorical (>2-class) target — correlation
-        // ratio η. Previously this pairing fell through BOTH branches above and
-        // contributed no signal, flooring signalScore. η is on the same 0-1 scale
-        // as Pearson |r| / Cramér's V, so it drops straight into maxTargetR.
-        const values = [];
-        const labels = [];
-        data.forEach(row => {
-          const rawV = row[col];
-          const rawL = row[target];
-          if (isMissing(rawV) || isMissing(rawL)) return;   // exclude missing on both sides
-          const v = toNumber(rawV);
-          if (isNaN(v)) return;
-          values.push(v);
-          labels.push(normalizeValue(rawL));                // same key as targetUnique
-        });
-
-        if (values.length >= 3) {
-          const eta = etaCorrelation(values, labels);
-          const k   = new Set(labels).size;
-          targetCorrelations[col] = {
-            metric:   "eta",
-            value:    r2(eta),
-            absValue: Math.abs(r2(eta)),
-            spearman: null,           // undefined against a nominal target
-            pValue:   etaPValue(eta, values.length, k),
-            n:        values.length,
-          };
-        }
       }
     });
   }
