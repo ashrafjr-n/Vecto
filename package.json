@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node tests/phase0.test.mjs && node tests/engine-contract.test.mjs && node tests/hardening.test.mjs && node tests/ai-worker.test.mjs && node tests/ai-dossier.test.mjs && node tests/ai-eval-score.test.mjs"
+    "test": "node tests/phase0.test.mjs && node tests/engine-contract.test.mjs && node tests/hardening.test.mjs && node tests/ai-worker.test.mjs && node tests/ai-dossier.test.mjs && node tests/ai-eval-score.test.mjs && node tests/ai-leakage.test.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.38.0",
