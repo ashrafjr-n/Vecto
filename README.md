@@ -99,15 +99,19 @@ Run `npm test` after any change under `src/components/utils/core/`.
 
 ```text
 src/
-  App.jsx                     routes: / (upload), /analyze (target → processing → results)
+  App.jsx                     routes: / (upload), /analyze (target → processing → results),
+                              /methodology (how the engine works)
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
+  content/
+    methodology.js            copy for /methodology — thresholds quoted from the engine
   pages/
     Home.jsx                  intro + the functional CSV dropzone
     Analyze.jsx                3-step machine: Target → Processing → Results
+    Methodology.jsx           the eight engine stages, trust principles and limits
   components/
     layout/Header.jsx         fixed, full-width, shared by every page
-    common/                   shared primitives (ErrorBoundary)
+    common/                   shared primitives (ErrorBoundary, SectionLabel)
     analyze/
       shared/                 primitives used across steps/tabs (RolePill, StatTile,
                                SectionCard, StatusBadge, correlationColor)
