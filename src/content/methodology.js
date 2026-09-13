@@ -112,3 +112,32 @@ export const PHASES = [
     ],
   },
 ];
+
+/* Why the numbers can be trusted — each one a property that can be checked, not
+   an adjective. Absorbs Home's former "Trustworthy by construction" list. */
+export const PRINCIPLES = [
+  {
+    title: "Validated against scipy",
+    text: "The statistical core is tested against a reference generated with pandas and scipy — sample variance and standard deviation, type-7 quartiles, bias-corrected skewness and kurtosis, Pearson's r and its p-value, Spearman's ρ — to a tolerance of 1e-6. The suite runs on every engine change.",
+  },
+  {
+    title: "Roles come from the data",
+    text: "Column roles are inferred from values over the whole column, not from names and not from the first rows. A name can support a signal; it never decides a role on its own.",
+  },
+  {
+    title: "Estimators are bias-corrected",
+    text: "Plug-in association measures grow with the number of cells, which is how a name column once outranked sex as Titanic's top predictor. Cramér's V carries the Bergsma correction and mutual information the Miller–Madow correction, and no new estimator ships without one.",
+  },
+  {
+    title: "Not measured is never shown as clean",
+    text: "A skipped duplicate scan is reported as skipped and its weight redistributed. A column the target scan could not score is listed with its reason. A value dropped to keep a column numeric is counted and quoted.",
+  },
+  {
+    title: "Every number arrives with its reason",
+    text: "Coefficients come with a p-value and n, recommendations with a rationale, and a capped score with the evidence that held it. A number without its reasoning can only be believed or ignored.",
+  },
+  {
+    title: "Deterministic and local",
+    text: "Parsing and analysis run in this browser tab, in a background worker. Nothing is uploaded, and sampling is deterministic, so the same file and target always produce the same report.",
+  },
+];
