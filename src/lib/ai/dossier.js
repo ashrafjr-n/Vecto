@@ -28,11 +28,14 @@ const MAX_TARGETS = 3;
 const clip = (s) => (s.length > MAX_CHARS ? `${s.slice(0, MAX_CHARS)}…` : s);
 const sig = (x) => Number(x.toPrecision(6));
 
-export function buildDossierPayload(data, columns, roles, engineTargetGuess) {
+/* The engine's detectTarget() guess is deliberately NOT sent. Measured on the eval
+   (2026-09-14): both of the model's wrong top targets — penguins "sex", taxis
+   "dropoff_borough" — were exactly the engine's wrong guess, while on files where
+   the engine guessed wrong and the model had to judge alone it was right. */
+export function buildDossierPayload(data, columns, roles) {
   return {
     schemaVersion: 1,
     rows: data.length,
-    engineTargetGuess: engineTargetGuess ?? null,
     columns: columns.slice(0, DOSSIER_MAX_COLUMNS).map((col) => profileForAi(data, col, roles[col])),
   };
 }

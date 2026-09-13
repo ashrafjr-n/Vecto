@@ -70,7 +70,7 @@ for (const expect of selected) {
   const unknown = named.filter((c) => !columns.includes(c));
   if (unknown.length) throw new Error(`${expect.file}: expectations name columns not in the file: ${unknown.join(", ")}`);
 
-  const payload = buildDossierPayload(data, columns, roles, engineTargetGuess);
+  const payload = buildDossierPayload(data, columns, roles);
   const payloadJson = JSON.stringify(payload);
   const payloadHash = createHash("sha256").update(payloadJson).digest("hex").slice(0, 16);
 

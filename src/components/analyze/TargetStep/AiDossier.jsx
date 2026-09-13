@@ -14,7 +14,7 @@ import RolePill from "../shared/RolePill.jsx";
    The verified dossier and the accepted overrides are owned by Analyze.jsx, not
    here: Cancel on the processing step unmounts this component, and a finished
    answer costs a request from a small daily quota. */
-function AiDossier({ data, columns, roles, engineTarget, dossier, onDossier, overrides, onOverridesChange, onUseTarget, currentTarget }) {
+function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOverridesChange, onUseTarget, currentTarget }) {
   const [status, setStatus]   = useState("idle");   // idle | loading | error
   const [failure, setFailure] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -23,7 +23,7 @@ function AiDossier({ data, columns, roles, engineTarget, dossier, onDossier, ove
   // Leaving the picker mid-request: stop waiting for an answer nobody will see.
   useEffect(() => () => runRef.current?.abort(), []);
 
-  const payload = () => buildDossierPayload(data, columns, roles, engineTarget);
+  const payload = () => buildDossierPayload(data, columns, roles);
 
   const handleAsk = async () => {
     const run = new AbortController();
