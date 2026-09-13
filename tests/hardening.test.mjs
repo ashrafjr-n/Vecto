@@ -1099,7 +1099,8 @@ check("a constant target is flagged, capped, and gets no feature-style advice",
   && constRes.recommendations.some(r => r.issue === "Target never varies")
   && !constRes.recommendations.some(r => /SMOTE|Constant column|imbalance/i.test(r.issue + r.action))
   && Object.keys(constRes.relationships.targetCorrelations).length === 0
-  && constRes.insights[0]?.title === "Target Never Varies");
+  && constRes.insights[0]?.title === "Target Never Varies"
+  && constRes.meta.datasetType === "Unknown");
 
 /* Titanic "Name" as target: not a name/sequence identifier, but 100% distinct. */
 const nameRows = Array.from({ length: 300 }, (_, i) => ({ f: String(i % 4), who: `Person ${i}, Mr.` }));
