@@ -118,7 +118,12 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
 function getMeta(data, columns, target, numericCols, categoricalCols, identifierCols, temporalCols, textCols, columnRoles, targetIsIdentifier, targetIsConstant) {
   let datasetType = "Unknown";
 
-  if (target) {
+  /* A target with nothing to predict has no task type. It used to be read from the
+     role alone, so a single-valued target was announced as "Classification" at the
+     top of a report whose every section said the target was unusable. */
+  if (target && (targetIsConstant || targetIsIdentifier)) {
+    datasetType = "Unknown";
+  } else if (target) {
     // FIX #2: Use column role as primary signal — more reliable than unique count
     const targetRole = columnRoles[target];
 
