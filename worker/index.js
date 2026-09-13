@@ -12,6 +12,8 @@ import { DOSSIER_SCHEMA, DOSSIER_MAX_COLUMNS } from "../src/lib/ai/dossierSchema
 import { dossierMessages } from "./dossierPrompt.js";
 import { LEAKAGE_SCHEMA, LEAKAGE_MAX_COLUMNS } from "../src/lib/ai/leakageSchema.js";
 import { leakageMessages } from "./leakagePrompt.js";
+import { CLEANING_SCHEMA, CLEANING_MAX_COLUMNS } from "../src/lib/ai/cleaningSchema.js";
+import { cleaningMessages } from "./cleaningPrompt.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BODY_CHARS = 256_000;
@@ -62,6 +64,20 @@ const TASKS = {
       && payload.columns.length <= LEAKAGE_MAX_COLUMNS
       && payload.columns.every((c) => typeof c?.name === "string"),
     messages: leakageMessages,
+  },
+
+  /* Phase D — cleaning rules for the candidates the engine found. Built by
+     buildCleaningPayload() and checked by verifyCleaningRules(), which applies
+     every rule to a copy and measures it before the user can accept it. */
+  cleaning: {
+    maxTokens: 6000,
+    schema: CLEANING_SCHEMA,
+    validate: (payload) =>
+      Array.isArray(payload?.columns)
+      && payload.columns.length > 0
+      && payload.columns.length <= CLEANING_MAX_COLUMNS
+      && payload.columns.every((c) => typeof c?.name === "string" && Array.isArray(c.candidates)),
+    messages: cleaningMessages,
   },
 };
 
