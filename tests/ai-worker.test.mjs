@@ -126,5 +126,15 @@ check("a valid leakage payload is forwarded with its own prompt and strict schem
   && sent[0].response_format.json_schema.name === "leakage"
   && sent[0].response_format.json_schema.schema.required.includes("split"));
 
+// --- cleaning task ---
+script();
+check("cleaning with no candidate columns is 400 (nothing to ask about)", (await post({ task: "cleaning", payload: { columns: [] } })).status === 400);
+check("cleaning with a column lacking candidates is 400", (await post({ task: "cleaning", payload: { columns: [{ name: "a" }] } })).status === 400);
+script(answer('{"rules":[]}'));
+res = await post({ task: "cleaning", payload: { rows: 3, columns: [{ name: "amount", candidates: [{ kind: "numeric_affix" }] }] } });
+check("a valid cleaning payload is forwarded with its own prompt and strict schema",
+  res.status === 200 && /data-cleaning reviewer/.test(sent[0].messages[0].content)
+  && /<candidates>/.test(sent[0].messages[1].content) && sent[0].response_format.json_schema.name === "cleaning");
+
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-worker checks passed");
 process.exit(failures ? 1 : 0);
