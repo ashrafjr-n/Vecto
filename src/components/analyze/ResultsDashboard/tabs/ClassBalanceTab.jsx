@@ -56,7 +56,8 @@ function ClassBalanceTab({ result }) {
 
         <div className="space-y-4">
           {shown.map((cls, i) => {
-            const isMax = cls.pct === maxPct;
+            // A "majority" needs a minority: when every class ties (891 names, one row each) none is.
+            const isMax = cls.pct === maxPct && !cls.missing && classes.some(c => !c.missing && c.pct < maxPct);
             return (
               <div key={i}>
                 <div className="mb-1.5 flex items-center justify-between">
@@ -66,7 +67,7 @@ function ClassBalanceTab({ result }) {
                     {cls.missing && <span className="rounded bg-warning-tint px-1.5 py-0.5 text-[9px] font-medium text-warning">missing</span>}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-[11.5px] text-ink-faint">{cls.count.toLocaleString()} rows</span>
+                    <span className="font-mono text-[11.5px] text-ink-faint">{cls.count.toLocaleString()} row{cls.count === 1 ? "" : "s"}</span>
                     <span className={`w-11 text-right font-mono text-[13px] font-semibold ${isMax ? "text-accent-ink" : "text-ink-soft"}`}>{cls.pct}%</span>
                   </div>
                 </div>
