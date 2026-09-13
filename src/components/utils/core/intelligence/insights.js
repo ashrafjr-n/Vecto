@@ -26,6 +26,15 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
     );
   });
 
+  // The target is unusable — nothing else on the page matters until it changes.
+  if (meta.targetIsConstant) {
+    push("critical",
+      "Target Never Varies",
+      `Every row of "${meta.target}" has the same value — there is nothing to predict. Pick a different target.`,
+      101
+    );
+  }
+
   // Massive missing on a column (> 50%)
   quality.columnsWithIssues
     .filter(c => c.issue === "missing")
@@ -43,8 +52,9 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
       }
     });
 
-  // Severe class imbalance
-  if (classBalance?.isImbalanced) {
+  // Severe class imbalance — meaningless for a single-valued or per-row-unique target
+  const classesMeaningful = !meta.targetIsConstant && !meta.targetIsIdentifier;
+  if (classesMeaningful && classBalance?.isImbalanced) {
     const nonMissing = classBalance.classes.filter(c => !c.missing);
     const majority   = nonMissing[0];
     const minority   = nonMissing[nonMissing.length - 1];   // smallest class = binding constraint
@@ -78,7 +88,9 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
       if (pct > 5 && pct <= 50) {
         push("warning",
           `Missing Values in "${c.col}"`,
-          `${pct}% of values in "${c.col}" are missing — imputation recommended.`,
+          c.col === meta.target
+            ? `${pct}% of target values are missing — drop those rows; never impute the target.`
+            : `${pct}% of values in "${c.col}" are missing — imputation recommended.`,
           70 + pct * 0.3
         );
       }
@@ -97,7 +109,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   }
 
   // Moderate class imbalance
-  if (classBalance?.isImbalanced) {
+  if (classesMeaningful && classBalance?.isImbalanced) {
     const nonMissing = classBalance.classes.filter(c => !c.missing);
     const majority   = nonMissing[0];
     const minority   = nonMissing[nonMissing.length - 1];   // smallest class = binding constraint
@@ -140,7 +152,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   }
 
   // Constant columns
-  const constCols = quality.columnsWithIssues.filter(c => c.issue === "constant");
+  const constCols = quality.columnsWithIssues.filter(c => c.issue === "constant" && c.col !== meta.target);
   if (constCols.length > 0) {
     push("warning",
       "Constant Columns",
@@ -305,7 +317,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   // Balanced classes. An identifier target passes the plain imbalance test —
   // 891 classes of one row each have a majority/minority ratio of exactly 1.0 —
   // so this used to print a green "Classes are Balanced" for PassengerId.
-  if (classBalance && !classBalance.isImbalanced && !meta.targetIsIdentifier) {
+  if (classBalance && !classBalance.isImbalanced && classesMeaningful) {
     const majority = classBalance.classes.filter(c => !c.missing)[0];
     push("success",
       "Classes are Balanced",
