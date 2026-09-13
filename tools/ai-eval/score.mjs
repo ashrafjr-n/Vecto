@@ -38,3 +38,42 @@ export function scoreDossier(expect, verified, engineTargetGuess) {
     engineTargetOk: expect.targets ? expect.targets.includes(engineTargetGuess) : null,
   };
 }
+
+/* Scores one verified leakage review. A leak counts as found only if the model
+   raised it in an acceptable category AND it survived verification — a finding
+   the verifier withheld is not on the page. A clean column counts as clean only
+   if it was not raised at all, in any category: flagging a real predictor as
+   leakage is the failure that would do the most damage, because a user would
+   drop a good feature on the model's word. */
+export function scoreLeakage(expect, verified) {
+  const checks = [];
+  const add = (kind, name, ok, got, want) => checks.push({ kind, name, ok, got, want });
+  const raised = (col) => verified.findings.filter((f) => f.column === col).map((f) => f.category);
+
+  for (const [col, want] of Object.entries(expect.leaks ?? {})) {
+    const got = raised(col);
+    add("leak", col, got.some((c) => want.includes(c)), got, want);
+  }
+  for (const col of expect.clean ?? []) {
+    const got = raised(col);
+    add("clean", col, got.length === 0, got, ["(not raised)"]);
+  }
+  if (expect.split) {
+    const got = verified.split?.strategy ?? null;
+    add("split", "split strategy", expect.split.includes(got), got, expect.split);
+  }
+
+  const verdicts = {};
+  for (const f of verified.findings) verdicts[f.verdict] = (verdicts[f.verdict] ?? 0) + 1;
+  return {
+    passed: checks.filter((c) => c.ok).length,
+    total: checks.length,
+    checks,
+    hygiene: {
+      findings: verified.findings.length,
+      withheld: verified.withheld.length,
+      engineOnly: verified.engineOnly.length,
+      verdicts,
+    },
+  };
+}
