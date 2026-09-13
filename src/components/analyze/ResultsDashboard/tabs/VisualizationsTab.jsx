@@ -7,8 +7,8 @@ import SectionCard from "../../shared/SectionCard.jsx";
 function InsightBanner({ text }) {
   if (!text) return null;
   return (
-    <div className="flex items-start gap-2.5 rounded-lg border border-gold/25 bg-gold-tint px-4 py-3 text-[12.5px] leading-relaxed text-ink-soft">
-      <Info size={14} className="mt-0.5 shrink-0 text-gold-ink" />
+    <div className="flex items-start gap-2.5 rounded-lg border border-accent/25 bg-accent-tint px-4 py-3 text-[12.5px] leading-relaxed text-ink-soft">
+      <Info size={14} className="mt-0.5 shrink-0 text-accent-ink" />
       {text}
     </div>
   );
@@ -23,7 +23,7 @@ function FlatLine({ value }) {
   return (
     <div className="py-3 text-center">
       <div className="relative h-1 rounded-full bg-paper">
-        <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold" />
+        <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent" />
       </div>
       <div className="mt-3 text-[11px] text-ink-faint">
         No variance — all values equal <span className="font-mono font-medium text-ink">{value?.toLocaleString()}</span>
@@ -54,7 +54,7 @@ function BoxPlot({ boxplot }) {
         {meanX != null && (
           <polygon
             points={`${meanX},5 ${meanX + 2},14 ${meanX},23 ${meanX - 2},14`}
-            fill="var(--color-gold)"
+            fill="var(--color-accent)"
           />
         )}
       </svg>
@@ -94,14 +94,14 @@ function NumericView({ vis }) {
             const isMax = b.count === maxCount;
             return (
               <div key={b.bin} title={`${b.bin}: ${b.count.toLocaleString()}`} className="flex h-full flex-1 flex-col items-center justify-end">
-                <span className={`mb-1 whitespace-nowrap font-mono text-[9px] ${isMax ? "text-gold-ink" : "invisible"}`}>
+                <span className={`mb-1 whitespace-nowrap font-mono text-[9px] ${isMax ? "text-accent-ink" : "invisible"}`}>
                   {b.count.toLocaleString()}
                 </span>
                 <motion.div
                   initial={{ height: 0 }}
                   animate={{ height: `${heightPct}%` }}
                   transition={{ delay: i * 0.02, duration: 0.4, ease: "easeOut" }}
-                  className={`w-full rounded-t-sm ${isMax ? "bg-gold" : "bg-ink-faint/50"}`}
+                  className={`w-full rounded-t-sm ${isMax ? "bg-accent" : "bg-ink-faint/50"}`}
                   style={{ minHeight: b.count > 0 ? "3px" : 0 }}
                 />
               </div>
@@ -127,7 +127,7 @@ function NumericView({ vis }) {
 }
 
 /* ─────────────────────────────────────────────
-   CATEGORICAL — emphasis form: top category in gold, the rest in neutral ink,
+   CATEGORICAL — emphasis form: top category in the accent, the rest in faint ink,
    never a rainbow of hues for what is really one highlighted bar + context.
 ───────────────────────────────────────────── */
 function CategoricalView({ vis }) {
@@ -161,14 +161,14 @@ function CategoricalView({ vis }) {
                   <div className="flex min-w-0 items-center gap-2">
                     <span className={`truncate text-[12.5px] ${isHovered ? "text-ink" : "text-ink-soft"}`}>{item.value}</span>
                     {isHovered && (
-                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${isTop ? "bg-gold-tint text-gold-ink" : "bg-paper text-ink-faint"}`}>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${isTop ? "bg-accent-tint text-accent-ink" : "bg-paper text-ink-faint"}`}>
                         #{rankMap[item.value]} of {totalCategories}
                       </span>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2.5">
                     {isHovered && <span className="font-mono text-[11px] text-ink-faint">{item.count.toLocaleString()}</span>}
-                    <span className={`w-11 text-right font-mono text-[12px] font-medium ${isTop ? "text-gold-ink" : "text-ink-soft"}`}>
+                    <span className={`w-11 text-right font-mono text-[12px] font-medium ${isTop ? "text-accent-ink" : "text-ink-soft"}`}>
                       {Math.round(pct * 10) / 10}%
                     </span>
                   </div>
@@ -178,7 +178,7 @@ function CategoricalView({ vis }) {
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
                     transition={{ delay: i * 0.03, duration: 0.4, ease: "easeOut" }}
-                    className={`h-full rounded-full ${isTop ? "bg-gold" : "bg-ink-faint/60"}`}
+                    className={`h-full rounded-full ${isTop ? "bg-accent" : "bg-ink-faint/60"}`}
                   />
                 </div>
               </div>
@@ -230,7 +230,7 @@ function VisualizationsTab({ result }) {
                   type="button"
                   onClick={() => setSelected(v.col)}
                   className={`rounded-md px-3 py-1.5 font-mono text-[12px] transition-colors ${
-                    activeCol === v.col ? "bg-gold-tint font-medium text-gold-ink" : "bg-paper text-ink-soft hover:text-ink"
+                    activeCol === v.col ? "bg-accent-tint font-medium text-accent-ink" : "bg-paper text-ink-soft hover:text-ink"
                   }`}
                 >
                   {v.col}
