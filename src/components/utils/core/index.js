@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   Datassert CSV ANALYZER — Entry Point (V3)
+   Vecto CSV ANALYZER — Entry Point (V3)
    Pure JavaScript · No AI · No external APIs
 ───────────────────────────────────────────── */
 
