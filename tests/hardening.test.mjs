@@ -1297,5 +1297,30 @@ check("a near-unique numeric column is not called an ID or told to group rare ca
   !signal.quality.columnsWithIssues.some(c => c.issue === "high_cardinality")
   && !signal.recommendations.some(r => /cardinality|Group rare/i.test(r.issue + r.action)));
 
+/* ══════════════════════════════════════════
+   ROLE OVERRIDES — a user decision is an input, recorded, never guessed
+══════════════════════════════════════════ */
+console.log("\nROLE OVERRIDES — accepted AI roles reach the engine as explicit inputs\n");
+
+/* region is five integer codes: the engine reads it NUMERIC (ceiling 4 — see
+   roles.js). A user who knows they are codes overrides it to CATEGORICAL. */
+const overrideRows = Array.from({ length: 120 }, (_, i) => ({
+  region: String((i % 5) + 1), spend: String(100 + ((i * 37) % 90)), churn: i % 3 ? "no" : "yes",
+}));
+const plain = analyzeDataset(overrideRows, ["region", "spend", "churn"], "churn");
+const overridden = analyzeDataset(overrideRows, ["region", "spend", "churn"], "churn", undefined,
+  { region: ROLE.CATEGORICAL, spend: "banana", ghost: ROLE.NUMERIC, churn: ROLE.BINARY });
+check("without overrides the code column is numeric and nothing is recorded",
+  plain.meta.columnRoles.region === ROLE.NUMERIC && Object.keys(plain.meta.roleOverrides).length === 0);
+check("an override changes the role and reroutes the column",
+  overridden.meta.columnRoles.region === ROLE.CATEGORICAL
+  && overridden.meta.categoricalCols.includes("region") && !overridden.meta.numericCols.includes("region")
+  && !overridden.statistics.some(r => r.col === "region"));
+check("the applied override is recorded with the role it replaced",
+  JSON.stringify(overridden.meta.roleOverrides) === JSON.stringify({ region: { from: ROLE.NUMERIC, to: ROLE.CATEGORICAL } }));
+check("a non-ROLE value, an unknown column and a no-op override are ignored",
+  overridden.meta.columnRoles.spend === ROLE.NUMERIC && !("ghost" in overridden.meta.columnRoles)
+  && !("churn" in overridden.meta.roleOverrides));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
