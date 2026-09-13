@@ -2,8 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import {
-  UploadCloud, LoaderCircle, TriangleAlert,
-  ArrowRight, FileWarning, CheckCircle2, TrendingUp, Lightbulb,
+  UploadCloud, LoaderCircle, TriangleAlert, ArrowRight, FileWarning,
 } from "lucide-react";
 
 import Header from "../components/layout/Header.jsx";
@@ -77,6 +76,19 @@ const DIAGNOSTIC_LAYERS = [
   { title: "Relationships",   text: "A full correlation matrix with multicollinearity and leakage checks." },
   { title: "Class Balance",   text: "Majority-to-minority ratio and minority-class row counts." },
   { title: "Recommendations", text: "Prioritized, actionable fixes tied to what was actually found." },
+];
+
+/* The raw-CSV-to-report illustration. Same facts as before, now as rows. */
+const SPECIMEN_INPUT = [
+  { label: "Column roles",  value: "Unknown" },
+  { label: "Target",        value: "Not chosen" },
+  { label: "Data quality",  value: "Unmeasured" },
+];
+
+const SPECIMEN_REPORT = [
+  { label: "Top predictor",  value: "eat-well?" },
+  { label: "Missing values", value: "None" },
+  { label: "Recommendation", value: "Drop ID before training" },
 ];
 
 const index2 = (i) => String(i + 1).padStart(2, "0");
@@ -336,38 +348,42 @@ function Home() {
 
             <div className="mt-24 sm:mt-32">
               <SectionLabel mark="05">From raw CSV to clear decisions</SectionLabel>
-              <div className="mt-12 flex flex-col items-center gap-8 rounded-[2rem] border border-line px-6 py-12 sm:flex-row sm:justify-center sm:gap-12 sm:px-12">
+              {/* Before / after as one recessed specimen. Hairline rows and a large mono
+                  figure — the hero's stat grammar — instead of icon badges in a card
+                  nested inside a card. Static illustration, not live data. */}
+              <div className="mt-12 grid overflow-hidden rounded-[2rem] border border-line bg-paper lg:grid-cols-[minmax(0,5fr)_auto_minmax(0,7fr)]">
 
-                <div className="text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-line-strong">
-                    <FileWarning size={22} className="text-ink-faint" />
-                  </div>
-                  <div className="mt-3 font-mono text-[12px] text-ink-soft">messy.csv</div>
+                <div className="p-8 sm:p-10">
+                  <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">Input</div>
+                  <div className="mt-8 font-mono text-3xl font-medium tracking-tight text-ink sm:text-4xl">messy.csv</div>
+                  <dl className="mt-10 border-t border-line">
+                    {SPECIMEN_INPUT.map((row) => (
+                      <div key={row.label} className="flex items-baseline justify-between gap-6 border-b border-line py-4">
+                        <dt className="text-[13.5px] text-ink-soft">{row.label}</dt>
+                        <dd className="font-mono text-[13px] text-ink-faint">{row.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
 
-                <ArrowRight size={20} className="rotate-90 shrink-0 text-ink-faint sm:rotate-0" />
+                <div className="flex items-center justify-center border-y border-line py-4 lg:border-x lg:border-y-0 lg:px-6 lg:py-0">
+                  <ArrowRight size={18} className="rotate-90 text-ink-faint lg:rotate-0" />
+                </div>
 
-                <div className="w-full max-w-xs rounded-2xl border border-line px-5 py-4">
-                  <div className="flex items-center justify-between border-b border-line pb-3">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">Health Score</span>
-                    <span className="font-mono text-xl font-medium text-success">
-                      92<span className="text-xs text-ink-faint">/100</span>
-                    </span>
+                <div className="p-8 sm:p-10">
+                  <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">Report</div>
+                  <div className="mt-8 flex items-baseline gap-3">
+                    <span className="font-mono text-5xl font-medium tracking-tight text-success sm:text-6xl">92</span>
+                    <span className="font-mono text-[13px] text-ink-faint">/100 · Health score · Excellent</span>
                   </div>
-                  <div className="mt-4 space-y-2.5 text-[13px] text-ink-soft">
-                    <div className="flex items-center gap-2.5">
-                      <TrendingUp size={13} className="shrink-0 text-accent-ink" />
-                      Top predictor: <span className="font-mono text-ink">eat-well?</span>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <CheckCircle2 size={13} className="shrink-0 text-success" />
-                      No missing values
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <Lightbulb size={13} className="shrink-0 text-warning" />
-                      Drop ID before training
-                    </div>
-                  </div>
+                  <dl className="mt-10 border-t border-line">
+                    {SPECIMEN_REPORT.map((row) => (
+                      <div key={row.label} className="flex items-baseline justify-between gap-6 border-b border-line py-4">
+                        <dt className="text-[13.5px] text-ink-soft">{row.label}</dt>
+                        <dd className="text-right font-mono text-[13px] text-ink">{row.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
 
               </div>
