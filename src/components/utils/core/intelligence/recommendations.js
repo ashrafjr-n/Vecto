@@ -234,8 +234,8 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
           priority:  "medium",
           column:    s.col,
           issue:     `${s.outlierCount} outliers (${outlierPct}%)`,
-          action:    `Investigate outliers in "${s.col}" before applying any treatment. These may represent valid extreme values rather than errors.`,
-          rationale: `${outlierPct}% of values fall outside IQR fences. High outlier rate often reflects natural distribution skew — verify with domain knowledge before removing or capping.`,
+          action:    `Investigate the values of "${s.col}" outside ${s.lowerFence} – ${s.upperFence} before applying any treatment. These may represent valid extreme values rather than errors.`,
+          rationale: `${outlierPct}% of values fall outside the skew-adjusted fences (${s.lowerFence} – ${s.upperFence}), which already allow for a long tail — a rate this high after that adjustment is worth a domain check before removing or capping anything.`,
         });
       } else if (outlierPct > 2) {
         push({
@@ -243,8 +243,8 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
           priority:  "low",
           column:    s.col,
           issue:     `${s.outlierCount} outliers (${outlierPct}%)`,
-          action:    `Review outliers in "${s.col}". If confirmed as errors, consider capping at 1st/99th percentile. If valid, leave as-is.`,
-          rationale: `${outlierPct}% outlier rate. Always verify whether extreme values are data errors or real observations before treatment.`,
+          action:    `Review the values of "${s.col}" outside ${s.lowerFence} – ${s.upperFence}. If they are errors, cap them at those fences; if they are real, leave them.`,
+          rationale: `${outlierPct}% of values fall outside the skew-adjusted fences. The advice caps at the same cutoff that flagged them — it used to detect with one rule and suggest capping at the 1st/99th percentile, a different one. Verify whether they are errors or real observations first.`,
         });
       }
     });
