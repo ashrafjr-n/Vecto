@@ -79,13 +79,6 @@ const DIAGNOSTIC_LAYERS = [
   { title: "Recommendations", text: "Prioritized, actionable fixes tied to what was actually found." },
 ];
 
-const TRUST_POINTS = [
-  { title: "Everything runs locally.",      text: "Your dataset never leaves the browser." },
-  { title: "Validated calculations.",       text: "Statistics are checked against reference implementations." },
-  { title: "Role detection based on data.", text: "Columns are classified from their values, not just their names." },
-  { title: "No black-box score.",           text: "The health score is broken into Quality, Structure, Relationships and Target Readiness." },
-];
-
 const index2 = (i) => String(i + 1).padStart(2, "0");
 
 function Home() {
