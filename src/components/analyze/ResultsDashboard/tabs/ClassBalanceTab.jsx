@@ -21,6 +21,16 @@ function ClassBalanceTab({ result }) {
 
   const { classes, isImbalanced } = classBalance;
 
+  /* Balance is a property of a class label. A single-valued target has one class,
+     an identifier has one class per row, and for both this tab printed a verdict
+     plus "consider oversampling (SMOTE)" beside the report's advice to pick a
+     different target. The distribution is still shown; the verdict is not. */
+  const notALabel = meta.targetIsConstant
+    ? "Every row has the same value, so there is no balance to assess — pick a different target."
+    : meta.targetIsIdentifier
+      ? "One class per row is an identifier, not a label, so there is no balance to assess — pick a different target."
+      : null;
+
   /* reduce(), not Math.max(...classes.map(...)): the spread passes one call
      argument per class and throws RangeError past ~125k of them. `classes` is
      unbounded — it is one entry per distinct target value, and nothing stops a
@@ -38,7 +48,9 @@ function ClassBalanceTab({ result }) {
     <div className="space-y-4">
       <SectionCard
         title="Target column"
-        action={<StatusBadge severity={isImbalanced ? "warning" : "success"}>{isImbalanced ? "Imbalanced" : "Balanced"}</StatusBadge>}
+        action={notALabel
+          ? <StatusBadge severity="critical">Not a class label</StatusBadge>
+          : <StatusBadge severity={isImbalanced ? "warning" : "success"}>{isImbalanced ? "Imbalanced" : "Balanced"}</StatusBadge>}
       >
         <div className="mb-5 font-mono text-lg font-semibold text-ink">{meta.target}</div>
 
@@ -80,7 +92,14 @@ function ClassBalanceTab({ result }) {
         )}
       </SectionCard>
 
-      {isImbalanced && (
+      {notALabel && (
+        <div className="flex items-start gap-3 rounded-lg border border-critical/20 bg-critical-tint px-4 py-3.5">
+          <TriangleAlert size={16} className="mt-0.5 shrink-0 text-critical" />
+          <div className="text-[12.5px] leading-relaxed text-ink-soft">{notALabel}</div>
+        </div>
+      )}
+
+      {isImbalanced && !notALabel && (
         <div className="flex items-start gap-3 rounded-lg border border-warning/20 bg-warning-tint px-4 py-3.5">
           <TriangleAlert size={16} className="mt-0.5 shrink-0 text-warning" />
           <div>
