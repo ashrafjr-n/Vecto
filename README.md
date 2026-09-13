@@ -2,7 +2,7 @@
 
 Know your dataset before you train on it.
 
-Datassert is a browser-based CSV dataset analyzer. Upload a CSV, pick a target column, and
+Vecto is a browser-based CSV dataset analyzer. Upload a CSV, pick a target column, and
 get a full readiness report: data quality, per-column statistics, correlations, class
 balance, a 0–100 health score, and prioritized recommendations.
 
@@ -128,7 +128,7 @@ chunk only once an analysis finishes.
 
 ## Privacy
 
-Datassert has no backend. CSV parsing and every statistic are computed client-side in
+Vecto has no backend. CSV parsing and every statistic are computed client-side in
 JavaScript; nothing is transmitted, stored, or logged anywhere.
 
 ## License
