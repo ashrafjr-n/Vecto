@@ -6,7 +6,7 @@
 export const METHODOLOGY_INTRO = {
   headline: "How Vecto reads a dataset.",
   lead: [
-    "Every figure in a Vecto report comes from a deterministic JavaScript engine that runs in your browser tab. There is no model in the loop and no server behind it — the same file and the same target produce the same report, every time.",
+    "Every figure in a Vecto report comes from a deterministic JavaScript engine that runs in your browser tab. No model computes any of it and no server is behind it — the same file and the same target produce the same report, every time. An optional AI assistant can suggest what columns mean; its suggestions are labelled, checked against the file, and change the report only when you accept one.",
     "This page documents that engine: the order it works in, the rule behind each decision, the thresholds it uses, and — just as important — what it cannot decide and hands back to you.",
   ],
 };
@@ -145,7 +145,7 @@ export const PRINCIPLES = [
   },
   {
     title: "Deterministic and local",
-    text: "Parsing and analysis run in this browser tab, in a background worker. Nothing is uploaded, and sampling is deterministic, so the same file and target always produce the same report.",
+    text: "Parsing and analysis run in this browser tab, in a background worker. No file is uploaded — the optional AI assistant sends only a column summary, and only when asked — and sampling is deterministic, so the same file and target always produce the same report.",
   },
 ];
 
