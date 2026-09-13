@@ -35,7 +35,7 @@ const METRIC_GROUPS = [
   {
     key:   "eta",
     title: "Numeric against categorical",
-    sub:   "Correlation ratio η, degrees-of-freedom corrected — how much of the numeric side's variance the categories explain: a numeric feature against the target's classes, or a numeric target across a categorical feature's levels.",
+    sub:   "Rank-based η (Kruskal–Wallis, bias-corrected) — how strongly the categories separate the numeric side's ranks: a numeric feature across the target's classes, or a numeric target across a categorical feature's levels. Ranks keep one extreme value from deciding it.",
     range: "0 to 1",
   },
 ];
