@@ -5,6 +5,7 @@ import { ArrowRight, ArrowLeft, Info, ChevronDown } from "lucide-react";
 import { detectColumnRoles } from "../../utils/core/detectors/roles.js";
 import { ROLE }              from "../../utils/core/roles.constants.js";
 import RolePill               from "../shared/RolePill.jsx";
+import AiDossier              from "./AiDossier.jsx";
 
 const TARGET_MODES = [
   { id: "auto",   label: "Auto Detect"   },
@@ -67,7 +68,7 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
   return null;
 }
 
-function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack }) {
+function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack, dossier, onDossier, roleOverrides, onRoleOverridesChange }) {
   const [mode,     setMode]     = useState("auto");
   const [selected, setSelected] = useState(initialTarget || columns[0] || "");
 
@@ -78,6 +79,8 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack }) {
     () => detectColumnRoles(csvData ?? [], columns, null),
     [columns, csvData],
   );
+  // What the picker shows: detected roles, with any role the user accepted from the AI.
+  const shownTypes = { ...colTypes, ...roleOverrides };
 
   const effectiveTarget =
     mode === "none" ? null :
@@ -162,7 +165,7 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack }) {
                 <ModePanel
                   mode={mode}
                   columns={columns}
-                  colTypes={colTypes}
+                  colTypes={shownTypes}
                   selected={selected}
                   setSelected={setSelected}
                   initialTarget={initialTarget}
@@ -190,6 +193,19 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack }) {
             </div>
 
           </div>
+
+          <AiDossier
+            data={csvData}
+            columns={columns}
+            roles={colTypes}
+            engineTarget={initialTarget}
+            dossier={dossier}
+            onDossier={onDossier}
+            overrides={roleOverrides}
+            onOverridesChange={onRoleOverridesChange}
+            currentTarget={effectiveTarget}
+            onUseTarget={(col) => { setMode("select"); setSelected(col); }}
+          />
         </div>
       </section>
     </>
