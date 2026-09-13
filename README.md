@@ -29,6 +29,8 @@ never leaves your machine.
   target readiness, with a letter grade and per-dimension breakdown
 - **Recommendations** — prioritized, human-readable next steps for making the dataset
   ML-ready
+- **Methodology page** — `/methodology` documents every stage of the engine: the rule
+  behind each decision, the thresholds and estimators it uses, and what it cannot decide
 
 ## Getting started
 
