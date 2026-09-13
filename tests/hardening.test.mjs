@@ -1282,5 +1282,20 @@ const iso = getRelationshipsV3(isoRows, [], "y", new Set(), ["zone", "tag"]).tar
 check("a column that isolates the outlier row is not read as strongly associated",
   iso?.metric === "eta" && iso.value < 0.2);
 
+/* ══════════════════════════════════════════
+   HELD-OUT — defects found on files no threshold was tuned on
+══════════════════════════════════════════ */
+console.log("\nHELD-OUT — continuous measurements are not identifiers\n");
+
+/* sonar.csv: 60 continuous signal columns, each >95% distinct, were flagged
+   "likely an ID column" and advised to group rare categories — 36 times. */
+const signalRows = Array.from({ length: 200 }, (_, i) => ({
+  s1: (Math.abs(Math.sin(i + 1)) * 0.9).toFixed(4), s2: (Math.abs(Math.cos(i * 1.7)) * 0.8).toFixed(4), label: i % 2 ? "R" : "M",
+}));
+const signal = analyzeDataset(signalRows, ["s1", "s2", "label"], "label");
+check("a near-unique numeric column is not called an ID or told to group rare categories",
+  !signal.quality.columnsWithIssues.some(c => c.issue === "high_cardinality")
+  && !signal.recommendations.some(r => /cardinality|Group rare/i.test(r.issue + r.action)));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
