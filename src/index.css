@@ -132,7 +132,12 @@ button:not(:disabled), select {
   cursor: pointer;
 }
 
-a {
-  text-decoration: none;
-  color: inherit;
+/* Layered, so a text-* utility on a link wins. Unlayered, this rule outranked
+   every Tailwind utility (utilities are layered), so no <a> could take a color:
+   a light-on-dark button rendered its label in the button's own color. */
+@layer base {
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
 }
