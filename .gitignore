@@ -13,8 +13,8 @@ vecto-docs.md
 *principles*.md
 # Vite dep pre-bundle cache — generated on every dev run, 12MB, never shipped
 .vite/
-# Production build — Cloudflare Pages runs `npm run build` on every push and deploys
-# dist/ itself, so a committed copy could only ever be stale.
+# Production build — Cloudflare Workers Builds runs `npm run build` on every push and
+# deploys dist/ itself, so a committed copy could only ever be stale.
 dist/
 
 # Dataset test reports written by tools/report.mjs — local test artifacts, not build output
