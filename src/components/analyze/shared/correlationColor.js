@@ -1,7 +1,14 @@
 /* Correlation is polarity (-1..+1 around a neutral 0) — a diverging color job per
    the dataviz skill: two hues + a neutral midpoint, equal steps per arm. Negative
-   = info blue, positive = gold (a data-encoding use of gold, distinct from its
-   sparse-UI-accent role elsewhere — see frontend.md "Correlation heatmap").
+   = info blue, positive = terracotta — see frontend.md "Correlation heatmap".
+
+   The positive arm was gold until the brand dropped gold (2026-09-13). It was
+   re-derived, not swapped: each step keeps the blue step's OKLCH lightness at
+   hue 40°. Hue chosen by measurement — rose (345°) was the first candidate and
+   collapsed toward blue under colour-vision simulation (ΔE 6.5–8.7 at bands 2–4,
+   below the skill's 8 target); terracotta holds 13.8+ under protan, deutan and
+   tritan. It stays clear of gold (~85°) and of the reserved critical status red
+   (21°), so a strong positive correlation never reads as an error.
 
    These are the DARK steps, selected for the night surface rather than flipped
    from the light ones (the dataviz skill's rule: dark mode is chosen, not
@@ -16,20 +23,21 @@
    spread <= 8° per arm.
 
    `validateOrdinal`'s fourth check — the pale end clearing 2:1 against the
-   surface — FAILS here by design, at 1.45:1 (gold) and 1.30:1 (blue). Lifting
+   surface — FAILS here by design, at 1.28:1 (terracotta) and 1.30:1 (blue). Lifting
    band 0 to clear it would make "almost no correlation" one of the loudest cells
    on screen, and the shipped light ramp took the same decision (#EAF2FA is
    1.08:1 on white). The mitigation is the one the marks spec asks for: the
    heatmap separates every cell with a surface gap (`mx-0.5` + `mt-1` in
    RelationshipsTab), so a cell reads as a mark from its boundary and does not
-   depend on its fill to be seen. Keep that gap if you touch the grid. */
+   depend on its fill to be seen. Keep that gap if you touch the grid.
+   (Terracotta's pale end measures 1.28:1, the same decision.) */
 const NEGATIVE = ["#1E2D40", "#27415E", "#38618F", "#4987BF", "#7DB2E3"];
-const POSITIVE = ["#3B3321", "#5A4C2A", "#786530", "#B49849", "#DDC36D"];
+const POSITIVE = ["#3D251D", "#5A3427", "#884C37", "#B86A4F", "#DE9981"];
 const NEUTRAL  = "#2A2F37"; // a true near-zero reads as neither arm — gray, not band 0
 
 /* Text color per band, each verified >=4.5:1 (WCAG AA normal text) against its
-   own fill via the dataviz skill's contrast() checker. Worst case is 5.11:1
-   (gold band 2); every other band clears 5.2:1.
+   own fill via the dataviz skill's contrast() checker. Worst case is 4.94:1
+   (terracotta band 3, dark text); terracotta bands 0–2 clear 6.0:1 in light text.
 
    Both arms cross to dark text at band 3 — unlike the light ramp, where they
    crossed at different bands and that asymmetry needed explaining. It is not a
