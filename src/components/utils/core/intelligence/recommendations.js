@@ -1,5 +1,31 @@
 import { ROLE } from "../roles.constants.js";
 
+/* Which columns the advice has already decided about, and how. ONE function, read
+   by getRecommendations and by the insight cards, because the cards were a second
+   copy of the same judgement and drifted: they showed "Critical Missing Values" and
+   "Possible Target Leakage" side by side for one column, and "Highly Correlated
+   Features" for a pair the recommendations had already replaced.
+     dropped  — identifier, empty, or constant with no gaps: remove it
+     replaced — more than half missing, or constant where recorded: its presence
+                indicator replaces it
+     leaking  — under leakage investigation; outranks the other two
+   The target is never in any of them — it has its own advice. */
+export function columnDecisions({ meta, quality, relationships }) {
+  const dropped = new Set(meta.identifierCols), replaced = new Set();
+  const leaking = new Set(relationships.leakageSuspects.map(l => l.col));
+  const missing = new Map(quality.columnsWithIssues.filter(c => c.issue === "missing").map(c => [c.col, c.count]));
+  for (const [col, count] of missing) {
+    if (col === meta.target) continue;
+    if (count >= meta.rows) dropped.add(col);
+    else if (Math.round((count / meta.rows) * 100) > 50) replaced.add(col);
+  }
+  quality.columnsWithIssues
+    .filter(c => c.issue === "constant" && c.col !== meta.target)
+    .forEach(c => (missing.has(c.col) ? replaced : dropped).add(c.col));
+  const notKept = new Set([...dropped, ...replaced, ...leaking]);
+  return { dropped, replaced, leaking, notKept };
+}
+
 export function getRecommendations({ meta, quality, statistics, relationships, classBalance, visualizations = [] }) {
   const recs = [];
 
@@ -75,7 +101,6 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
 
   /* ── Missing values ── */
   const lightlyMissingAll = [];
-  const replacedByIndicator = new Set();   // advised away: the original column is dropped
   quality.columnsWithIssues
     .filter(c => c.issue === "missing")
     .forEach(c => {
@@ -120,7 +145,6 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       }
 
       if (pct > 50) {
-        replacedByIndicator.add(c.col);
         /* "Just drop it" throws away the one thing a mostly-empty column still
            reliably carries: WHETHER the value was present. On titanic, Cabin is
            77% missing and its missingness tracks passenger class closely — the
@@ -164,7 +188,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
   /* Pair advice ("drop one of", "use a non-linear model for both") assumes both
      columns stay. ginf.csv advised dropping one of odd_bts / odd_bts_n two lines
      after replacing both with presence indicators. */
-  const notKept = new Set([...meta.identifierCols, ...relationships.leakageSuspects.map(l => l.col), ...replacedByIndicator]);
+  const { notKept } = columnDecisions({ meta, quality, relationships });
   const bothKept = (a, b) => !notKept.has(a) && !notKept.has(b);
 
   /* ── Duplicate rows ── */
