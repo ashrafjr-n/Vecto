@@ -19,7 +19,7 @@ const BASE_TABS = [
   { id: "classbalance",   label: "Class Balance", requiresClasses: true },
 ];
 
-function ResultsDashboard({ result, onReset }) {
+function ResultsDashboard({ result, onReset, ai }) {
   const [activeTab, setActiveTab] = useState("overview");
 
   if (!result) return null;
@@ -160,7 +160,7 @@ function ResultsDashboard({ result, onReset }) {
                 {activeTab === "quality"        && <QualityTab        result={result} />}
                 {activeTab === "statistics"     && <StatisticsTab     result={result} />}
                 {activeTab === "visualizations" && <VisualizationsTab result={result} />}
-                {activeTab === "targetsignal"   && <TargetSignalTab   result={result} />}
+                {activeTab === "targetsignal"   && <TargetSignalTab   result={result} ai={ai} />}
                 {activeTab === "relationships"  && <RelationshipsTab  result={result} />}
                 {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
               </motion.div>
