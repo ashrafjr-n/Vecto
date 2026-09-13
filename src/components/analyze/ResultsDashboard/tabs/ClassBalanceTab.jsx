@@ -55,7 +55,7 @@ function ClassBalanceTab({ result }) {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-[11.5px] text-ink-faint">{cls.count.toLocaleString()} rows</span>
-                    <span className={`w-11 text-right font-mono text-[13px] font-semibold ${isMax ? "text-gold-ink" : "text-ink-soft"}`}>{cls.pct}%</span>
+                    <span className={`w-11 text-right font-mono text-[13px] font-semibold ${isMax ? "text-accent-ink" : "text-ink-soft"}`}>{cls.pct}%</span>
                   </div>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-paper">
@@ -63,7 +63,7 @@ function ClassBalanceTab({ result }) {
                     initial={{ width: 0 }}
                     animate={{ width: `${cls.pct}%` }}
                     transition={{ delay: Math.min(i * 0.05, 0.6), duration: 0.5, ease: "easeOut" }}
-                    className={`h-full rounded-full ${isMax ? "bg-gold" : "bg-ink-faint/60"}`}
+                    className={`h-full rounded-full ${isMax ? "bg-accent" : "bg-ink-faint/60"}`}
                   />
                 </div>
               </div>
