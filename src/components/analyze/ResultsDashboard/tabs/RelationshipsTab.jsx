@@ -39,7 +39,7 @@ function Observations({ observations }) {
   );
 }
 
-/* Diverging by sign: gold = positive, info blue = negative, per
+/* Diverging by sign: terracotta = positive, info blue = negative, per
    correlationColor.js — the same encoding as the heatmap below, so ranking and
    grid never disagree. */
 function CorrelationRanking({ strongRelationships }) {
