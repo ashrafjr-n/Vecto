@@ -266,7 +266,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
           column:    s.col,
           issue:     `${s.outlierCount} outliers (${outlierPct}%)`,
           action:    `Review the values of "${s.col}" outside ${s.lowerFence} – ${s.upperFence}. If they are errors, cap them at those fences; if they are real, leave them.`,
-          rationale: `${outlierPct}% of values fall outside the skew-adjusted fences. The advice caps at the same cutoff that flagged them — it used to detect with one rule and suggest capping at the 1st/99th percentile, a different one. Verify whether they are errors or real observations first.`,
+          rationale: `${outlierPct}% of values fall outside the skew-adjusted fences, which already allow for this column's skew. Capping at those same fences keeps the treatment consistent with how the values were flagged. Verify whether they are errors or real observations first.`,
         });
       }
     });
