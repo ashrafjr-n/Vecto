@@ -437,19 +437,52 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
 
   /* ── Categorical redundancy (stage 7) ──
      multicollinearPairs only ever covered NUMERIC columns, so two categorical
-     features encoding the same thing produced no advice at all. */
+     features encoding the same thing produced no advice at all.
+
+     V is symmetric, dependency is not. With 9,676 Societies against 3
+     Furnishing levels, a high V says each Society maps to mostly one Furnishing
+     — it cannot say the reverse, because 3 levels cannot name 9,676. "Keep one of
+     the two" was wrong for every such pair (drop Society and its detail is gone),
+     and house_prices.csv issued it 15 times, once per pair. Uneven pairs are now
+     grouped under the column that determines the others; only pairs of similar
+     grain keep the "one of the two" advice. Columns already settled (dropped or
+     under leakage investigation) are left out — advising on them is moot. */
+  const UNEVEN_LEVELS = 3;
+  const skipRedundancy = new Set([...meta.identifierCols, ...relationships.leakageSuspects.map(l => l.col)]);
+  const fmtV = v => v.toFixed(2);
+  const determines = new Map();
   (relationships.categoricalAssociations ?? [])
-    .filter(a => a.cramersV >= 0.6)
+    .filter(a => a.cramersV >= 0.6 && !skipRedundancy.has(a.col1) && !skipRedundancy.has(a.col2))
     .forEach(a => {
+      const [l1, l2] = a.levels;
+      if (Math.max(l1, l2) >= UNEVEN_LEVELS * Math.min(l1, l2)) {
+        const [fine, fineLevels, coarse, coarseLevels] = l1 > l2 ? [a.col1, l1, a.col2, l2] : [a.col2, l2, a.col1, l1];
+        if (!determines.has(fine)) determines.set(fine, { levels: fineLevels, coarse: [] });
+        determines.get(fine).coarse.push({ col: coarse, levels: coarseLevels, v: a.cramersV });
+        return;
+      }
       push({
         category:  "Feature Selection",
         priority:  "medium",
         column:    null,
-        issue:     `Redundant categoricals: "${a.col1}" ↔ "${a.col2}" (Cramér's V ${a.cramersV.toFixed(2)})`,
+        issue:     `Redundant categoricals: "${a.col1}" ↔ "${a.col2}" (Cramér's V ${fmtV(a.cramersV)})`,
         action:    `Keep one of "${a.col1}" or "${a.col2}" — they encode largely overlapping information.`,
-        rationale: `Cramér's V of ${a.cramersV.toFixed(2)} over ${a.nPairs} rows (p = ${a.pValue < 0.001 ? "< 0.001" : a.pValue.toFixed(3)}) means knowing one largely tells you the other. Encoding both inflates the feature space — ${a.levels[0]} × ${a.levels[1]} levels — without adding information.`,
+        rationale: `Cramér's V of ${fmtV(a.cramersV)} over ${a.nPairs} rows (p = ${a.pValue < 0.001 ? "< 0.001" : a.pValue.toFixed(3)}) between columns of similar grain (${l1} and ${l2} levels) means knowing either largely tells you the other. Encoding both inflates the feature space without adding information.`,
       });
     });
+
+  determines.forEach(({ levels, coarse }, fine) => {
+    const names = coarse.map(c => `"${c.col}"`).join(", ");
+    push({
+      category:  "Feature Selection",
+      priority:  "medium",
+      column:    fine,
+      issue:     `"${fine}" (${levels} levels) largely determines ${coarse.length === 1 ? names : `${coarse.length} coarser columns`}`,
+      action:    `If you keep "${fine}", ${names} add${coarse.length === 1 ? "s" : ""} little on top of it. If you drop "${fine}", keep ${coarse.length === 1 ? "it" : "them"} — ${coarse.length === 1 ? "it does" : "they do"} not carry its detail. They are not interchangeable.`,
+      rationale: `Association is one-directional here: ${coarse.map(c => `"${c.col}" ${c.levels} level${c.levels === 1 ? "" : "s"}, V ${fmtV(c.v)}`).join("; ")}. `
+               + `A high Cramér's V between ${levels} levels and far fewer means each "${fine}" value maps to mostly one value of the coarser column — the reverse cannot hold, so "keep one of the two" would lose information.`,
+    });
+  });
 
   /* ── Signal the correlations cannot see (stage 7) ──
      Mutual information is non-zero while both correlations are ~0: the feature
