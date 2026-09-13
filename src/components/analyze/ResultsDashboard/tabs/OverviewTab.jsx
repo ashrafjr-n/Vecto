@@ -9,7 +9,7 @@ import { ROLE }      from "../../../utils/core/roles.constants.js";
 /* ─────────────────────────────────────────────
    HEALTH SCORE — radial gauge (a single ratio against a limit -> meter, in
    circular form). Fill color carries the score's severity, not the brand
-   accent: this is a good/bad signal, so it wears status tokens, not gold.
+   accent: this is a good/bad signal, so it wears status tokens, not the accent.
 ───────────────────────────────────────────── */
 const SIZE = 116, STROKE = 10, R = (SIZE - STROKE) / 2, C = 2 * Math.PI * R;
 
@@ -289,7 +289,7 @@ function RecommendationsCard({ recommendations }) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-4 text-[12.5px] font-medium text-gold-ink hover:underline"
+          className="mt-4 text-[12.5px] font-medium text-accent-ink hover:underline"
         >
           {expanded ? "Show less" : `Show ${recommendations.length - 4} more`}
         </button>

@@ -93,7 +93,7 @@ function SignalRow({ col, entry, index, rows }) {
         <span className={sig.strong ? "text-ink-soft" : ""}>{sig.text}</span>
 
         {divergence && (
-          <span className="rounded bg-gold-tint px-1.5 py-0.5 text-[11px] text-gold-ink">
+          <span className="rounded bg-accent-tint px-1.5 py-0.5 text-[11px] text-accent-ink">
             Spearman {entry.spearman.toFixed(2)} — monotonic, not linear
           </span>
         )}
