@@ -68,6 +68,25 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       const pct    = rawPct < 1 && rawPct > 0
         ? Math.max(0.1, Math.round(rawPct * 10) / 10)
         : Math.round(rawPct);
+
+      /* The target is never imputed. Every rule below is feature advice, and it
+         used to reach the target too — "Impute Price with median" invents the
+         answer a model is then graded against. A constant target has its own,
+         more fundamental advice below. */
+      if (c.col === meta.target) {
+        if (meta.targetIsConstant) return;
+        push({
+          category:  "Data Integrity",
+          priority:  pct > 20 ? "high" : "medium",
+          column:    c.col,
+          issue:     `Target has missing values (${pct}%)`,
+          action:    `Drop the ${count} row${count === 1 ? "" : "s"} where "${c.col}" is missing before training — do not impute the target.`,
+          rationale: `An imputed target is a label the engine made up: the model would be trained to reproduce the imputation and evaluated against it. `
+                   + `Rows without a label cannot teach or test anything supervised.`,
+        });
+        return;
+      }
+
       const { method, why } = imputationFor(c.col);
 
       if (pct > 50) {
@@ -131,7 +150,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
 
   /* ── Constant columns ── */
   quality.columnsWithIssues
-    .filter(c => c.issue === "constant")
+    .filter(c => c.issue === "constant" && c.col !== meta.target)
     .forEach(c => {
       push({
         category:  "Feature Selection",
@@ -248,7 +267,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      1%, then by definition every level is, and bucketing cannot do anything but
      collapse the column. */
   quality.columnsWithIssues
-    .filter(c => c.issue === "high_cardinality")
+    .filter(c => c.issue === "high_cardinality" && c.col !== meta.target)
     .forEach(c => {
       const viz    = catViz.get(c.col);
       const levels = viz?.uniqueCount ?? null;
@@ -298,7 +317,18 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
     });
   }
 
-  if (meta.target && !meta.targetIsIdentifier) {
+  if (meta.target && meta.targetIsConstant) {
+    push({
+      category:  "Data Integrity",
+      priority:  "high",
+      column:    meta.target,
+      issue:     "Target never varies",
+      action:    `Pick a different target column — every row of "${meta.target}" has the same value, so there is nothing to predict.`,
+      rationale: `A model trained on a single-valued target learns to output that value and nothing else. Every other recommendation on this page is scoped to this target, so change it first and re-run.`,
+    });
+  }
+
+  if (meta.target && !meta.targetIsIdentifier && !meta.targetIsConstant) {
     const entries  = Object.values(relationships.targetCorrelations ?? {});
     const strongest = entries.reduce((best, e) => (e.absValue ?? 0) > (best?.absValue ?? 0) ? e : best, null);
     const anySignificant = entries.some(e => e.pValue != null && e.pValue < 0.05);
@@ -315,7 +345,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
   }
 
   /* ── Class imbalance ── */
-  if (classBalance && classBalance.isImbalanced && !meta.targetIsIdentifier) {
+  if (classBalance && classBalance.isImbalanced && !meta.targetIsIdentifier && !meta.targetIsConstant) {
     const majority = classBalance.classes.filter(c => !c.missing)[0];
     const majPct   = majority?.pct ?? 0;
     const severity = majPct > 90 ? "high" : "medium";
