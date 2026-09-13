@@ -1,4 +1,4 @@
-import { isIdentifierCol, isNumeric, isMissing, normalizeValue } from "../helpers.js";
+import { isIdentifierCol, isNumeric, isMissing, normalizeValue, nameTokens } from "../helpers.js";
 import { isTemporalColumn } from "./temporal.js";
 import { ROLE } from "../roles.constants.js";
 
@@ -73,6 +73,25 @@ const TEXT_MIN_DISTINCT = 50;
    while the highest non-identifier is MeetName at 0.615 — nothing in the corpus
    falls between 0.62 and 1.00, so the threshold is not near anything real. */
 export const IDENTIFIER_MIN_DISTINCT_SHARE = 0.95;
+
+/* A column NAMED as a key that repeats is a key to something else: a foreign key
+   (openpowerlifting's "MeetID" → meets.csv, events' "id_odsp" → ginf.csv).
+   isIdentifierCol only catches keys that are unique per row, so these came back
+   NUMERIC or CATEGORICAL — the report gave MeetID a mean of 5,143, a histogram and
+   a place in the correlation matrix.
+
+   "name" is deliberately NOT a key word: "team_name" with 147 teams is a real
+   feature. A lifter's "Name" (136,687 levels, ~2.8 rows each) is handled where it
+   did damage — the redundancy advice — from its rows per level, not its name.
+
+   The name is the only evidence the values do not carry: 8,482 repeated integers
+   look exactly like a measurement. Above ENTITY_KEY_MIN_DISTINCT levels such a
+   column is an IDENTIFIER; at or below it (store_id with 12 stores) it is a small
+   set of groups that can be a real feature, so it is CATEGORICAL — never NUMERIC,
+   because an id's arithmetic means nothing. 50 is a stated default, not a
+   measurement: the corpus's repeated keys all sit in the thousands. */
+const KEY_TOKENS = new Set(["id", "uuid", "key", "ref", "index"]);
+const ENTITY_KEY_MIN_DISTINCT = 50;
 
 /* One full-column pass: cardinality, numeric share, and integrality.
 
@@ -164,6 +183,11 @@ export function detectColumnRoles(data, columns, target) {
     // meta.categoricalCols, so this renames the role without rerouting the column.
     if (profile.distinct === 2) {
       roles[col] = ROLE.BINARY;
+      return;
+    }
+
+    if (col !== target && nameTokens(col).some(t => KEY_TOKENS.has(t))) {
+      roles[col] = profile.distinct > ENTITY_KEY_MIN_DISTINCT ? ROLE.IDENTIFIER : ROLE.CATEGORICAL;
       return;
     }
 

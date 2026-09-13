@@ -1,4 +1,4 @@
-import { isMissing, normalizeValue } from "../helpers.js";
+import { isMissing, normalizeValue, nameTokens } from "../helpers.js";
 import { detectColumnRoles } from "./roles.js";
 import { ROLE } from "../roles.constants.js";
 
@@ -23,14 +23,6 @@ const TARGET_TOKENS = new Set(["target", "label", "outcome", "churn", "fraud", "
 const MAX_SUGGESTED_CLASSES = 20;
 /* The low-cardinality rule's share, unchanged from the original detector. */
 const LOW_CARDINALITY_SHARE = 0.05;
-
-/* "MeetID" → ["meet", "id"], "price_range" → ["price", "range"],
-   "Price (in rupees)" → ["price", "in", "rupees"]. */
-const nameTokens = col => String(col)
-  .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-  .toLowerCase()
-  .split(/[^a-z0-9]+/)
-  .filter(Boolean);
 
 /* The guess only pre-selects a column in the picker, but a bad pre-selection is
    still the report a hurried user gets. Measured on the 10-file corpus, 6 guesses

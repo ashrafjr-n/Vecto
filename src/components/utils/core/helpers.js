@@ -590,6 +590,15 @@ export function spearman(data, colA, colB) {
   return { rho: spearmanOf(xs, ys), n: xs.length };
 }
 
+/* The words of a column name: "MeetID" → ["meet", "id"], "price_range" →
+   ["price", "range"], "Price (in rupees)" → ["price", "in", "rupees"]. A regex
+   word boundary cannot split camelCase — "meetid" has none before "id". */
+export const nameTokens = col => String(col)
+  .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+  .toLowerCase()
+  .split(/[^a-z0-9]+/)
+  .filter(Boolean);
+
 /* ── FIX #8: isIdentifierCol — guard against year-like sequential features ── */
 export function isIdentifierCol(data, col) {
   const nameLower = col.toLowerCase();
