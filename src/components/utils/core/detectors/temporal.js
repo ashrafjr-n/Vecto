@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────
-   Datassert TEMPORAL detection — pure validator
+   Vecto TEMPORAL detection — pure validator
    Precision over recall. Custom regex + explicit range
    validation. NEVER uses Date.parse / new Date (those are
    permissive & browser-inconsistent). Bare integers, years,
