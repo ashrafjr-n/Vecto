@@ -117,7 +117,8 @@ src/
                                SectionCard, StatusBadge, correlationColor)
       TargetStep/              target-column picker
       ResultsDashboard/        tabbed report (Overview/Quality/Statistics/
-                                Visualizations/Relationships/Class Balance)
+                                Visualizations/Target Signal/Relationships/
+                                Class Balance)
     utils/core/                the analysis engine (pure functions, no side effects)
       roles.constants.js      ROLE enum — the single source of truth for role strings
       index.js                analyzeDataset() orchestrator
