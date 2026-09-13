@@ -131,6 +131,13 @@ async function complete(apiKey, models, name, task, messages) {
       messages,
       temperature: 0,
       max_tokens: task.maxTokens,
+      /* Reasoning OFF. Measured 2026-09-14 on the ping task: nemotron-3-super spent
+         its whole token budget thinking (finish "length", the reasoning text returned
+         as content) and nemotron-3-ultra ignored the strict schema ({"ok":{ "ok": true }).
+         With reasoning disabled both returned clean JSON. Models without reasoning
+         ignore the flag. ponytail: global off; make it per task if the eval shows a
+         task that is better with thinking. */
+      reasoning: { enabled: false },
       response_format: {
         type: "json_schema",
         json_schema: { name, strict: true, schema: task.schema },
