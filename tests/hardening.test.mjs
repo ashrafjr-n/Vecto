@@ -594,6 +594,18 @@ check("fallback and direct paths produce an identical score",
 check("a hostile input through the async wrapper resolves as an error, never rejects",
   await runAnalysis(null, null, null).then(r => r.result === null && !!r.error, () => false));
 
+/* Cancelling needs a Worker to cancel, so a stand-in is installed for this one
+   check: it never answers, which is exactly a long analysis still running. */
+let terminated = false;
+globalThis.Worker = class { postMessage() {} terminate() { terminated = true; } };
+const controller = new AbortController();
+const cancelled  = runAnalysis(wRows, ["a", "b", "y"], "y", undefined, controller.signal);
+controller.abort();
+const cancelRun  = await cancelled;
+delete globalThis.Worker;
+check("aborting a running analysis terminates the worker and settles as aborted, not failed",
+  terminated && cancelRun.aborted === true && cancelRun.result === null && cancelRun.error === null);
+
 /* ── Chi-square over the WHOLE contingency table ──────────────────────────
    A cell that was never observed still has a non-zero expectation, and it
    contributes exactly that expectation to chi-square. Summing only over the
