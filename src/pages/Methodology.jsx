@@ -1,7 +1,9 @@
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
-import { METHODOLOGY_INTRO } from "../content/methodology.js";
+import { METHODOLOGY_INTRO, PHASES } from "../content/methodology.js";
+
+const index2 = (i) => String(i + 1).padStart(2, "0");
 
 /* Documentation for the audience that will check the numbers. Same dark
    editorial language as Home: a hero panel curving away at the bottom, the
@@ -32,6 +34,29 @@ function Methodology() {
               ))}
             </div>
           </div>
+        </section>
+
+        {/* ── DOTTED CANVAS — the index of stages. Plain anchors: each link jumps
+            to the stage below, and the URL hash makes a stage shareable. ── */}
+        <section className="px-6 py-20 sm:px-10 sm:py-28">
+          <nav aria-label="Analysis stages" className="mx-auto max-w-[1400px] rounded-[2rem] border border-line-strong bg-paper-sunken px-6 py-8 sm:px-10 sm:py-10">
+            <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
+              {PHASES.length} stages, in order
+            </div>
+            <ol className="mt-6 grid grid-cols-1 gap-x-10 sm:grid-cols-2 lg:grid-cols-4">
+              {PHASES.map((phase, i) => (
+                <li key={phase.id} className="border-t border-line">
+                  <a
+                    href={`#${phase.id}`}
+                    className="flex items-baseline gap-4 py-4 text-[15px] tracking-tight text-ink-soft transition-colors hover:text-ink"
+                  >
+                    <span className="font-mono text-[11px] text-ink-faint">{index2(i)}</span>
+                    {phase.title}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
         </section>
 
       </main>
