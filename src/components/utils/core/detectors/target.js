@@ -99,5 +99,7 @@ export function detectTarget(columns, data) {
   //    meets.csv otherwise fell through to MeetName, 5,154 meet names.
   const plausible = usable.filter(c => roles[c] !== ROLE.CATEGORICAL
                                     || profile.get(c).levels.size <= MAX_SUGGESTED_CLASSES);
-  return last(plausible.length ? plausible : usable);
+  if (plausible.length) return last(plausible);
+  // Nothing plausible at all: the coarsest usable column is the least-bad offer.
+  return usable.reduce((best, c) => profile.get(c).levels.size < profile.get(best).levels.size ? c : best);
 }
