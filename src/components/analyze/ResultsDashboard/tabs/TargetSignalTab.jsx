@@ -34,8 +34,8 @@ const METRIC_GROUPS = [
   },
   {
     key:   "eta",
-    title: "Numeric features against a categorical target",
-    sub:   "Correlation ratio η — how much of the feature's variance the target's classes explain.",
+    title: "Numeric against categorical",
+    sub:   "Correlation ratio η, degrees-of-freedom corrected — how much of the numeric side's variance the categories explain: a numeric feature against the target's classes, or a numeric target across a categorical feature's levels.",
     range: "0 to 1",
   },
 ];
