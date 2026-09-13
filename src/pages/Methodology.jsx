@@ -59,6 +59,44 @@ function Methodology() {
           </nav>
         </section>
 
+        {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero ── */}
+        <section className="rounded-t-[2.5rem] bg-paper-sunken px-6 pt-20 pb-24 sm:rounded-t-[4.5rem] sm:px-10 sm:pt-28 sm:pb-32 lg:rounded-t-[7rem]">
+          <div className="mx-auto max-w-[1400px]">
+
+            <SectionLabel mark="02">The analysis, stage by stage</SectionLabel>
+            <h2 className="mt-10 max-w-[24ch] text-[2rem] font-semibold leading-[1.08] tracking-[-0.03em] text-ink sm:text-5xl">
+              Eight stages, in the order a report is built.
+            </h2>
+
+            <div className="mt-16">
+              {PHASES.map((phase, i) => (
+                <article
+                  key={phase.id}
+                  id={phase.id}
+                  className="grid scroll-mt-24 gap-x-16 gap-y-8 border-t border-line py-12 sm:py-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
+                >
+                  <div>
+                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
+                    <h3 className="mt-4 text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-3xl">
+                      {phase.title}
+                    </h3>
+                    <p className="mt-5 max-w-xl text-[15px] leading-[1.75] text-ink-soft">{phase.lead}</p>
+                  </div>
+                  <dl className="border-t border-line lg:border-t-0">
+                    {phase.points.map((point) => (
+                      <div key={point.label} className="border-b border-line py-5 first:pt-5 lg:first:pt-0">
+                        <dt className="text-[15px] font-medium tracking-tight text-ink">{point.label}</dt>
+                        <dd className="mt-1.5 text-[13.5px] leading-[1.75] text-ink-soft">{point.text}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </article>
+              ))}
+            </div>
+
+          </div>
+        </section>
+
       </main>
 
       <Footer />
