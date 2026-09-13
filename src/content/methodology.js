@@ -91,12 +91,13 @@ export const PHASES = [
   {
     id: "class-balance",
     title: "Class balance",
-    lead: "The problem type follows the target's role: a numeric target is regression, a binary or categorical one is classification, a date is forecasting. For a classification target the distribution of classes is measured directly.",
+    lead: "The problem type follows the target's role: a numeric target is regression, a binary or categorical one is classification, a date is forecasting. For a classification target the distribution of classes is measured directly; a regression target has no classes, so no class table or imbalance advice is produced for it.",
     points: [
       { label: "Classes", text: "Levels are grouped by the same normalised key as everywhere else, and percentages are taken over all rows, with missing target values shown as their own row so the shares add up." },
       { label: "Imbalance", text: "A target is imbalanced when the majority class is more than three times the minority, or holds more than 80% of rows. The ratio catches multi-class skew — 60 / 20 / 20 — that a majority threshold alone would pass." },
       { label: "Absolute counts", text: "The smallest class is named with its row count. Under ten rows is called critically few regardless of what the percentage looks like." },
-      { label: "Identifier as target", text: "A target that is unique per row is an identifier, not a label, and holds the health score to 40. Cardinality cannot detect this — a continuous price is also one value per row — so the identifier rules from the role stage decide it." },
+      { label: "Identifier as target", text: "A target that is unique per row is an identifier, not a label, and holds the health score to 40. Cardinality cannot detect this — a continuous price is also one value per row — so the identifier rules from the role stage decide it — plus, for a text target only, the role stage's rule that more than 95% distinct values is an identifier." },
+      { label: "Unusable target", text: "A target with a single value holds the score to 25 and is not scanned against any feature. A target's missing rows are advised to be dropped, never imputed — an imputed label is an answer the engine invented." },
     ],
   },
   {
