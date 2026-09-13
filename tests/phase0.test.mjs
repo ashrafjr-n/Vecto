@@ -11,7 +11,7 @@ import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { getVisualizations } from "../src/components/utils/core/analyzers/stats.js";
-import { etaCorrelation, medcouple, adjustedFences, quantileSorted } from "../src/components/utils/core/helpers.js";
+import { etaCorrelation, medcouple, adjustedFences, quantileSorted, rankEta } from "../src/components/utils/core/helpers.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -323,6 +323,19 @@ for (const col of ["val", "noise"]) {
     `${pass ? "PASS" : "FAIL"}  ${col.padEnd(6)} η actual=${actual.toFixed(12)} ` +
     `expected=${want.toFixed(12)}  |diff|=${diff.toExponential(3)}`,
   );
+}
+
+/* ── Stage 10e — rank-based η (Kruskal-Wallis) vs scipy.stats.kruskal ── */
+const rk = parseCsv(join(__dirname, "reference", "datasets", "rank_eta.csv"));
+console.log("\nStage 10e — rank-based η: Kruskal-Wallis H, p and effect size vs scipy\n");
+for (const [key, want] of Object.entries(expected.rank_eta.pairs)) {
+  const [g, v] = key.split("|");
+  const res = rankEta(rk.rows.map(r => parseFloat(r[v])), rk.rows.map(r => String(r[g]).toLowerCase().trim()));
+  const pass = Math.abs(res.H - want.H) <= 1e-9
+    && Math.abs(res.pValue - want.p) <= 1e-9 * Math.max(1, want.p) + 1e-12
+    && Math.abs(res.value - want.rank_eta) <= TOL && res.k === want.k;
+  if (!pass) failures++;
+  console.log(`${pass ? "PASS" : "FAIL"}  ${key.padEnd(11)} H=${res.H.toFixed(6)} p=${res.pValue.toExponential(4)} rank η=${res.value.toFixed(6)} (raw η ${want.raw_eta.toFixed(3)})`);
 }
 
 /* ── Step 2a — identifier-numeric detection (the false-positive battleground) ──
