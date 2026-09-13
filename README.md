@@ -17,7 +17,8 @@ never leaves your machine.
 - **Column roles** — automatic classification into numeric, categorical, binary,
   identifier, temporal, and free text, read from whole columns rather than a head sample
 - **Relationships** — Pearson and Spearman with two-sided p-values, bias-corrected
-  Cramér's V for categorical pairs, correlation ratio (η), mutual information for
+  Cramér's V for categorical pairs, a rank-based correlation ratio (η, Kruskal–Wallis) for
+  numeric–categorical pairs, mutual information for
   non-monotonic signal, multicollinearity and target-leakage warnings, feature clusters
 - **Missingness as signal** — whether a column was recorded at all is measured against
   the target, so a mostly-empty column whose absence tracks the label is reported rather
@@ -64,6 +65,20 @@ Parses each CSV exactly as the app does, runs the analysis engine over it, and
 writes the full `analyzeDataset()` output to `reports/<name>.json` — one file per
 dataset, so a result can be diffed or re-read later. Written for testing the
 engine against many datasets; it is not part of the shipped app.
+
+## Deployment
+
+Deployed on **Cloudflare Pages**, connected to the GitHub repository. Every push triggers a
+build — there is nothing to upload by hand and no build output in the repository.
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Environment variables | none |
+
+The app is a static single-page application; Cloudflare serves `index.html` for client-side
+routes such as `/methodology` and `/analyze`.
 
 ## Tests
 
