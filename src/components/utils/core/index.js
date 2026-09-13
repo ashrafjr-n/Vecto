@@ -60,7 +60,7 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}) {
      just leaving it out. Map answers .has() exactly as the Set did, so callers
      that only ask membership are unaffected. */
   const skipFromCorrelation = new Map([
-    ...identifierCols.map(c => [c, `"${c}" is an identifier — one value per row identifies the row, not a property of it, so any association with the target would be memorisation.`]),
+    ...identifierCols.map(c => [c, `"${c}" is an identifier — it names a row, or an entity the row belongs to (a key into another table), rather than describing it, so any association with the target would be memorisation.`]),
     ...temporalCols.map(c => [c, `"${c}" is a date. Correlating a raw timestamp against the target measures drift over the collection period, not a feature; derive a part of it (month, weekday, age-at-event) and scan that instead.`]),
     ...textCols.map(c => [c, `"${c}" is free text, not a category. Its values are sentences, so an association measure over them describes the wording rather than a variable; extract features from it (length, keywords, embeddings) and scan those.`]),
   ]);
