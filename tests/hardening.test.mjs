@@ -1014,5 +1014,49 @@ check("the phase callback reports every phase, in order",
 check("and announcing the phases does not change the result",
   JSON.stringify(withPhases) === JSON.stringify(perf));
 
+/* ══════════════════════════════════════════
+   STAGE 10a — the target scan reads the roles
+══════════════════════════════════════════ */
+console.log("\nTARGET SCAN — one type system, one missing policy\n");
+
+/* house_prices.csv: a 3-level Furnishing against a numeric price scored
+   Cramér's V 0.73, because every distinct price became a contingency column.
+   The true η is 0.005. Here the level is unrelated to y by construction. */
+const furnRows = Array.from({ length: 3000 }, (_, i) => ({
+  furn: ["furnished", "semi", "unfurnished"][i % 3],
+  y:    String((i * 7919) % 2999 + 0.5),
+}));
+const furn = getRelationshipsV3(furnRows, [], "y", new Set(), ["furn"]).targetCorrelations.furn;
+check("a categorical feature against a numeric target is measured with η, not Cramér's V",
+  furn?.metric === "eta" && furn.value < 0.1);
+
+/* "NA" is missing everywhere else in the engine. The scan counted it as a value,
+   so 30% "NA" dropped a numeric target under the 80% numeric share. */
+const naTargetRows = Array.from({ length: 1000 }, (_, i) => ({
+  x: String((i * 37) % 1000),
+  y: i % 10 < 3 ? "NA" : String(((i * 37) % 1000) * 2 + (i % 7)),
+}));
+const naTargetX = getRelationshipsV3(naTargetRows, ["x"], "y", new Set(), []).targetCorrelations.x;
+check("missing tokens in a numeric target do not turn it categorical",
+  naTargetX?.metric === "pearson" && naTargetX.value > 0.99 && naTargetX.n === 700);
+
+/* η grows with the number of groups alone; the grouping side is now a feature,
+   which can have thousands of levels. 500 levels, 2 rows each, unrelated y. */
+const manyRows = Array.from({ length: 1000 }, (_, i) => ({
+  g: `lvl${Math.floor(i / 2)}`, y: String(Math.floor(Math.abs(Math.sin(i + 1)) * 1e6) % 1000),
+}));
+const many = getRelationshipsV3(manyRows, [], "y", new Set(), ["g"]).targetCorrelations.g;
+check("η against a many-level feature is bias-corrected, not inflated by cardinality",
+  many?.metric === "eta" && many.value < 0.3);
+
+/* A date target has no statistic here; a number would look real and mean nothing. */
+const dateRows = Array.from({ length: 200 }, (_, i) => ({
+  f: `c${i % 4}`, d: `2024-01-${String(i % 28 + 1).padStart(2, "0")}`,
+}));
+const dateRel = getRelationshipsV3(dateRows, [], "d", new Set(), ["f"]);
+check("a date target is not scored — every column says why",
+  Object.keys(dateRel.targetCorrelations).length === 0
+  && dateRel.unscoredColumns.some(u => u.col === "f" && u.reason.includes("is a date")));
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
