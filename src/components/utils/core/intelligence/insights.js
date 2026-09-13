@@ -24,6 +24,15 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
 
   /* ── CRITICAL ── */
 
+  // The target is unusable — nothing else on the page matters until it changes.
+  if (meta.targetIsConstant) {
+    push("critical",
+      "Target Never Varies",
+      `Every row of "${meta.target}" has the same value — there is nothing to predict. Pick a different target.`,
+      101
+    );
+  }
+
   // Target leakage — one card per column (meets.csv "MeetState" leaks by value AND by presence)
   const leakByCol = new Map();
   relationships.leakageSuspects.forEach(l => leakByCol.set(l.col, [...(leakByCol.get(l.col) ?? []), l.warning]));
