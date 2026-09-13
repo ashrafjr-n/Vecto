@@ -1260,5 +1260,26 @@ check("columns sharing one missing-values message share one card",
   cardPairCards.filter(i => /Critical Missing Values/.test(i.title)).length === 1
   && cardPairCards.some(i => i.title === "Critical Missing Values in 2 Columns"));
 
+/* ══════════════════════════════════════════
+   STAGE 10e — one extreme value does not decide η
+══════════════════════════════════════════ */
+console.log("\nRANK η — an outlier neither creates nor hides an association\n");
+
+/* house_prices.csv: one 6.7M price among values near 6,000 swamped the total
+   variance, so location's plain η read 0.11 (rank-based 0.65). */
+const etaOutRows = Array.from({ length: 900 }, (_, i) => ({
+  zone: `z${i % 3}`, y: String(1000 * (i % 3) + ((i * 7919) % 400)),
+}));
+etaOutRows[5].y = "6700000";
+const etaOut = getRelationshipsV3(etaOutRows, [], "y", new Set(), ["zone"]).targetCorrelations.zone;
+check("a real group difference survives one extreme target value",
+  etaOut?.metric === "eta" && etaOut.value > 0.8 && etaOut.pValue < 0.001);
+
+/* ...and the row that isolates the outlier does not score as a predictor. */
+const isoRows = etaOutRows.map((r, i) => ({ ...r, tag: i === 5 ? "odd" : `t${i % 40}` }));
+const iso = getRelationshipsV3(isoRows, [], "y", new Set(), ["zone", "tag"]).targetCorrelations.tag;
+check("a column that isolates the outlier row is not read as strongly associated",
+  iso?.metric === "eta" && iso.value < 0.2);
+
 console.log(`\n${failures === 0 ? "ALL PASS" : failures + " FAILURE(S)"}`);
 process.exit(failures === 0 ? 0 : 1);
