@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import SectionCard from "../../shared/SectionCard.jsx";
 import RolePill     from "../../shared/RolePill.jsx";
 import AiBadge      from "../../shared/AiBadge.jsx";
+import AiPlan       from "./AiPlan.jsx";
 import StatusBadge  from "../../shared/StatusBadge.jsx";
 import { ROLE }      from "../../../utils/core/roles.constants.js";
 
@@ -307,7 +308,8 @@ function RecommendationsCard({ recommendations }) {
 /* ─────────────────────────────────────────────
    OVERVIEW TAB
 ───────────────────────────────────────────── */
-function OverviewTab({ result }) {
+/* `ai` (from Analyze.jsx) carries the plan state for AI phase E. */
+function OverviewTab({ result, ai }) {
   const { meta, snapshot, healthScore, insights, recommendations } = result;
 
   return (
@@ -317,6 +319,8 @@ function OverviewTab({ result }) {
         <ColumnRolesCard meta={meta} />
       </div>
       <DatasetSnapshot snapshot={snapshot} />
+      {/* Directly above the list it orders, so the plan and its source sit together. */}
+      {ai && recommendations?.length > 0 && <AiPlan result={result} ai={ai} />}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <InsightsCard insights={insights} />
         <RecommendationsCard recommendations={recommendations} />
