@@ -1,7 +1,7 @@
 /* ai-eval-score.test.mjs — the eval's scoring rule, on a hand-built dossier.
    Plain Node, no framework. */
 
-import { scoreDossier, scoreLeakage } from "../tools/ai-eval/score.mjs";
+import { scoreDossier, scoreLeakage, scoreCleaning } from "../tools/ai-eval/score.mjs";
 
 let failures = 0;
 function check(name, ok) {
@@ -53,6 +53,30 @@ check("a leak raised only in the wrong category is not found", !lc["leak:alive"]
 check("a clean column raised in ANY category fails; one never raised passes", !lc["clean:fare"].ok && lc["clean:sex"].ok);
 check("a wrong split strategy fails", !lc["split:split strategy"].ok);
 check("leakage hygiene counts verdicts", ls.hygiene.verdicts.partial === 1 && ls.hygiene.verdicts.question === 2 && ls.passed === 2 && ls.total === 5);
+
+const cleanExpect = {
+  rules: [
+    { column: "Amount", types: ["unit_map"], factors: { lac: 100000, cr: 10000000 } },
+    { column: "Area", types: ["unit_map"], ratios: [["sqyrd", "sqft", 9]] },
+    { column: "Weight", types: ["censored_numeric"], affixes: ["+"] },
+  ],
+  forbidden: { Parking: ["unit_map"] },
+};
+const cleanVerified = {
+  rules: [
+    { column: "Amount", type: "unit_map", effective: true, affixes: [{ affix: "lac", factor: 100000 }, { affix: "cr", factor: 1000000 }] },
+    { column: "Area", type: "unit_map", effective: true, affixes: [{ affix: "sqft", factor: 0.0929 }, { affix: "sqyrd", factor: 0.8361 }] },
+    { column: "Weight", type: "censored_numeric", effective: false, affixes: [{ affix: "+", factor: 1 }] },
+    { column: "Parking", type: "unit_map", effective: true, affixes: [{ affix: "covered", factor: 1 }] },
+  ],
+  withheld: [],
+};
+const cs = scoreCleaning(cleanExpect, cleanVerified);
+const cc = Object.fromEntries(cs.checks.map((c) => [`${c.kind}:${c.name}`, c]));
+check("a right factor passes and a factor off by 10x fails", cc['factor:Amount "lac"'].ok && !cc['factor:Amount "cr"'].ok);
+check("a unit ladder is judged by ratio, whatever the base unit", cc['factor:Area "sqyrd"/"sqft"'].ok);
+check("a rule that changes nothing does not count as proposed", !cc["rule:Weight"].ok && !cc['factor:Weight covers "+"']);
+check("an effective forbidden rule fails the declined check", !cc["declined:Parking"].ok);
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-eval-score checks passed");
 process.exit(failures ? 1 : 0);
