@@ -12,6 +12,7 @@ const ResultsDashboard = lazy(() =>
 
 import { detectTarget, generateSampleData } from "../components/utils/core/index.js";
 import { runAnalysis, runAnalysisSync } from "../lib/runAnalysis.js";
+import { applyCleaningRules } from "../lib/ai/cleaning.js";
 
 const stepVariants = {
   initial:  { opacity: 0, y: 16 },
@@ -111,6 +112,14 @@ function Analyze() {
   const [roleOverrides,  setRoleOverrides]  = useState({});
   // The AI leakage review of the CURRENT report — cleared whenever a new analysis starts.
   const [leakageReview,  setLeakageReview]  = useState(null);
+  /* Cleaning (AI phase D). `cleaningRules` are the rules the CURRENT report was built
+     with, and `analysisData` the rows it was built from — both set only when an
+     analysis completes, so a cancelled re-run leaves the report and its provenance
+     consistent. `cleaning` holds the engine's candidates and the verified proposal;
+     it describes the ORIGINAL file and survives re-runs. */
+  const [analysisData,   setAnalysisData]   = useState(entry?.data   ?? null);
+  const [cleaningRules,  setCleaningRules]  = useState([]);
+  const [cleaning,       setCleaning]       = useState(null);
   // The running analysis's AbortController, so Cancel and unmount can stop it.
   const runRef = useRef(null);
 
@@ -128,16 +137,18 @@ function Analyze() {
      work and the spinner's floor run concurrently, so a slow analysis costs its
      own time and a fast one still shows a spinner rather than a single flashed
      frame. */
-  const handleTargetConfirmed = (selectedTarget) => {
+  const startAnalysis = (selectedTarget, rules) => {
     setTarget(selectedTarget);
     setLeakageReview(null);
     setStep("processing");
 
+    // Rules always apply to the file as uploaded, never to an already-cleaned copy.
+    const rows = applyCleaningRules(csvData, rules).data;
     const startedAt = Date.now();
     const run = new AbortController();
     runRef.current = run;
     setPhase(null);
-    runAnalysis(csvData, columns, selectedTarget, setPhase, run.signal, roleOverrides).then(({ result, error }) => {
+    runAnalysis(rows, columns, selectedTarget, setPhase, run.signal, roleOverrides).then(({ result, error }) => {
       const remaining = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt));
       setTimeout(() => {
         // Cancelled — including during the minimum-visible delay after the
@@ -149,10 +160,15 @@ function Analyze() {
           return;
         }
         setAnalysisResult(result);
+        setAnalysisData(rows);
+        setCleaningRules(rules);
         setStep("results");
       }, remaining);
     });
   };
+
+  const handleTargetConfirmed = (selectedTarget) => startAnalysis(selectedTarget, cleaningRules);
+  const handleApplyCleaning   = (rules) => startAnalysis(target, rules);
 
   /* Cancelled is not failed: back to the target picker with the chosen target
      kept, so the user can start again or pick a different one. */
@@ -233,7 +249,11 @@ function Analyze() {
                 <ResultsDashboard
                   result={analysisResult}
                   onReset={handleReset}
-                  ai={{ data: csvData, dossier, leakageReview, onLeakageReview: setLeakageReview }}
+                  ai={{
+                    data: analysisData, originalData: csvData, dossier,
+                    leakageReview, onLeakageReview: setLeakageReview,
+                    cleaning, onCleaning: setCleaning, cleaningRules, onApplyCleaning: handleApplyCleaning,
+                  }}
                 />
               </Suspense>
             </motion.div>
