@@ -86,6 +86,9 @@ function AiCleaningProposals({ result, ai }) {
   });
 
   const chosen = (proposal?.rules ?? []).filter((r) => r.effective && picked.has(`${r.column}|${r.type}`));
+  // The button only appears when running would change something — not for the rules already applied.
+  const ruleKeys = (rules) => rules.map((r) => `${r.column}|${r.type}`).sort().join();
+  const changesSomething = ruleKeys(chosen) !== ruleKeys(cleaningRules);
 
   return (
     <AiPanel
@@ -185,7 +188,7 @@ function AiCleaningProposals({ result, ai }) {
             </details>
           )}
 
-          {chosen.length > 0 && (
+          {chosen.length > 0 && changesSomething && (
             <button type="button" onClick={() => onApplyCleaning(chosen)} className="inline-flex items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90">
               Re-run the analysis with {chosen.length} rule{chosen.length > 1 ? "s" : ""}
             </button>
