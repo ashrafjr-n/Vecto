@@ -35,7 +35,7 @@ console.log("\nVERIFY\n");
 const high = payload.recommendations.filter((r) => r.priority === "high").map((r) => r.id);
 const score = result.healthScore.score;
 const answer = {
-  summary: `The dataset scores ${score} out of 100. Your data is 87.3% clean. Fix the high-priority items first.`,
+  summary: `The dataset scores ${score} out of 100. Your data has 987654.3 clean cells. Fix the high-priority items first.`,
   steps: [
     { title: "Drop identifiers", why: "They name rows instead of describing them.", recommendationIds: [high[0], "R999"] },
     { title: "Invented step", why: "Nothing real.", recommendationIds: ["R999"] },
@@ -46,7 +46,7 @@ const v = verifyPlan(answer, payload);
 
 check("a malformed answer is an error", !!verifyPlan({ steps: "x" }, payload).error);
 check("a sentence with a number from the report is kept", v.summary.includes(`scores ${score} out of 100`));
-check("a sentence with an invented number is removed and listed", !v.summary.includes("87.3") && v.removed.some((r) => r.number === "87.3"));
+check("a sentence with an invented number is removed and listed", !v.summary.includes("987654.3") && v.removed.some((r) => r.number === "987654.3"));
 check("a sentence without numbers is kept", v.summary.includes("Fix the high-priority items first."));
 check("unknown ids are dropped from a step and noted", v.steps[0].recommendationIds.join() === high[0] && v.withheld.some((w) => /R999/.test(w.reason)));
 check("a step referencing nothing real is dropped", !v.steps.some((s) => s.title === "Invented step"));
