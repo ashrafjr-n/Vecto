@@ -7,6 +7,8 @@ frontend.md
 .claude/
 
 vecto-docs.md
+# Planning/critique document — thinking, not shipped code or docs
+vecto-plan.md
 
 # glob, not a literal name: the original literal "reactjs-principles.md" failed to
 # match the real on-disk "reactjs-principles .md" (stray space) and it got tracked.
