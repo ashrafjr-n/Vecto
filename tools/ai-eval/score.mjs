@@ -77,3 +77,41 @@ export function scoreLeakage(expect, verified) {
     },
   };
 }
+
+/* Scores one verified cleaning proposal. Only EFFECTIVE rules count — a rule that
+   changes no value is never offered on the page. Factors are checked within 2%,
+   and a unit ladder by ratio, because the model may pick any unit as the base. */
+export function scoreCleaning(expect, verified) {
+  const checks = [];
+  const add = (kind, name, ok, got, want) => checks.push({ kind, name, ok, got, want });
+  const near = (a, b) => Number.isFinite(a) && Math.abs(a - b) <= 0.02 * Math.abs(b);
+  const effective = verified.rules.filter((r) => r.effective);
+
+  for (const e of expect.rules ?? []) {
+    const rule = effective.find((r) => r.column === e.column && e.types.includes(r.type));
+    add("rule", e.column, !!rule, rule?.type ?? null, e.types);
+    if (!rule) continue;
+    const factor = new Map(rule.affixes.map((a) => [a.affix, a.factor]));
+    for (const [affix, want] of Object.entries(e.factors ?? {})) {
+      add("factor", `${e.column} "${affix}"`, near(factor.get(affix), want), factor.get(affix) ?? null, [want]);
+    }
+    for (const [affix, base, ratio] of e.ratios ?? []) {
+      const got = factor.has(affix) && factor.has(base) ? factor.get(affix) / factor.get(base) : null;
+      add("factor", `${e.column} "${affix}"/"${base}"`, near(got, ratio), got, [ratio]);
+    }
+    for (const affix of e.affixes ?? []) {
+      add("factor", `${e.column} covers "${affix}"`, factor.has(affix), [...factor.keys()], [affix]);
+    }
+  }
+  for (const [column, types] of Object.entries(expect.forbidden ?? {})) {
+    const hit = effective.find((r) => r.column === column && types.includes(r.type));
+    add("declined", column, !hit, hit?.type ?? null, ["(not proposed)"]);
+  }
+
+  return {
+    passed: checks.filter((c) => c.ok).length,
+    total: checks.length,
+    checks,
+    hygiene: { rules: verified.rules.length, effective: effective.length, withheld: verified.withheld.length },
+  };
+}
