@@ -164,7 +164,7 @@ function ResultsDashboard({ result, onReset, ai }) {
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
-                {activeTab === "overview"       && <OverviewTab       result={result} />}
+                {activeTab === "overview"       && <OverviewTab       result={result} ai={ai} />}
                 {activeTab === "quality"        && <QualityTab        result={result} ai={ai} />}
                 {activeTab === "statistics"     && <StatisticsTab     result={result} />}
                 {activeTab === "visualizations" && <VisualizationsTab result={result} />}
