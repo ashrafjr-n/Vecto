@@ -136,5 +136,15 @@ check("a valid cleaning payload is forwarded with its own prompt and strict sche
   res.status === 200 && /data-cleaning reviewer/.test(sent[0].messages[0].content)
   && /<candidates>/.test(sent[0].messages[1].content) && sent[0].response_format.json_schema.name === "cleaning");
 
+// --- plan task ---
+script();
+check("a plan with no recommendations is 400 (nothing to order)", (await post({ task: "plan", payload: { recommendations: [] } })).status === 400);
+check("a plan with an id-less recommendation is 400", (await post({ task: "plan", payload: { recommendations: [{ issue: "x" }] } })).status === 400);
+script(answer('{"summary":"x","steps":[]}'));
+res = await post({ task: "plan", payload: { recommendations: [{ id: "R1", priority: "high" }] } });
+check("a valid plan payload is forwarded with its own prompt and strict schema",
+  res.status === 200 && /explainer/.test(sent[0].messages[0].content)
+  && /<report>/.test(sent[0].messages[1].content) && sent[0].response_format.json_schema.name === "plan");
+
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-worker checks passed");
 process.exit(failures ? 1 : 0);
