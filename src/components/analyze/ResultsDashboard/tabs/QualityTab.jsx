@@ -4,6 +4,7 @@ import { CircleCheckBig, CircleSlash, Hash, Layers, Minus } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
 import StatTile     from "../../shared/StatTile.jsx";
+import AiCleaningProposals from "./AiCleaningProposals.jsx";
 
 const ISSUE_ICON = { high_cardinality: Layers, constant: Minus, mixed_numeric: CircleSlash, possible_code: Hash };
 
@@ -80,7 +81,8 @@ function OtherIssues({ items }) {
   );
 }
 
-function QualityTab({ result }) {
+/* `ai` (from Analyze.jsx) carries the original rows and the cleaning state for AI phase D. */
+function QualityTab({ result, ai }) {
   const { quality, meta } = result;
   const totalRows = meta?.rows;
   const rowsReady = totalRows > 0;
@@ -106,6 +108,7 @@ function QualityTab({ result }) {
 
   return (
     <div className="space-y-4">
+      {ai?.originalData && <AiCleaningProposals result={result} ai={ai} />}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatTile label="Missing cells" value={quality.missingCells.toLocaleString()} tone={quality.missingCells > 0 ? "warning" : "success"} />
         <StatTile

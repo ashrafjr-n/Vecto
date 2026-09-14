@@ -8,6 +8,7 @@ import VisualizationsTab from "./tabs/VisualizationsTab.jsx";
 import RelationshipsTab  from "./tabs/RelationshipsTab.jsx";
 import ClassBalanceTab   from "./tabs/ClassBalanceTab.jsx";
 import TargetSignalTab   from "./tabs/TargetSignalTab.jsx";
+import AiBadge           from "../shared/AiBadge.jsx";
 
 const BASE_TABS = [
   { id: "overview",       label: "Overview"                            },
@@ -91,6 +92,13 @@ function ResultsDashboard({ result, onReset, ai }) {
               ? <>Task type read as {meta.datasetType}. Every figure below is computed from the file in this tab, and each one is stated with the reasoning that produced it.</>
               : <>Class balance and task type need a target and are omitted. Every other section is computed normally.</>}
           </p>
+          {/* Provenance: a report built from cleaned rows must say so where the report starts. */}
+          {ai?.cleaningRules?.length > 0 && (
+            <p className="mt-4 flex max-w-2xl flex-wrap items-center gap-2 text-[13px] text-ink-soft">
+              <AiBadge>set by you</AiBadge>
+              Built after {ai.cleaningRules.length} cleaning rule{ai.cleaningRules.length > 1 ? "s" : ""} you accepted — listed on the Quality tab.
+            </p>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -157,7 +165,7 @@ function ResultsDashboard({ result, onReset, ai }) {
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
                 {activeTab === "overview"       && <OverviewTab       result={result} />}
-                {activeTab === "quality"        && <QualityTab        result={result} />}
+                {activeTab === "quality"        && <QualityTab        result={result} ai={ai} />}
                 {activeTab === "statistics"     && <StatisticsTab     result={result} />}
                 {activeTab === "visualizations" && <VisualizationsTab result={result} />}
                 {activeTab === "targetsignal"   && <TargetSignalTab   result={result} ai={ai} />}
