@@ -4,6 +4,7 @@
      --task=dossier  (default) phase B, tools/ai-eval/expectations.mjs
      --task=leakage  phase C, tools/ai-eval/leakage-expectations.mjs
      --task=cleaning phase D, tools/ai-eval/cleaning-expectations.mjs
+     --task=plan     phase E, the leakage files and targets, scored on fixed properties
 
    It goes through the Worker, not straight to OpenRouter, so what is measured is
    what the app gets: the same prompt, schema, model fallback list and repair
@@ -36,10 +37,11 @@ import { buildDossierPayload, verifyDossier } from "../src/lib/ai/dossier.js";
 import { askDossier } from "../src/lib/ai/askDossier.js";
 import { buildLeakagePayload, verifyLeakage } from "../src/lib/ai/leakage.js";
 import { findCleaningCandidates, buildCleaningPayload, verifyCleaningRules } from "../src/lib/ai/cleaning.js";
+import { buildPlanPayload, verifyPlan } from "../src/lib/ai/plan.js";
 import { EXPECTATIONS } from "./ai-eval/expectations.mjs";
 import { LEAKAGE_EXPECTATIONS } from "./ai-eval/leakage-expectations.mjs";
 import { CLEANING_EXPECTATIONS } from "./ai-eval/cleaning-expectations.mjs";
-import { scoreDossier, scoreLeakage, scoreCleaning } from "./ai-eval/score.mjs";
+import { scoreDossier, scoreLeakage, scoreCleaning, scorePlan } from "./ai-eval/score.mjs";
 
 const args     = process.argv.slice(2);
 const flag     = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
@@ -137,6 +139,27 @@ const TASK_DEFS = {
     ],
     columns: ["Candidate columns", "Rules", "Effective", "Withheld"],
     cells: (r) => [r.record.candidateColumns?.join(", ") || "—", r.score.hygiene.rules, r.score.hygiene.effective, r.score.hygiene.withheld],
+  },
+
+  plan: {
+    title: "Plan and explainer",
+    outDir: "reports/ai-eval-plan",
+    // No known answers exist for a plan; the same files and targets as leakage, scored on scorePlan's fixed properties.
+    expectations: LEAKAGE_EXPECTATIONS.map(({ file, target }) => ({ file, target })),
+    promptFiles: ["worker/planPrompt.js", "src/lib/ai/planSchema.js"],
+    named: (e) => [e.target],
+    prepare: (e, data, columns) => {
+      const result = analyzeDataset(data, columns, e.target);
+      return { payload: buildPlanPayload(result), skip: result.recommendations.length ? null : "no recommendations — nothing to order" };
+    },
+    ask: (ctx, send) => send("plan", ctx.payload),
+    verify: (answer, ctx) => verifyPlan(answer, ctx.payload),
+    score: (e, verified) => scorePlan(e, verified),
+    record: (ctx) => ({ recommendations: ctx.payload.recommendations.length }),
+    line: (s) => `steps ${s.hygiene.steps} · removed ${s.hygiene.removed} · withheld ${s.hygiene.withheld} · left out ${s.hygiene.notInPlan} · ${s.hygiene.words} words`,
+    measures: (all) => ["grounded", "ids", "coverage", "length", "steps"].map((k) => [all.find((c) => c.kind === k)?.name ?? k, pctOf(all.filter((c) => c.kind === k))]),
+    columns: ["Recommendations", "Steps", "Sentences removed", "High left out", "Words"],
+    cells: (r) => [r.record.recommendations, r.score.hygiene.steps, r.score.hygiene.removed, r.score.hygiene.notInPlan, r.score.hygiene.words],
   },
 };
 
