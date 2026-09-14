@@ -3,6 +3,7 @@
 
      --task=dossier  (default) phase B, tools/ai-eval/expectations.mjs
      --task=leakage  phase C, tools/ai-eval/leakage-expectations.mjs
+     --task=cleaning phase D, tools/ai-eval/cleaning-expectations.mjs
 
    It goes through the Worker, not straight to OpenRouter, so what is measured is
    what the app gets: the same prompt, schema, model fallback list and repair
@@ -34,9 +35,11 @@ import { transformHeader } from "../src/lib/csvIntake.js";
 import { buildDossierPayload, verifyDossier } from "../src/lib/ai/dossier.js";
 import { askDossier } from "../src/lib/ai/askDossier.js";
 import { buildLeakagePayload, verifyLeakage } from "../src/lib/ai/leakage.js";
+import { findCleaningCandidates, buildCleaningPayload, verifyCleaningRules } from "../src/lib/ai/cleaning.js";
 import { EXPECTATIONS } from "./ai-eval/expectations.mjs";
 import { LEAKAGE_EXPECTATIONS } from "./ai-eval/leakage-expectations.mjs";
-import { scoreDossier, scoreLeakage } from "./ai-eval/score.mjs";
+import { CLEANING_EXPECTATIONS } from "./ai-eval/cleaning-expectations.mjs";
+import { scoreDossier, scoreLeakage, scoreCleaning } from "./ai-eval/score.mjs";
 
 const args     = process.argv.slice(2);
 const flag     = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
@@ -110,6 +113,31 @@ const TASK_DEFS = {
     columns: ["Findings", "Verdicts", "Withheld", "Engine-only flags"],
     cells: (r) => [r.score.hygiene.findings, Object.entries(r.score.hygiene.verdicts).map(([k, v]) => `${k} ${v}`).join(", ") || "—", r.score.hygiene.withheld, r.score.hygiene.engineOnly],
   },
+
+  cleaning: {
+    title: "Cleaning proposals",
+    outDir: "reports/ai-eval-cleaning",
+    expectations: CLEANING_EXPECTATIONS,
+    promptFiles: ["worker/cleaningPrompt.js", "src/lib/ai/cleaningSchema.js"],
+    named: (e) => [...(e.rules ?? []).map((r) => r.column), ...Object.keys(e.forbidden ?? {})],
+    // The same scan the Quality tab runs, on the file as uploaded, without a dossier.
+    prepare: (e, data, columns) => {
+      const candidates = findCleaningCandidates(data, columns, detectColumnRoles(data, columns, null));
+      return { candidates, payload: buildCleaningPayload(candidates, data.length, null), skip: candidates.length ? null : "no candidates — nothing is asked" };
+    },
+    ask: (ctx, send) => send("cleaning", ctx.payload),
+    verify: (answer, ctx, data, columns) => verifyCleaningRules(answer, { data, columns, candidates: ctx.candidates }),
+    score: (e, verified) => scoreCleaning(e, verified),
+    record: (ctx) => ({ candidateColumns: ctx.candidates.map((c) => c.name) }),
+    line: (s) => `rules ${s.hygiene.rules} · effective ${s.hygiene.effective} · withheld ${s.hygiene.withheld}`,
+    measures: (all) => [
+      ["Expected rules proposed", pctOf(all.filter((c) => c.kind === "rule"))],
+      ["Factors and bounds right", pctOf(all.filter((c) => c.kind === "factor"))],
+      ["Wrong rules declined", pctOf(all.filter((c) => c.kind === "declined" || c.kind === "quiet"))],
+    ],
+    columns: ["Candidate columns", "Rules", "Effective", "Withheld"],
+    cells: (r) => [r.record.candidateColumns?.join(", ") || "—", r.score.hygiene.rules, r.score.hygiene.effective, r.score.hygiene.withheld],
+  },
 };
 
 const def = TASK_DEFS[taskName];
@@ -166,6 +194,14 @@ for (const expect of selected) {
   if (unknown.length) throw new Error(`${expect.file}: expectations name columns not in the file: ${unknown.join(", ")}`);
 
   const ctx = def.prepare(expect, data, columns);
+  /* A task can decline to ask (the cleaning scan found nothing). That is the right
+     answer for a clean file, so it is scored — against an empty proposal — not dropped. */
+  if (ctx.skip) {
+    const score = def.score(expect, { rules: [], findings: [], withheld: [], engineOnly: [] }, ctx);
+    rows.push({ file: expect.file, source: "skipped", model: null, ms: 0, error: null, score, record: def.record(ctx) });
+    console.log(`${expect.file}: ${score.passed}/${score.total} (skipped: ${ctx.skip})`);
+    continue;
+  }
   const payloadJson = JSON.stringify(ctx.payload);
   const payloadHash = createHash("sha256").update(payloadJson).update(promptHash).digest("hex").slice(0, 16);
 
@@ -236,7 +272,7 @@ function summarize(results) {
     `| File | Model | Time | Score | ${def.columns.join(" | ")} |`,
     `| --- | --- | --- | --- | ${def.columns.map(() => "---").join(" | ")} |`,
     ...results.map((r) => (r.score
-      ? `| ${r.file} | ${r.model} | ${(r.ms / 1000).toFixed(1)}s | ${r.score.passed}/${r.score.total} | ${def.cells(r).join(" | ")} |`
+      ? `| ${r.file} | ${r.model ?? r.source} | ${(r.ms / 1000).toFixed(1)}s | ${r.score.passed}/${r.score.total} | ${def.cells(r).join(" | ")} |`
       : `| ${r.file} | — | — | ERROR: ${r.error} | ${blank} |`)),
     "",
     "## Failed checks",
