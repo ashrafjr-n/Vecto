@@ -110,7 +110,7 @@ function AiPlan({ result, ai }) {
           {review.notInPlan.length > 0 && (
             <p className="text-[12.5px] leading-relaxed text-ink-soft">
               <span className="text-ink-faint">High-priority items the plan left out: </span>
-              {review.notInPlan.map((id) => byId.get(id)?.issue).join("; ")}.
+              {review.notInPlan.map((id) => { const r = byId.get(id); return r?.column ? `${r.issue} (${r.column})` : r?.issue; }).join("; ")}.
             </p>
           )}
 
