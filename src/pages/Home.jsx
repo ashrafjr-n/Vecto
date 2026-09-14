@@ -179,8 +179,8 @@ function Home() {
               </p>
               <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
                 No file is uploaded — parsing and analysis run locally, in this tab. An
-                optional AI assistant sends a column summary, only when you ask and only
-                after you can inspect it. The report is a statistical document, not a dashboard: every
+                optional AI assistant sends a summary of the file, never its rows, only
+                when you ask and only after you can inspect it. The report is a statistical document, not a dashboard: every
                 number arrives with the reasoning behind it, and every score that was
                 held back says which piece of evidence held it.
               </p>
