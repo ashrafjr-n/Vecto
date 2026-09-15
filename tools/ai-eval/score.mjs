@@ -117,27 +117,3 @@ export function scoreCleaning(expect, verified) {
     hygiene: { rules: verified.rules.length, effective: effective.length, withheld: verified.withheld.length },
   };
 }
-
-/* Scores one verified plan (AI phase E). There is no single right plan to compare
-   against, so the checks are the properties every acceptable plan has — fixed here
-   before the first real run:
-     grounded   no sentence had to be removed for a number the report lacks
-     ids        no step pointed at a recommendation that does not exist
-     coverage   every high-priority recommendation is in some step
-     length     the summary stays within its word limit
-     steps      the plan has at least one step */
-export function scorePlan(expect, verified) {
-  const checks = [
-    { kind: "grounded", name: "no invented numbers", ok: verified.removed.length === 0, got: verified.removed.map((r) => r.number), want: ["(none)"] },
-    { kind: "ids", name: "only real recommendation ids", ok: verified.withheld.length === 0, got: verified.withheld.map((w) => w.reason), want: ["(none)"] },
-    { kind: "coverage", name: "every high-priority item planned", ok: verified.notInPlan.length === 0, got: verified.notInPlan, want: ["(none)"] },
-    { kind: "length", name: "summary within the word limit", ok: !verified.summaryTooLong && verified.summaryWords > 0, got: verified.summaryWords, want: ["1–150 words"] },
-    { kind: "steps", name: "at least one step", ok: verified.steps.length > 0, got: verified.steps.length, want: ["≥ 1"] },
-  ];
-  return {
-    passed: checks.filter((c) => c.ok).length,
-    total: checks.length,
-    checks,
-    hygiene: { steps: verified.steps.length, removed: verified.removed.length, withheld: verified.withheld.length, notInPlan: verified.notInPlan.length, words: verified.summaryWords },
-  };
-}
