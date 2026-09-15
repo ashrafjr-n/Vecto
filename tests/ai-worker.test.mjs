@@ -82,11 +82,38 @@ out = await res.json();
 check("a truncated answer is 502 truncated with no repair round", res.status === 502 && out.error === "truncated" && sent.length === 1);
 check("reasoning is switched off in the request", sent[0].reasoning?.enabled === false);
 
-script([200, { error: { code: 502, message: "Upstream error from Nvidia: Service temporarily overloaded" } }]);
+// --- a provider error inside a 200: one retry, without the model that failed ---
+const overloaded = (model) => [200, { ...(model && { model }), error: { code: 502, message: "Upstream error from Nvidia: Service temporarily overloaded" } }];
+
+script(overloaded("a/one:free"), overloaded("b/two:free"));
 res = await post({ task: "ping" });
 out = await res.json();
-check("an error carried inside a 200 is upstream_error with the provider message, no repair round",
-  res.status === 502 && out.error === "upstream_error" && /overloaded/.test(out.message) && sent.length === 1);
+check("an error inside a 200 twice is upstream_error with the provider message, exactly one retry, no repair round",
+  res.status === 502 && out.error === "upstream_error" && /overloaded/.test(out.message) && sent.length === 2);
+
+script(overloaded("a/one:free"), answer('{"ok": true}', "b/two:free"));
+res = await post({ task: "ping" });
+out = await res.json();
+check("an error inside a 200 is retried once and the retry's answer is returned",
+  res.status === 200 && out.result.ok === true && out.model === "b/two:free" && sent.length === 2);
+check("the retry leaves out the model that failed", JSON.stringify(sent[1].models) === '["b/two:free"]');
+
+script(overloaded(null), answer('{"ok": true}'));
+res = await post({ task: "ping" });
+check("an unnamed failing model retries with the full list", res.status === 200 && JSON.stringify(sent[1].models) === '["a/one:free","b/two:free"]');
+
+script(overloaded("a/one:free"), answer('{"ok": true}', "b/two:free"));
+await post({ task: "ping" }, { ...ENV, AI_MODELS: "a/one:free" });
+check("a one-model list retries with that model rather than none", JSON.stringify(sent[1].models) === '["a/one:free"]');
+
+script(answer("sure! here it is"), overloaded("a/one:free"), answer('{"ok": true}', "b/two:free"));
+res = await post({ task: "ping" });
+check("the JSON repair round gets the same single retry", res.status === 200 && sent.length === 3
+  && sent[2].messages.some((m) => m.content === "sure! here it is"));
+
+script([502, { error: { code: 502, message: "bad gateway" } }]);
+res = await post({ task: "ping" });
+check("a non-200 upstream error is not retried here (OpenRouter's fallback already ran)", res.status === 502 && sent.length === 1);
 
 // --- dossier task: payload validated before any call, profile fenced as data ---
 script();
