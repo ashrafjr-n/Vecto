@@ -11,6 +11,10 @@
    the set's first entry. Targets are not κ (the categories are a file's own columns):
    plain agreement on the top pick.
 
+   Every figure is also split by the sampler's stratum — "ambiguous" vs the rest — and
+   the share of "not sure" is reported per stratum. A κ over a sample nobody can decide
+   says the sample is impossible, not that the exam is easy; the split keeps those apart.
+
    Usage: node tools/blind-agreement.mjs [--labels=forTesting/blind/labels.json]
    Writes reports/blind/agreement.md. */
 
@@ -47,24 +51,28 @@ export function kappa(pairs) {
   return { n, agree, kappa: pe === 1 ? 1 : (po - pe) / (1 - pe) };
 }
 
-const out = { role: { model: [], expect: [] }, subtype: { model: [], expect: [] } };
+const GROUPS = ["all", "ambiguous", "clear"];
+const groupsOf = (stratum) => ["all", stratum === "ambiguous" ? "ambiguous" : "clear"];
+const out = Object.fromEntries(GROUPS.map((g) => [g, { role: { model: [], expect: [] }, subtype: { model: [], expect: [] } }]));
+const unsure = Object.fromEntries(GROUPS.map((g) => [g, [0, 0]]));   // [not sure or blank, fields]
 const disagreements = [];
-let skipped = 0;
 
-for (const { file, column } of sample.columns) {
+for (const { file, column, stratum } of sample.columns) {
+  const groups = groupsOf(stratum);
   const model = modelAnswer(file)?.columns.find((c) => c.name === column);
   const exp = expectFor(file);
   for (const field of ["role", "subtype"]) {
     const owner = labels[`${field}::${file}::${column}`];
-    if (!usable(owner)) { skipped++; continue; }
+    for (const g of groups) unsure[g][1]++;
+    if (!usable(owner)) { for (const g of groups) unsure[g][0]++; continue; }
     if (model?.[field]) {
-      out[field].model.push({ owner, other: model[field] });
+      for (const g of groups) out[g][field].model.push({ owner, other: model[field] });
       if (owner !== model[field]) disagreements.push(`| ${file} | ${column} | ${field} | model | ${owner} | ${model[field]} |`);
     }
     const want = exp?.[`${field}s`]?.[column];
     if (want) {
       const other = want.includes(owner) ? owner : want[0];
-      out[field].expect.push({ owner, other });
+      for (const g of groups) out[g][field].expect.push({ owner, other });
       if (other !== owner) disagreements.push(`| ${file} | ${column} | ${field} | expectations | ${owner} | ${want.join(" / ")} |`);
     }
   }
@@ -93,13 +101,13 @@ const pct = ([a, n]) => (n ? `${a}/${n} (${Math.round((100 * a) / n)}%)` : "n/a"
 const md = [
   `# Blind label agreement — ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`,
   "",
-  `Sample seed ${sample.seed} · ${sample.columns.length} columns · labels saved ${saved.savedAt} · "not sure" or blank: ${skipped}`,
+  `Sample seed ${sample.seed} · ${sample.columns.length} columns (${sample.columns.filter((c) => c.stratum === "ambiguous").length} ambiguous) · labels saved ${saved.savedAt}`,
   "",
-  "| | Owner vs model (day-1 dossier) | Owner vs expectations |",
-  "| --- | --- | --- |",
-  `| Role | ${fmt(kappa(out.role.model))} | ${fmt(kappa(out.role.expect))} |`,
-  `| Subtype | ${fmt(kappa(out.subtype.model))} | ${fmt(kappa(out.subtype.expect))} |`,
-  `| Target (top pick) | ${pct(targets.model)} | ${pct(targets.expect)} |`,
+  "| Columns | Role/subtype fields \"not sure\" or blank | Role: owner vs model | Role: owner vs expectations | Subtype: owner vs model | Subtype: owner vs expectations |",
+  "| --- | --- | --- | --- | --- | --- |",
+  ...GROUPS.map((g) => `| ${g} | ${pct(unsure[g])} | ${fmt(kappa(out[g].role.model))} | ${fmt(kappa(out[g].role.expect))} | ${fmt(kappa(out[g].subtype.model))} | ${fmt(kappa(out[g].subtype.expect))} |`),
+  "",
+  `Target (top pick, sonar excluded — headerless): owner vs model ${pct(targets.model)} · owner vs expectations ${pct(targets.expect)}`,
   "",
   "## Disagreements",
   "",
