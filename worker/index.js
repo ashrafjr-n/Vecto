@@ -14,8 +14,6 @@ import { LEAKAGE_SCHEMA, LEAKAGE_MAX_COLUMNS } from "../src/lib/ai/leakageSchema
 import { leakageMessages } from "./leakagePrompt.js";
 import { CLEANING_SCHEMA, CLEANING_MAX_COLUMNS } from "../src/lib/ai/cleaningSchema.js";
 import { cleaningMessages } from "./cleaningPrompt.js";
-import { PLAN_SCHEMA } from "../src/lib/ai/planSchema.js";
-import { planMessages } from "./planPrompt.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BODY_CHARS = 256_000;
@@ -80,20 +78,6 @@ const TASKS = {
       && payload.columns.length <= CLEANING_MAX_COLUMNS
       && payload.columns.every((c) => typeof c?.name === "string" && Array.isArray(c.candidates)),
     messages: cleaningMessages,
-  },
-
-  /* Phase E — an ordered plan over the engine's recommendations and a plain-language
-     summary. Built by buildPlanPayload(); verifyPlan() drops steps with no real
-     recommendation id and every sentence carrying a number the report lacks. */
-  plan: {
-    maxTokens: 4000,
-    schema: PLAN_SCHEMA,
-    validate: (payload) =>
-      Array.isArray(payload?.recommendations)
-      && payload.recommendations.length > 0
-      && payload.recommendations.length <= 200
-      && payload.recommendations.every((r) => typeof r?.id === "string"),
-    messages: planMessages,
   },
 };
 
