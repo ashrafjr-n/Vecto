@@ -52,10 +52,6 @@ changes the report only when you accept a suggestion.
   then proposes rules in a closed format. Each rule is applied to a copy and measured before
   it can be accepted, accepted rules re-run the analysis on the original rows, the report
   says it was built from cleaned data, and the rules export as a pandas snippet.
-- **AI plan (optional)** — on the Overview tab, the recommendations are put in order and the
-  report is explained in plain language. Every step points at the engine's own
-  recommendations, any sentence with a number the report does not contain is removed, and
-  high-priority items the plan leaves out are listed.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
   behind each decision, the thresholds and estimators it uses, and what it cannot decide
 
@@ -118,7 +114,7 @@ Workers.
 prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }`. The
 client only names a task; prompts, JSON schemas and token limits live in the Worker. Tasks:
 `ping` (deployment check), `dossier` (the column dossier on the target picker), `leakage`
-(Target Signal tab), `cleaning` (Quality tab) and `plan` (Overview tab). The
+(Target Signal tab), and `cleaning` (Quality tab). The
 analysis itself still runs entirely in the browser.
 
 - **Models** — `AI_MODELS` in `wrangler.jsonc`, comma-separated, tried in order by
@@ -143,10 +139,8 @@ analysis itself still runs entirely in the browser.
 corpus and scores each answer against known answers written before the first run:
 `--task=dossier` (default) against `tools/ai-eval/expectations.mjs` (targets, roles,
 subtypes), `--task=leakage` against `tools/ai-eval/leakage-expectations.mjs` (known leaks,
-legitimate predictors that must not be flagged, split strategy), `--task=cleaning` against
-`tools/ai-eval/cleaning-expectations.mjs` (rules and factors, rules that must be declined),
-and `--task=plan` on fixed properties (no invented numbers, real ids, every high-priority
-item planned, summary length).
+legitimate predictors that must not be flagged, split strategy), and `--task=cleaning`
+against `tools/ai-eval/cleaning-expectations.mjs` (rules and factors, rules that must be declined).
 Answers are verified exactly as the page verifies them, cached by payload hash in
 `reports/ai-eval/`, and summarised in `reports/ai-eval/summary.md`, including the engine's
 own target guess for comparison.
@@ -200,8 +194,6 @@ This runs nine files:
   measurement, the engine's own association, and timing claims as questions.
 - **`tests/ai-cleaning.test.mjs`** — cleaning candidates, rule application (never in place),
   rule verification and measurement, and the pandas export.
-- **`tests/ai-plan.test.mjs`** — the plan payload and its grounding: real ids only, sentences
-  with numbers the report lacks removed, left-out high-priority items listed.
 - **`tests/ai-eval-score.test.mjs`** — the eval's scoring rules on hand-built answers.
 
 Run `npm test` after any change under `src/components/utils/core/`.
@@ -216,7 +208,7 @@ src/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
     ai/                       AI client (requestAi); per feature a payload builder, a verifier
                               and a schema shared with the Worker (dossier, leakage,
-                              cleaning, plan)
+                              cleaning)
   content/
     methodology.js            copy for /methodology — thresholds quoted from the engine
   pages/
@@ -246,7 +238,6 @@ worker/index.js               Cloudflare Worker entry: POST /api/ai (OpenRouter 
 worker/dossierPrompt.js       the column-dossier prompt
 worker/leakagePrompt.js       the leakage-review prompt
 worker/cleaningPrompt.js      the cleaning-proposal prompt
-worker/planPrompt.js          the plan-and-explainer prompt
 tools/ai-eval.mjs, ai-eval/   dossier eval over the test corpus, known answers, scoring
 wrangler.jsonc                Worker + static-assets config, AI model list
 ```
