@@ -6,7 +6,7 @@
    file. The answers are merged into the shape a single request returns, so
    verifyDossier() and every caller see one answer either way.
 
-   Shared by the target picker and tools/ai-eval.mjs, which pass their own `send`
+   Used for both the `dossier` and the `review` task. Shared by the target picker and tools/ai-eval.mjs, which pass their own `send`
    (the page's requestAi, the eval's direct call) — the eval measures the same
    splitting the user gets. */
 
@@ -27,7 +27,8 @@ export function splitDossierPayload(payload) {
 
 /* Columns are concatenated in order. Target candidates are interleaved by rank —
    every part's first pick, then every part's second — and de-duplicated later by
-   the verifier, which keeps the first occurrence and the top 3. */
+   the verifier, which keeps the first occurrence and the top 3. Cleaning rules (the
+   review task) are concatenated: each part only proposes rules for its own columns. */
 export function mergeDossierAnswers(answers) {
   const lists = answers.map((a) => (Array.isArray(a?.targetCandidates) ? a.targetCandidates : []));
   const longest = lists.reduce((n, l) => Math.max(n, l.length), 0);
@@ -39,6 +40,7 @@ export function mergeDossierAnswers(answers) {
     rowGrain: answers.find((a) => a?.rowGrain)?.rowGrain ?? "",
     columns: answers.flatMap((a) => (Array.isArray(a?.columns) ? a.columns : [])),
     targetCandidates,
+    rules: answers.flatMap((a) => (Array.isArray(a?.rules) ? a.rules : [])),
   };
 }
 
