@@ -163,6 +163,21 @@ check("a valid cleaning payload is forwarded with its own prompt and strict sche
   res.status === 200 && /data-cleaning reviewer/.test(sent[0].messages[0].content)
   && /<candidates>/.test(sent[0].messages[1].content) && sent[0].response_format.json_schema.name === "cleaning");
 
+// --- review task (B+D merged) ---
+script();
+check("review is validated like the dossier (no columns is 400)", (await post({ task: "review", payload: { rows: 3 } })).status === 400);
+check("review with a non-array cleaning field is 400", (await post({ task: "review", payload: { rows: 3, columns: [{ name: "a", cleaning: "x" }] } })).status === 400);
+check("no upstream call for an invalid review payload", sent.length === 0);
+script(answer('{"rules":[],"rowGrain":"x","columns":[],"targetCandidates":[]}'));
+res = await post({ task: "review", payload: { rows: 3, columns: [{ name: "amount", cleaning: [{ kind: "numeric_affix" }] }, { name: "b" }] } });
+const reviewSchema = sent[0]?.response_format.json_schema.schema;
+check("a valid review payload is forwarded with its own prompt, both halves of the schema, rules first",
+  res.status === 200 && /three parts/.test(sent[0].messages[0].content)
+  && /<profile>[\s\S]*numeric_affix[\s\S]*<\/profile>/.test(sent[0].messages[1].content)
+  && sent[0].response_format.json_schema.name === "review"
+  && Object.keys(reviewSchema.properties)[0] === "rules"
+  && ["rules", "rowGrain", "columns", "targetCandidates"].every((k) => reviewSchema.required.includes(k)));
+
 // --- removed tasks stay removed ---
 script();
 check("the plan task (phase E, removed) is an unknown task", (await post({ task: "plan", payload: { recommendations: [{ id: "R1" }] } })).status === 400 && sent.length === 0);
