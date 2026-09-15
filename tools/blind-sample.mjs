@@ -8,8 +8,15 @@
    Stratified so the sample is not all easy columns: half comes from columns the
    expectations name (so owner-vs-expectations has overlap), and inside each half the
    picks rotate through strata — each engine role, plus an "ambiguous" stratum (small
-   integer ranges, partly numeric text, two-valued numbers) taken first. Seeded, so
-   the same command always gives the same sample.
+   integer ranges, partly numeric text, two-valued numbers) taken first, at most
+   AMBIGUOUS_PER_FILE from one file. Seeded, so the same command always gives the same sample.
+
+   Left out, because no label from them measures anything:
+   - a headerless file (most column names are numbers — sonar's first data row became
+     its header), where there is no name to judge from;
+   - a column name already sampled from a sibling file — one in the same folder sharing
+     ≥ 80% of its columns, like a train/test pair: that is one dataset, and the same
+     column labelled twice counts one judgement twice.
 
    Writes forTesting/blind/sheet.html and forTesting/blind/sample.json (gitignored).
    Usage: node --max-old-space-size=8192 tools/blind-sample.mjs [--size=60] [--seed=17] */
@@ -20,6 +27,7 @@ import Papa from "papaparse";
 
 import { detectColumnRoles } from "../src/components/utils/core/index.js";
 import { transformHeader } from "../src/lib/csvIntake.js";
+import { isNumeric } from "../src/components/utils/core/helpers.js";
 import { buildDossierPayload } from "../src/lib/ai/dossier.js";
 import { DOSSIER_ROLES, DOSSIER_SUBTYPES } from "../src/lib/ai/dossierSchema.js";
 import { EXPECTATIONS } from "./ai-eval/expectations.mjs";
@@ -28,6 +36,7 @@ const flag = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.spl
 const SIZE = Number(flag("size") ?? 60);
 const SEED = Number(flag("seed") ?? 17);
 const PER_FILE_CAP = 6;
+const AMBIGUOUS_PER_FILE = 2;
 const OUT = "forTesting/blind";
 
 // mulberry32 — a small seeded generator, so the sample is reproducible.
@@ -60,14 +69,22 @@ for (const e of EXPECTATIONS) {
   if (!existsSync(path)) { console.log(`${e.file}: MISSING FILE, skipped`); continue; }
   const parsed = Papa.parse(readFileSync(path, "utf8"), { header: true, skipEmptyLines: true, transformHeader });
   const columns = parsed.meta.fields;
+  if (columns.filter((c) => isNumeric(c)).length > columns.length / 2) {
+    console.log(`${e.file}: headerless (column names are data), skipped`);
+    continue;
+  }
   const roles = detectColumnRoles(parsed.data, columns, null);
   const payload = buildDossierPayload(parsed.data, columns, roles);
   const named = new Set([...Object.keys(e.roles ?? {}), ...Object.keys(e.subtypes ?? {})]);
-  files.push({ file: e.file, rows: parsed.data.length, columns });
+  const dir = e.file.includes("/") ? e.file.slice(0, e.file.lastIndexOf("/")) : "";
+  const sibling = files.find((f) => f.dir === dir && columns.filter((c) => f.columns.includes(c)).length >= 0.8 * columns.length);
+  const dataset = sibling?.dataset ?? e.file;
+  files.push({ file: e.file, dir, dataset, rows: parsed.data.length, columns });
   for (const profile of payload.columns) {
     const { engineRole, ...shown } = profile;   // never shown to the labeller
     pool.push({
       file: e.file,
+      dataset,
       column: profile.name,
       named: named.has(profile.name),
       stratum: ambiguous(profile) ? "ambiguous" : engineRole,
@@ -78,6 +95,8 @@ for (const e of EXPECTATIONS) {
 }
 
 const perFile = new Map();
+const ambiguousPerFile = new Map();
+const sampledNames = new Set();   // "dataset::column"
 function take(candidates, quota) {
   const strata = new Map();
   for (const c of shuffle(candidates)) {
@@ -94,7 +113,12 @@ function take(candidates, quota) {
       while (list.length) {
         const c = list.shift();
         if ((perFile.get(c.file) ?? 0) >= PER_FILE_CAP) continue;
+        if (c.stratum === "ambiguous" && (ambiguousPerFile.get(c.file) ?? 0) >= AMBIGUOUS_PER_FILE) continue;
+        const nameKey = `${c.dataset}::${c.column}`;
+        if (sampledNames.has(nameKey)) continue;
+        sampledNames.add(nameKey);
         perFile.set(c.file, (perFile.get(c.file) ?? 0) + 1);
+        if (c.stratum === "ambiguous") ambiguousPerFile.set(c.file, (ambiguousPerFile.get(c.file) ?? 0) + 1);
         picked.push(c);
         break;
       }
@@ -113,7 +137,7 @@ const sheetData = {
   seed: SEED,
   roles: DOSSIER_ROLES,
   subtypes: DOSSIER_SUBTYPES,
-  files: files.map((f) => ({ ...f, items: sample.filter((s) => s.file === f.file).map((s) => ({ column: s.column, profile: s.profile })) })),
+  files: files.map(({ file, rows, columns }) => ({ file, rows, columns, items: sample.filter((s) => s.file === file).map((s) => ({ column: s.column, profile: s.profile })) })),
 };
 writeFileSync(join(OUT, "sample.json"), JSON.stringify({
   seed: SEED,
