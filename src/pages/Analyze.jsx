@@ -120,8 +120,6 @@ function Analyze() {
   const [analysisData,   setAnalysisData]   = useState(entry?.data   ?? null);
   const [cleaningRules,  setCleaningRules]  = useState([]);
   const [cleaning,       setCleaning]       = useState(null);
-  // The AI plan of the CURRENT report (phase E) — cleared whenever a new analysis starts.
-  const [planReview,     setPlanReview]     = useState(null);
   // The running analysis's AbortController, so Cancel and unmount can stop it.
   const runRef = useRef(null);
 
@@ -142,7 +140,6 @@ function Analyze() {
   const startAnalysis = (selectedTarget, rules) => {
     setTarget(selectedTarget);
     setLeakageReview(null);
-    setPlanReview(null);
     setStep("processing");
 
     // Rules always apply to the file as uploaded, never to an already-cleaned copy.
@@ -256,7 +253,6 @@ function Analyze() {
                     data: analysisData, originalData: csvData, dossier,
                     leakageReview, onLeakageReview: setLeakageReview,
                     cleaning, onCleaning: setCleaning, cleaningRules, onApplyCleaning: handleApplyCleaning,
-                    planReview, onPlanReview: setPlanReview,
                   }}
                 />
               </Suspense>
