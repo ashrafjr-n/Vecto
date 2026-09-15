@@ -120,6 +120,9 @@ function Analyze() {
   const [analysisData,   setAnalysisData]   = useState(entry?.data   ?? null);
   const [cleaningRules,  setCleaningRules]  = useState([]);
   const [cleaning,       setCleaning]       = useState(null);
+  /* The rules the user has ticked — on the target step (column review) or on the
+     Quality tab. The next analysis is built with exactly these. */
+  const [acceptedRules,  setAcceptedRules]  = useState([]);
   // The running analysis's AbortController, so Cancel and unmount can stop it.
   const runRef = useRef(null);
 
@@ -167,8 +170,11 @@ function Analyze() {
     });
   };
 
-  const handleTargetConfirmed = (selectedTarget) => startAnalysis(selectedTarget, cleaningRules);
-  const handleApplyCleaning   = (rules) => startAnalysis(target, rules);
+  const handleTargetConfirmed = (selectedTarget) => startAnalysis(selectedTarget, acceptedRules);
+  const handleApplyCleaning   = (rules) => {
+    setAcceptedRules(rules);
+    startAnalysis(target, rules);
+  };
 
   /* Cancelled is not failed: back to the target picker with the chosen target
      kept, so the user can start again or pick a different one. */
@@ -198,10 +204,12 @@ function Analyze() {
                 initialTarget={target}
                 onConfirm={handleTargetConfirmed}
                 onBack={handleReset}
-                dossier={dossier}
-                onDossier={setDossier}
-                roleOverrides={roleOverrides}
-                onRoleOverridesChange={setRoleOverrides}
+                ai={{
+                  dossier, onDossier: setDossier,
+                  roleOverrides, onRoleOverridesChange: setRoleOverrides,
+                  cleaning, onCleaning: setCleaning,
+                  acceptedRules, onAcceptedRulesChange: setAcceptedRules,
+                }}
               />
             </motion.div>
           )}
