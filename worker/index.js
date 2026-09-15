@@ -127,14 +127,25 @@ async function handleAi(request, env) {
   if (task.validate && !task.validate(body.payload)) return json({ error: "invalid_payload" }, 400);
 
   const messages = task.messages(body.payload);
-  let reply = await complete(env.OPENROUTER_API_KEY, models, name, task, messages);
+  /* A provider failing inside a 200 ends the request for OpenRouter, so its `models`
+     fallback never runs — measured 2026-09-15: 5/18 dossier files lost this way and the
+     second model answered none. Ask once more, without the model that failed when the
+     reply names it. One retry, not a loop over models; further fallback stays with OpenRouter. */
+  const ask = async (msgs) => {
+    const first = await complete(env.OPENROUTER_API_KEY, models, name, task, msgs);
+    if (first.unavailable === undefined) return first;
+    const rest = models.filter((m) => m !== first.unavailable);
+    return complete(env.OPENROUTER_API_KEY, rest.length ? rest : models, name, task, msgs);
+  };
+
+  let reply = await ask(messages);
   if (reply.error) return reply.error;
 
   // A 200 carrying invalid JSON is not an error to OpenRouter, so its fallback never
-  // fires. Ask once more with the parse error; availability retries stay with OpenRouter.
+  // fires. Ask once more with the parse error.
   let parsed = parseJson(reply.content);
   if (parsed.error) {
-    reply = await complete(env.OPENROUTER_API_KEY, models, name, task, [
+    reply = await ask([
       ...messages,
       { role: "assistant", content: reply.content },
       { role: "user", content: `That was not valid JSON (${parsed.error}). Reply with only the JSON object.` },
@@ -180,10 +191,14 @@ async function complete(apiKey, models, name, task, messages) {
   /* A provider can fail AFTER OpenRouter has answered 200 — measured on the eval:
      "Upstream error from Nvidia: Service temporarily overloaded" arrived as a 200
      whose body carries `error` and no content. It is an availability failure, not
-     an empty answer, and saying so tells the user that trying again may work. */
+     an empty answer, and saying so tells the user that trying again may work.
+     `unavailable` marks it retryable for handleAi: the failed model, or null if unnamed. */
   const upstreamError = data?.error ?? data?.choices?.[0]?.error;
   if (upstreamError) {
-    return { error: json({ error: "upstream_error", status: upstreamError.code ?? res.status, message: upstreamError.message ?? message }, 502) };
+    return {
+      error: json({ error: "upstream_error", status: upstreamError.code ?? res.status, message: upstreamError.message ?? message }, 502),
+      unavailable: data?.model ?? null,
+    };
   }
   const choice = data?.choices?.[0];
   /* Cut off at max_tokens: the JSON is incomplete by construction, so asking the
