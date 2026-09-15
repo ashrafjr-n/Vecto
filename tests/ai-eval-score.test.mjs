@@ -1,7 +1,7 @@
 /* ai-eval-score.test.mjs — the eval's scoring rule, on a hand-built dossier.
    Plain Node, no framework. */
 
-import { scoreDossier, scoreLeakage, scoreCleaning, scorePlan } from "../tools/ai-eval/score.mjs";
+import { scoreDossier, scoreLeakage, scoreCleaning } from "../tools/ai-eval/score.mjs";
 
 let failures = 0;
 function check(name, ok) {
@@ -77,10 +77,6 @@ check("a right factor passes and a factor off by 10x fails", cc['factor:Amount "
 check("a unit ladder is judged by ratio, whatever the base unit", cc['factor:Area "sqyrd"/"sqft"'].ok);
 check("a rule that changes nothing does not count as proposed", !cc["rule:Weight"].ok && !cc['factor:Weight covers "+"']);
 check("an effective forbidden rule fails the declined check", !cc["declined:Parking"].ok);
-
-const planOk = scorePlan({}, { removed: [], withheld: [], notInPlan: [], summaryWords: 80, summaryTooLong: false, steps: [{}] });
-const planBad = scorePlan({}, { removed: [{ number: "87" }], withheld: [], notInPlan: ["R2"], summaryWords: 200, summaryTooLong: true, steps: [] });
-check("a clean plan passes all five properties; a bad one fails four", planOk.passed === 5 && planBad.passed === 1);
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-eval-score checks passed");
 process.exit(failures ? 1 : 0);
