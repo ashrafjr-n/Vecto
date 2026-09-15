@@ -6,7 +6,7 @@
 export const METHODOLOGY_INTRO = {
   headline: "How Vecto reads a dataset.",
   lead: [
-    "Every figure in a Vecto report comes from a deterministic JavaScript engine that runs in your browser tab. No model computes any of it and no server is behind it — the same file and the same target produce the same report, every time. An optional AI assistant can suggest what columns mean, which columns leak the target and how dirty values should be cleaned, and can order the recommendations in plain language; everything it says is labelled, checked against the file, and changes the report only when you accept it.",
+    "Every figure in a Vecto report comes from a deterministic JavaScript engine that runs in your browser tab. No model computes any of it and no server is behind it — the same file and the same target produce the same report, every time. An optional AI assistant can suggest what columns mean, which columns leak the target and how dirty values should be cleaned; everything it says is labelled, checked against the file, and changes the report only when you accept it.",
     "This page documents that engine: the order it works in, the rule behind each decision, the thresholds it uses, and — just as important — what it cannot decide and hands back to you.",
   ],
 };
