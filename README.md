@@ -156,8 +156,15 @@ node --max-old-space-size=8192 tools/ai-eval.mjs   # [--task=leakage] [--only=ti
 
 One request per file, or one per 25 columns for a wider file (the same parts the page sends);
 a rate-limit response stops the run and finished files stay cached. The cache is keyed on the
-payload and on `worker/dossierPrompt.js`, so a prompt change re-asks every file. `--rescore`
-makes no requests.
+payload and on the task's prompt and schema files, so a prompt change re-asks every file.
+`--rescore` makes no requests.
+
+The eval's known answers were written by the same author as the prompts, so a second check
+tests the eval itself: `tools/blind-sample.mjs` writes a labelling sheet
+(`forTesting/blind/sheet.html`) for a seeded, stratified sample of columns, with no engine
+role, model answer or expectation shown. A person fills it in and saves `labels.json`, and
+`tools/blind-agreement.mjs` reports Cohen's κ against the model and against the expectations,
+with every disagreement listed. Neither script makes a request.
 
 ## Tests
 
@@ -242,7 +249,9 @@ worker/index.js               Cloudflare Worker entry: POST /api/ai (OpenRouter 
 worker/dossierPrompt.js       the column-dossier prompt
 worker/leakagePrompt.js       the leakage-review prompt
 worker/cleaningPrompt.js      the cleaning-proposal prompt
-tools/ai-eval.mjs, ai-eval/   dossier eval over the test corpus, known answers, scoring
+worker/reviewPrompt.js        the column-review prompt (dossier + cleaning in one request)
+tools/ai-eval.mjs, ai-eval/   AI evals over the test corpus, known answers, scoring
+tools/blind-*.mjs             blind labelling sheet and agreement (checks the eval itself)
 wrangler.jsonc                Worker + static-assets config, AI model list
 ```
 
