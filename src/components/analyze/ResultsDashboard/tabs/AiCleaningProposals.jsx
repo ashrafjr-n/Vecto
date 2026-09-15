@@ -7,6 +7,8 @@ import { requestAi } from "../../../../lib/ai/requestAi.js";
 import AiPanel          from "../../shared/AiPanel.jsx";
 import AiPayloadPreview from "../../shared/AiPayloadPreview.jsx";
 import AiBadge          from "../../shared/AiBadge.jsx";
+import CleaningRuleList from "../../shared/CleaningRuleList.jsx";
+import { TYPE_LABEL, ruleKey, describeRule } from "../../shared/cleaningRuleText.js";
 
 /* AI phase D on the Quality tab, in two steps.
 
@@ -21,27 +23,11 @@ import AiBadge          from "../../shared/AiBadge.jsx";
    Candidates are always found on the ORIGINAL file, so removing rules and asking
    again starts from what was uploaded, not from an already-cleaned copy. */
 
-const TYPE_LABEL = {
-  unit_map:         "Convert units",
-  censored_numeric: "Read bounds as numbers",
-  treat_as_missing: "Treat as missing",
-  merge_levels:     "Merge spellings",
-};
-
-const pct = (x) => `${Math.round(x * 1000) / 10}%`;
-
-function describeRule(r) {
-  if (r.type === "unit_map") return r.affixes.map((a) => `"${a.affix}" × ${a.factor.toLocaleString()}`).join(", ");
-  if (r.type === "censored_numeric") return r.affixes.map((a) => `"${a.affix}" → the number itself`).join(", ");
-  if (r.type === "treat_as_missing") return r.values.map((v) => `"${v}"`).join(", ");
-  return r.merges.map((m) => `"${m.from}" → "${m.to}"`).join(", ");
-}
-
 function AiCleaningProposals({ result, ai }) {
   const { originalData, dossier, cleaningRules, onApplyCleaning, cleaning, onCleaning } = ai;
   const [status, setStatus]   = useState("idle");   // idle | scanning | loading | error
   const [failure, setFailure] = useState(null);
-  const [picked, setPicked]   = useState(() => new Set(cleaningRules.map((r) => `${r.column}|${r.type}`)));
+  const [picked, setPicked]   = useState(() => new Set(cleaningRules.map(ruleKey)));
   const runRef = useRef(null);
 
   useEffect(() => () => runRef.current?.abort(), []);
@@ -79,15 +65,16 @@ function AiCleaningProposals({ result, ai }) {
     setStatus("idle");
   };
 
-  const toggle = (key) => setPicked((prev) => {
+  const toggle = (rule) => setPicked((prev) => {
+    const key = ruleKey(rule);
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
 
-  const chosen = (proposal?.rules ?? []).filter((r) => r.effective && picked.has(`${r.column}|${r.type}`));
+  const chosen = (proposal?.rules ?? []).filter((r) => r.effective && picked.has(ruleKey(r)));
   // The button only appears when running would change something — not for the rules already applied.
-  const ruleKeys = (rules) => rules.map((r) => `${r.column}|${r.type}`).sort().join();
+  const ruleKeys = (rules) => rules.map(ruleKey).sort().join();
   const changesSomething = ruleKeys(chosen) !== ruleKeys(cleaningRules);
 
   return (
@@ -145,40 +132,7 @@ function AiCleaningProposals({ result, ai }) {
           {proposal.rules.length === 0 ? (
             <p className="text-[13px] text-ink-soft">The model proposed no rules for these candidates.</p>
           ) : (
-            <ul className="divide-y divide-line rounded-xl border border-line bg-paper">
-              {proposal.rules.map((r) => {
-                const key = `${r.column}|${r.type}`;
-                const m = r.measurement;
-                return (
-                  <li key={key} className="px-4 py-3.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-[13px] text-ink">{r.column}</span>
-                      <span className="text-[11.5px] text-ink-faint">{TYPE_LABEL[r.type]}</span>
-                    </div>
-                    <p className="mt-1 font-mono text-[11.5px] text-ink-soft">{describeRule(r)}</p>
-                    {r.reason && <p className="mt-1.5 text-[13px] leading-relaxed text-ink-soft">{r.reason}</p>}
-                    <p className="mt-1.5 text-[12px] leading-relaxed text-ink">
-                      <span className="text-ink-faint">Applied to a copy: </span>
-                      {m.rowsChanged.toLocaleString()} values changed
-                      {r.type === "merge_levels"
-                        ? `; ${m.levelsBefore.toLocaleString()} → ${m.levelsAfter.toLocaleString()} distinct levels`
-                        : `; values that are numbers ${pct(m.numericShareBefore)} → ${pct(m.numericShareAfter)}`}.
-                    </p>
-                    {m.examples.length > 0 && (
-                      <p className="mt-1 font-mono text-[11px] text-ink-faint">{m.examples.map((e) => `${e.before} → ${e.after}`).join("   ·   ")}</p>
-                    )}
-                    {r.effective ? (
-                      <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[12.5px] text-ink">
-                        <input type="checkbox" checked={picked.has(key)} onChange={() => toggle(key)} className="h-3.5 w-3.5 accent-current" />
-                        Use this rule
-                      </label>
-                    ) : (
-                      <p className="mt-2 text-[12px] text-ink-faint">Not offered: it changes no value in this file.</p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <CleaningRuleList rules={proposal.rules} picked={picked} onToggle={toggle} />
           )}
 
           {proposal.withheld.length > 0 && (
@@ -241,7 +195,7 @@ function AppliedRules({ rules, onRemoveAll }) {
         <AiBadge>set by you</AiBadge>
       </div>
       <ul className="mt-2 space-y-1 font-mono text-[11.5px] text-ink-soft">
-        {rules.map((r) => <li key={`${r.column}|${r.type}`}>{r.column}: {TYPE_LABEL[r.type].toLowerCase()} — {describeRule(r)}</li>)}
+        {rules.map((r) => <li key={ruleKey(r)}>{r.column}: {TYPE_LABEL[r.type].toLowerCase()} — {describeRule(r)}</li>)}
       </ul>
       <details className="mt-3 text-[12.5px] text-ink-soft">
         <summary className="cursor-pointer font-medium hover:text-ink">Reproduce in pandas</summary>
