@@ -1,0 +1,141 @@
+<!doctype html>
+<!-- Template for tools/blind-sample.mjs, which replaces __DATA__ and writes the filled
+     page to forTesting/blind/sheet.html. Open that file straight from disk. -->
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vecto — blind labels</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fafaf9; --card:#fff; --ink:#1c1c1c; --soft:#555; --line:#ddd; --ok:#1f7a4d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111214; --card:#1a1c20; --ink:#eee; --soft:#aaa; --line:#333; --ok:#5fd39a; } }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--ink); font:15px/1.6 system-ui, sans-serif; }
+  main { max-width:900px; margin:auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin:14px 0; }
+  code, .mono, select, pre { font-family:ui-monospace, Menlo, monospace; direction:ltr; unicode-bidi:isolate; }
+  .col { border-top:1px solid var(--line); padding:14px 0; }
+  .col:first-of-type { border-top:0; }
+  .facts { color:var(--soft); font-size:13px; white-space:pre-wrap; text-align:left; direction:ltr; margin:6px 0; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  select { font-size:14px; padding:6px 8px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); }
+  details { margin:8px 0; }
+  .bar { position:sticky; top:0; background:var(--bg); padding:10px 0; border-bottom:1px solid var(--line); z-index:1; }
+  button { font-size:15px; padding:10px 18px; border-radius:10px; border:0; background:var(--ink); color:var(--bg); cursor:pointer; }
+  .done { color:var(--ok); }
+  dl { margin:0; } dt { font-weight:600; direction:ltr; text-align:right; } dd { margin:0 0 8px; color:var(--soft); }
+</style>
+</head>
+<body>
+<main>
+  <h1>تسميات عمياء — فحص الـ eval</h1>
+  <div class="card">
+    <p><strong>المطلوب:</strong> لكل عمود، اختار الـ <b>role</b> والـ <b>subtype</b> حسب رأيك إنت، من اسم العمود والقيم اللي قدامك. ولكل ملف، اختار العمود اللي الموديل المفروض يتنبأ فيه (الـ target).</p>
+    <p><strong>ممنوع:</strong> تفتح مجلد <code>reports/</code> أو ملف الـ expectations أو تشغّل التطبيق على هاي الملفات قبل ما تخلص. ما في جواب "صح" هون — بدنا رأيك المستقل.</p>
+    <p>إذا عن جد مش عارف، اختار <b>not sure</b> — أحسن من التخمين. الشغل بينحفظ لحاله بالمتصفح، فبتقدر تسكّر وترجع.</p>
+    <details>
+      <summary>شرح الـ roles</summary>
+      <dl>
+        <dt>identifier</dt><dd>رقم أو كود بيميّز صف أو كيان، مش معلومة بحد ذاته (ID، رابط، مفتاح لجدول ثاني).</dd>
+        <dt>numeric</dt><dd>كمية بتنقاس أو بتنعد، والفرق بين قيمتين إله معنى.</dd>
+        <dt>binary</dt><dd>قيمتين بس (نعم/لا، 0/1، ذكر/أنثى).</dd>
+        <dt>categorical</dt><dd>فئات، حتى لو مكتوبة كأرقام (كود منطقة 1..8).</dd>
+        <dt>temporal</dt><dd>تاريخ أو وقت.</dd>
+        <dt>text</dt><dd>نص حر، جمل أو وصف.</dd>
+      </dl>
+    </details>
+    <details>
+      <summary>شرح الـ subtypes</summary>
+      <dl>
+        <dt>measurement</dt><dd>قياس مستمر (سعر، وزن، مسافة).</dd>
+        <dt>count</dt><dd>عدد أشياء (أولاد، أهداف، غرف).</dd>
+        <dt>code</dt><dd>رقم أو رمز بيمثّل فئة.</dd>
+        <dt>identifier</dt><dd>معرّف فريد للصف.</dd>
+        <dt>foreign_key</dt><dd>مفتاح بيأشر على كيان بجدول ثاني، وبيتكرر.</dd>
+        <dt>entity_name</dt><dd>اسم شخص أو مكان أو شي محدد.</dd>
+        <dt>category</dt><dd>فئة مكتوبة بكلمات.</dd>
+        <dt>flag</dt><dd>مؤشر نعم/لا.</dd>
+        <dt>date</dt><dd>تاريخ أو وقت.</dd>
+        <dt>free_text</dt><dd>نص حر.</dd>
+        <dt>other</dt><dd>ولا وحدة من فوق.</dd>
+      </dl>
+    </details>
+  </div>
+
+  <div class="bar row">
+    <span id="progress"></span>
+    <button id="save" type="button">حفظ الملف (labels.json)</button>
+  </div>
+
+  <div id="files"></div>
+</main>
+
+<script>
+const DATA = __DATA__;
+const KEY = `vecto-blind-labels-${DATA.seed}`;
+let labels = {};
+try { labels = JSON.parse(localStorage.getItem(KEY) ?? "{}"); } catch { labels = {}; }
+const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(labels)); } catch { /* storage blocked: the save button still works */ } };
+
+const el = (tag, props = {}, ...children) => {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+};
+function picker(id, options, placeholder) {
+  const s = el("select");
+  s.append(el("option", { value: "", textContent: placeholder }));
+  for (const o of options) s.append(el("option", { value: o, textContent: o }));
+  s.append(el("option", { value: "not_sure", textContent: "not sure" }));
+  s.value = labels[id] ?? "";
+  s.addEventListener("change", () => { labels[id] = s.value; persist(); progress(); });
+  return s;
+}
+function facts(p) {
+  const lines = [`missing: ${p.missingPct}%   distinct: ${p.distinct}   numbers: ${Math.round(p.numericShare * 100)}%`];
+  if (p.summary) lines.push(`min ${p.summary.min}   median ${p.summary.median}   max ${p.summary.max}`);
+  if (p.topValues) lines.push(`top values: ${p.topValues.map(([v, n]) => `"${v}" ×${n}`).join(", ")}`);
+  if (p.examples?.length) lines.push(`examples: ${p.examples.map((v) => `"${v}"`).join(", ")}`);
+  if (p.nonNumericExamples?.length) lines.push(`not numbers: ${p.nonNumericExamples.map((v) => `"${v}"`).join(", ")}`);
+  if (p.avgLength !== undefined) lines.push(`free text, average length ${p.avgLength} chars (values not shown)`);
+  return lines.join("\n");
+}
+
+const ids = [];
+const root = document.getElementById("files");
+DATA.files.forEach((f, i) => {
+  const card = el("section", { className: "card" });
+  card.append(el("h2", {}, `${i + 1}. `, el("code", { textContent: f.file })));
+  card.append(el("p", { className: "facts", textContent: `${f.rows.toLocaleString()} rows · ${f.columns.length} columns:\n${f.columns.join(", ")}` }));
+  const tId = `target::${f.file}`;
+  ids.push(tId);
+  const targets = f.columns.map(String);
+  const t = picker(tId, ["(no real target)", ...targets], "— اختار الـ target —");
+  card.append(el("div", { className: "row" }, el("strong", { textContent: "الـ target لهاد الملف:" }), t));
+  for (const item of f.items) {
+    const rId = `role::${f.file}::${item.column}`;
+    const sId = `subtype::${f.file}::${item.column}`;
+    ids.push(rId, sId);
+    card.append(el("div", { className: "col" },
+      el("code", { textContent: item.column }),
+      el("div", { className: "facts", textContent: facts(item.profile) }),
+      el("div", { className: "row" }, picker(rId, DATA.roles, "— role —"), picker(sId, DATA.subtypes, "— subtype —")),
+    ));
+  }
+  root.append(card);
+});
+
+function progress() {
+  const filled = ids.filter((id) => labels[id]).length;
+  const p = document.getElementById("progress");
+  p.textContent = `${filled} / ${ids.length} معبّى`;
+  p.className = filled === ids.length ? "done" : "";
+}
+progress();
+
+document.getElementById("save").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({ seed: DATA.seed, savedAt: new Date().toISOString(), labels }, null, 2)], { type: "application/json" });
+  el("a", { href: URL.createObjectURL(blob), download: "labels.json" }).click();
+});
+</script>
+</body>
+</html>
