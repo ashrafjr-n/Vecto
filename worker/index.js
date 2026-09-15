@@ -14,9 +14,20 @@ import { LEAKAGE_SCHEMA, LEAKAGE_MAX_COLUMNS } from "../src/lib/ai/leakageSchema
 import { leakageMessages } from "./leakagePrompt.js";
 import { CLEANING_SCHEMA, CLEANING_MAX_COLUMNS } from "../src/lib/ai/cleaningSchema.js";
 import { cleaningMessages } from "./cleaningPrompt.js";
+import { REVIEW_SCHEMA } from "../src/lib/ai/reviewSchema.js";
+import { reviewMessages } from "./reviewPrompt.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BODY_CHARS = 256_000;
+
+const validDossierPayload = (payload) =>
+  Array.isArray(payload?.columns)
+  && payload.columns.length > 0
+  && payload.columns.length <= DOSSIER_MAX_COLUMNS
+  && payload.columns.every((c) => typeof c?.name === "string")
+  && Number.isFinite(payload.rows)
+  && (payload.allColumnNames === undefined
+      || (Array.isArray(payload.allColumnNames) && payload.allColumnNames.every((n) => typeof n === "string")));
 
 const TASKS = {
   // Smoke test for the plumbing — key, model list, fallback, JSON parsing.
@@ -40,15 +51,22 @@ const TASKS = {
   dossier: {
     maxTokens: 16000,
     schema: DOSSIER_SCHEMA,
-    validate: (payload) =>
-      Array.isArray(payload?.columns)
-      && payload.columns.length > 0
-      && payload.columns.length <= DOSSIER_MAX_COLUMNS
-      && payload.columns.every((c) => typeof c?.name === "string")
-      && Number.isFinite(payload.rows)
-      && (payload.allColumnNames === undefined
-          || (Array.isArray(payload.allColumnNames) && payload.allColumnNames.every((n) => typeof n === "string"))),
+    validate: validDossierPayload,
     messages: dossierMessages,
+  },
+
+  /* B+D merged — the dossier profile with cleaning candidates on their columns, one
+     request for both answers (buildReviewPayload / verifyReview in src/lib/ai/review.js).
+     Built beside `dossier` and `cleaning`, which are deleted once it holds their day-1
+     scores (vecto-plan.md item 16). Same token budget as the dossier: the rules
+     section is short, and the column section is what grows. */
+  review: {
+    maxTokens: 16000,
+    schema: REVIEW_SCHEMA,
+    validate: (payload) =>
+      validDossierPayload(payload)
+      && payload.columns.every((c) => c.cleaning === undefined || Array.isArray(c.cleaning)),
+    messages: reviewMessages,
   },
 
   /* Phase C — semantic leakage and split advice, after the analysis. Built by
