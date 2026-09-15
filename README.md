@@ -33,12 +33,14 @@ changes the report only when you accept a suggestion.
   target readiness, with a letter grade and per-dimension breakdown
 - **Recommendations** — prioritized, human-readable next steps for making the dataset
   ML-ready
-- **AI column dossier (optional)** — a language model reads a per-column summary and
-  suggests what each column records, a finer subtype, a unit, a plausible range and the
-  likely target. Every claim is checked against the file before it is shown: quoted values
+- **AI column review (optional)** — on the target picker, one request asks a language model
+  to read a per-column summary and suggest what each column records, a finer subtype, a
+  unit, a plausible range and the likely target, together with cleaning rules for the values
+  the engine's scan found dirty (see cleaning proposals below). Every claim is checked against the file before it is shown: quoted values
   must exist, a suggested role the data contradicts is not offered, the plausible range is
   counted by the engine, and an unusable target is withheld. An accepted role becomes an
-  explicit input to the analysis and is marked in the report.
+  explicit input to the analysis and is marked in the report; accepted cleaning rules are
+  applied to the upload before the first analysis, so no re-run is needed.
 - **AI leakage review (optional)** — on the Target Signal tab, a language model reads column
   names, roles and the engine's measured associations (no cell values) and names the
   columns a model could not use at prediction time: derived from the target, recorded after
@@ -113,8 +115,9 @@ Workers.
 `POST /api/ai` with `{ "task": "<name>", "payload": { ... } }` forwards a server-defined
 prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }`. The
 client only names a task; prompts, JSON schemas and token limits live in the Worker. Tasks:
-`ping` (deployment check), `dossier` (the column dossier on the target picker), `leakage`
-(Target Signal tab), and `cleaning` (Quality tab). The
+`ping` (deployment check), `review` (dossier and cleaning rules in one request, on the
+target picker), `leakage` (Target Signal tab), and the two tasks `review` replaces while it
+is evaluated: `dossier` and `cleaning` (the Quality tab's "ask again"). The
 analysis itself still runs entirely in the browser.
 
 - **Models** — `AI_MODELS` in `wrangler.jsonc`, comma-separated, tried in order by
@@ -140,7 +143,8 @@ corpus and scores each answer against known answers written before the first run
 `--task=dossier` (default) against `tools/ai-eval/expectations.mjs` (targets, roles,
 subtypes), `--task=leakage` against `tools/ai-eval/leakage-expectations.mjs` (known leaks,
 legitimate predictors that must not be flagged, split strategy), and `--task=cleaning`
-against `tools/ai-eval/cleaning-expectations.mjs` (rules and factors, rules that must be declined).
+against `tools/ai-eval/cleaning-expectations.mjs` (rules and factors, rules that must be declined),
+and `--task=review` against both, with the dossier and cleaning scores reported apart.
 Answers are verified exactly as the page verifies them, cached by payload hash in
 `reports/ai-eval/`, and summarised in `reports/ai-eval/summary.md`, including the engine's
 own target guess for comparison.
