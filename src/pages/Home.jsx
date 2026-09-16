@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Papa from "papaparse";
+import { motion, useScroll, useTransform } from "framer-motion";
 import {
   UploadCloud, LoaderCircle, TriangleAlert, ArrowRight, FileWarning,
 } from "lucide-react";
@@ -100,6 +101,16 @@ function Home() {
   /* Spans the hero and the reveal spacer — the scroll distance over which the
      fixed dropzone box gets its own subtle motion (see the useScroll below). */
   const revealRef = useRef(null);
+  /* The box itself never scrolls (it's in the fixed layer), but it isn't
+     inert either: it eases in from slightly below center as the hero clears,
+     rests at dead center for the reveal, then eases slightly further up as
+     the content panel arrives to cover it. Center is its resting place, not
+     a single frame it passes through. */
+  const { scrollYProgress: revealProgress } = useScroll({
+    target: revealRef,
+    offset: ["start start", "end start"],
+  });
+  const dropzoneBoxY = useTransform(revealProgress, [0, 0.3, 0.7, 1], [36, 0, 0, -20]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
   const [error,      setError]      = useState(null);
@@ -168,7 +179,7 @@ function Home() {
           at a higher stacking level, so this layer only ever gets revealed
           or covered — it never moves itself. ───────────────────────────── */}
       <div className="dot-grid fixed inset-0 z-0 flex items-center justify-center overflow-y-auto px-6 py-16 sm:px-10">
-        <div className="mx-auto w-full max-w-2xl">
+        <motion.div style={{ y: dropzoneBoxY }} className="mx-auto w-full max-w-2xl">
 
           <div
             onDragOver={onDragOver}
@@ -246,7 +257,7 @@ function Home() {
             </div>
           )}
 
-        </div>
+        </motion.div>
       </div>
 
       <main>
