@@ -8,12 +8,9 @@
    would be a general-purpose LLM proxy on the account's quota for anyone who finds
    the URL. Every prompt, schema and token limit lives in TASKS below. */
 
-import { DOSSIER_SCHEMA, DOSSIER_MAX_COLUMNS } from "../src/lib/ai/dossierSchema.js";
-import { dossierMessages } from "./dossierPrompt.js";
+import { DOSSIER_MAX_COLUMNS } from "../src/lib/ai/dossierSchema.js";
 import { LEAKAGE_SCHEMA, LEAKAGE_MAX_COLUMNS } from "../src/lib/ai/leakageSchema.js";
 import { leakageMessages } from "./leakagePrompt.js";
-import { CLEANING_SCHEMA, CLEANING_MAX_COLUMNS } from "../src/lib/ai/cleaningSchema.js";
-import { cleaningMessages } from "./cleaningPrompt.js";
 import { REVIEW_SCHEMA } from "../src/lib/ai/reviewSchema.js";
 import { reviewMessages } from "./reviewPrompt.js";
 
@@ -45,21 +42,12 @@ const TASKS = {
     ],
   },
 
-  /* Phase B — what each column is, plus target suggestions, in one call. The
-     payload is built by buildDossierPayload() in src/lib/ai/dossier.js and the
-     answer is checked against the data by verifyDossier() before it is shown. */
-  dossier: {
-    maxTokens: 16000,
-    schema: DOSSIER_SCHEMA,
-    validate: validDossierPayload,
-    messages: dossierMessages,
-  },
-
-  /* B+D merged — the dossier profile with cleaning candidates on their columns, one
-     request for both answers (buildReviewPayload / verifyReview in src/lib/ai/review.js).
-     Built beside `dossier` and `cleaning`, which are deleted once it holds their day-1
-     scores (vecto-plan.md item 16). Same token budget as the dossier: the rules
-     section is short, and the column section is what grows. */
+  /* Phases B+D in one request — what each column is, target suggestions, and cleaning
+     rules for the values the engine's scan flagged. The payload is built by
+     buildReviewPayload() and the answer checked by verifyReview() (src/lib/ai/review.js)
+     before anything is shown. It replaced the separate `dossier` and `cleaning` tasks
+     once it held their day-1 scores (vecto-plan.md item 16). The rules section is
+     short; the column section is what grows, hence the dossier's token budget. */
   review: {
     maxTokens: 16000,
     schema: REVIEW_SCHEMA,
@@ -82,20 +70,6 @@ const TASKS = {
       && payload.columns.length <= LEAKAGE_MAX_COLUMNS
       && payload.columns.every((c) => typeof c?.name === "string"),
     messages: leakageMessages,
-  },
-
-  /* Phase D — cleaning rules for the candidates the engine found. Built by
-     buildCleaningPayload() and checked by verifyCleaningRules(), which applies
-     every rule to a copy and measures it before the user can accept it. */
-  cleaning: {
-    maxTokens: 6000,
-    schema: CLEANING_SCHEMA,
-    validate: (payload) =>
-      Array.isArray(payload?.columns)
-      && payload.columns.length > 0
-      && payload.columns.length <= CLEANING_MAX_COLUMNS
-      && payload.columns.every((c) => typeof c?.name === "string" && Array.isArray(c.candidates)),
-    messages: cleaningMessages,
   },
 };
 
