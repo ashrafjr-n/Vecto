@@ -125,19 +125,6 @@ export function findCleaningCandidates(data, columns, roles) {
   return out;
 }
 
-export function buildCleaningPayload(candidates, rows, dossier) {
-  const meaning = new Map((dossier?.columns ?? []).map((c) => [c.name, c]));
-  return {
-    schemaVersion: 1,
-    rows,
-    columns: candidates.map((c) => {
-      const d = meaning.get(c.name);
-      return { ...c, ...(d?.meaning ? { meaning: d.meaning } : {}), ...(d?.unit ? { unit: d.unit } : {}) };
-    }),
-  };
-}
-
-
 /* ── Applying ─────────────────────────────────────────────────────────────── */
 
 const tidy = (x) => String(Number(x.toPrecision(12)));
