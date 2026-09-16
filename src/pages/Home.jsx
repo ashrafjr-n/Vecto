@@ -97,6 +97,9 @@ const index2 = (i) => String(i + 1).padStart(2, "0");
 function Home() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
+  /* Spans the hero and the reveal spacer — the scroll distance over which the
+     fixed dropzone box gets its own subtle motion (see the useScroll below). */
+  const revealRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
   const [error,      setError]      = useState(null);
@@ -248,51 +251,55 @@ function Home() {
 
       <main>
 
-        {/* ── HERO — normal flow, scrolls away like any other content. The
-            fixed dropzone layer behind it (lower stacking level) is what
-            makes this read as "the hero flies up to reveal what's behind
-            it" rather than a section sliding in from below. ────────────── */}
-        <section className={`relative z-10 bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}>
-          <div className="mx-auto max-w-[1400px]">
+        <div ref={revealRef}>
 
-            <SectionLabel mark="01">Client-side dataset audit</SectionLabel>
+          {/* ── HERO — normal flow, scrolls away like any other content. The
+              fixed dropzone layer behind it (lower stacking level) is what
+              makes this read as "the hero flies up to reveal what's behind
+              it" rather than a section sliding in from below. ──────────── */}
+          <section className={`relative z-10 bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}>
+            <div className="mx-auto max-w-[1400px]">
 
-            <h1 className="mt-12 max-w-[19ch] text-[2.5rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-6xl lg:text-[5.25rem]">
-              A structural audit of your dataset, in the browser.
-            </h1>
+              <SectionLabel mark="01">Client-side dataset audit</SectionLabel>
 
-            <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                Upload a CSV and select a target column. Vecto returns column-role
-                detection, missing-value and duplicate analysis, per-column statistics,
-                a correlation matrix with multicollinearity and target-leakage checks,
-                class-balance diagnostics, and a weighted health score.
-              </p>
-              <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                No file is uploaded — parsing and analysis run locally, in this tab. An
-                optional AI assistant sends a summary of the file, never its rows, only
-                when you ask and only after you can inspect it. The report is a statistical document, not a dashboard: every
-                number arrives with the reasoning behind it, and every score that was
-                held back says which piece of evidence held it.
-              </p>
+              <h1 className="mt-12 max-w-[19ch] text-[2.5rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-6xl lg:text-[5.25rem]">
+                A structural audit of your dataset, in the browser.
+              </h1>
+
+              <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
+                  Upload a CSV and select a target column. Vecto returns column-role
+                  detection, missing-value and duplicate analysis, per-column statistics,
+                  a correlation matrix with multicollinearity and target-leakage checks,
+                  class-balance diagnostics, and a weighted health score.
+                </p>
+                <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
+                  No file is uploaded — parsing and analysis run locally, in this tab. An
+                  optional AI assistant sends a summary of the file, never its rows, only
+                  when you ask and only after you can inspect it. The report is a statistical document, not a dashboard: every
+                  number arrives with the reasoning behind it, and every score that was
+                  held back says which piece of evidence held it.
+                </p>
+              </div>
+
+              <div className="mt-16 grid grid-cols-1 border-t border-line sm:grid-cols-3">
+                {DIAGNOSTICS.map((d) => (
+                  <div key={d.label} className="border-b border-line py-8 pr-8 sm:border-b-0">
+                    <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
+                    <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">{d.label}</div>
+                  </div>
+                ))}
+              </div>
+
             </div>
+          </section>
 
-            <div className="mt-16 grid grid-cols-1 border-t border-line sm:grid-cols-3">
-              {DIAGNOSTICS.map((d) => (
-                <div key={d.label} className="border-b border-line py-8 pr-8 sm:border-b-0">
-                  <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
-                  <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">{d.label}</div>
-                </div>
-              ))}
-            </div>
+          {/* ── REVEAL SPACER — no content of its own; it just reserves scroll
+              distance so the fixed dropzone layer gets a moment fully uncovered
+              before the content panel below scrolls up over it in turn. ──── */}
+          <div className="min-h-[70vh]" aria-hidden="true" />
 
-          </div>
-        </section>
-
-        {/* ── REVEAL SPACER — no content of its own; it just reserves scroll
-            distance so the fixed dropzone layer gets a moment fully uncovered
-            before the content panel below scrolls up over it in turn. ───── */}
-        <div className="min-h-[70vh]" aria-hidden="true" />
+        </div>
 
         {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero.
             Scrolls normally, like the hero; being positioned above the fixed
