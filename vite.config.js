@@ -11,5 +11,6 @@ export default defineConfig({
   // beside `npm run dev`; wrangler's default port is 8787.
   server: {
     proxy: { '/api': 'http://127.0.0.1:8787' },
+    port: 3001,
   },
 })
