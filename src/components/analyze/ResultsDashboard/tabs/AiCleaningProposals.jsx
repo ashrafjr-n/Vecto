@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { RotateCcw, Sparkles, ScanSearch, Copy, Check } from "lucide-react";
 
 import { detectColumnRoles } from "../../../utils/core/detectors/roles.js";
-import { findCleaningCandidates, buildCleaningPayload, verifyCleaningRules, cleaningRulesToPandas } from "../../../../lib/ai/cleaning.js";
+import { findCleaningCandidates, cleaningRulesToPandas } from "../../../../lib/ai/cleaning.js";
+import { buildReviewPayload, verifyReview } from "../../../../lib/ai/review.js";
 import { requestAi } from "../../../../lib/ai/requestAi.js";
+import { askDossier } from "../../../../lib/ai/askDossier.js";
 import AiPanel          from "../../shared/AiPanel.jsx";
 import AiPayloadPreview from "../../shared/AiPayloadPreview.jsx";
 import AiBadge          from "../../shared/AiBadge.jsx";
@@ -16,6 +18,10 @@ import { TYPE_LABEL, ruleKey, describeRule } from "../../shared/cleaningRuleText
       with units or bounds, category spellings that collide, placeholder values.
       Deterministic and free; useful on its own.
    2. Only then can the model be asked what they mean, as rules in a closed format.
+      That ask is the `review` task — the same single request the target step makes,
+      so the answer carries the column dossier as well as the rules. This is the way
+      in for a user who reached the report without asking for a review; there is no
+      route back to the target picker.
       Every rule is applied to a copy and measured (verifyCleaningRules) before it
       can be ticked, and nothing changes until the user re-runs the analysis with
       the rules they accepted — which Analyze.jsx does on the original rows.
@@ -24,15 +30,19 @@ import { TYPE_LABEL, ruleKey, describeRule } from "../../shared/cleaningRuleText
    again starts from what was uploaded, not from an already-cleaned copy. */
 
 function AiCleaningProposals({ result, ai }) {
-  const { originalData, dossier, cleaningRules, onApplyCleaning, cleaning, onCleaning } = ai;
+  const { originalData, dossier, onDossier, cleaningRules, onApplyCleaning, cleaning, onCleaning } = ai;
   const [status, setStatus]   = useState("idle");   // idle | scanning | loading | error
   const [failure, setFailure] = useState(null);
   const [picked, setPicked]   = useState(() => new Set(cleaningRules.map(ruleKey)));
   const runRef = useRef(null);
+  /* Roles of the ORIGINAL file, cached: every pass is a full read, and the report's
+     own roles describe the analysed rows (already cleaned, already overridden). */
+  const rolesRef = useRef(null);
 
   useEffect(() => () => runRef.current?.abort(), []);
 
   const columns = Object.keys(result.meta.columnRoles);
+  const rolesOf = () => (rolesRef.current ??= detectColumnRoles(originalData, columns, null));
   const candidates = cleaning?.candidates ?? null;
   const proposal = cleaning?.proposal ?? null;
 
@@ -40,28 +50,31 @@ function AiCleaningProposals({ result, ai }) {
     setStatus("scanning");
     // Yield one frame so "Scanning" paints before a full pass over a large file blocks the thread.
     setTimeout(() => {
-      const roles = detectColumnRoles(originalData, columns, null);
-      onCleaning({ candidates: findCleaningCandidates(originalData, columns, roles), proposal: null });
+      onCleaning({ candidates: findCleaningCandidates(originalData, columns, rolesOf()), proposal: null });
       setStatus("idle");
     }, 30);
   };
 
-  const payload = () => buildCleaningPayload(candidates, originalData.length, dossier);
+  const payload = () => buildReviewPayload(originalData, columns, rolesOf(), candidates ?? []);
 
   const handleAsk = async () => {
     const run = new AbortController();
     runRef.current = run;
     setStatus("loading");
     setFailure(null);
-    const reply = await requestAi("cleaning", payload(), run.signal);
-    if (reply.aborted) return;
-    const verified = reply.error ? null : verifyCleaningRules(reply.result, { data: originalData, columns, candidates });
-    if (reply.error || verified.error) {
-      setFailure({ error: reply.error ?? verified.error, detail: reply.detail });
+    const { result: answer, model, error, detail, aborted } = await askDossier(
+      payload(),
+      (part) => requestAi("review", part, run.signal),
+    );
+    if (aborted) return;
+    const verified = error ? null : verifyReview(answer, { data: originalData, columns, roles: rolesOf(), candidates });
+    if (error || verified.error) {
+      setFailure({ error: error ?? verified.error, detail });
       setStatus("error");
       return;
     }
-    onCleaning({ candidates, proposal: { ...verified, model: reply.model } });
+    onDossier({ ...verified.dossier, model });
+    onCleaning({ candidates, proposal: { ...verified.cleaning, model } });
     setStatus("idle");
   };
 
@@ -84,7 +97,7 @@ function AiCleaningProposals({ result, ai }) {
       status={status}
       failure={failure}
       onCancel={() => { runRef.current?.abort(); setStatus("idle"); }}
-      loadingText="Waiting for the model — free models can take a minute."
+      loadingText="Waiting for the model — free models can take a minute, and a file over 25 columns is asked in parts."
     >
       {cleaningRules.length > 0 && <AppliedRules rules={cleaningRules} onRemoveAll={() => onApplyCleaning([])} />}
 
@@ -109,9 +122,10 @@ function AiCleaningProposals({ result, ai }) {
           {candidates.length > 0 && (
             <>
               <p className="mt-4 text-[12px] leading-[1.7] text-ink-faint">
-                Asking a language model sends these candidates to OpenRouter&apos;s free models, which may log or
-                train on requests: column names, each affix or spelling with its count, and up to 3 example
-                values per group{dossier ? ", plus column meanings from the AI dossier" : ""}. No rows.
+                Asking a language model sends a profile of every column to OpenRouter&apos;s free models, which
+                may log or train on requests: names, the engine&apos;s role, counts, a numeric summary, the most
+                frequent values and a few examples, with these candidates on the columns they were found in.
+                No rows. It is one request, and the answer also describes what each column is{dossier ? "" : " — the same column review offered on the target step"}.
               </p>
               <AiPayloadPreview build={payload} />
               <button type="button" onClick={handleAsk} className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line-strong px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
