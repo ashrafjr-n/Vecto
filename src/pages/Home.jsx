@@ -290,17 +290,14 @@ function Home() {
 
               <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                  Upload a CSV and select a target column. Vecto returns column-role
-                  detection, missing-value and duplicate analysis, per-column statistics,
-                  a correlation matrix with multicollinearity and target-leakage checks,
-                  class-balance diagnostics, and a weighted health score.
+                  Upload a CSV and pick a target column. Vecto checks column roles, data
+                  quality, correlations and leakage, then returns a weighted health score.
                 </p>
                 <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                  No file is uploaded — parsing and analysis run locally, in this tab. An
-                  optional AI assistant sends a summary of the file, never its rows, only
-                  when you ask and only after you can inspect it. The report is a statistical document, not a dashboard: every
-                  number arrives with the reasoning behind it, and every score that was
-                  held back says which piece of evidence held it.
+                  Nothing is uploaded — parsing and analysis run locally, in this tab. An
+                  optional AI assistant can send a column summary, never row data, only
+                  when you ask. Every number in the report carries its reasoning, and
+                  every score held back says why.
                 </p>
               </div>
 
