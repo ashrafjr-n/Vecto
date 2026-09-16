@@ -1,10 +1,11 @@
 /* AI eval — runs a REAL /api/ai task over the corpus and scores each answer
    against known answers written before the first run.
 
-     --task=dossier  (default) phase B, tools/ai-eval/expectations.mjs
+     --task=review   (default) B+D merged — what each column is, target suggestions and
+                     cleaning rules in one request. Scored on BOTH expectation files
+                     (tools/ai-eval/expectations.mjs, cleaning-expectations.mjs),
+                     reported apart as "B checks" and "D checks".
      --task=leakage  phase C, tools/ai-eval/leakage-expectations.mjs
-     --task=cleaning phase D, tools/ai-eval/cleaning-expectations.mjs
-     --task=review   B+D merged: scored on BOTH expectation files, reported apart
 
    It goes through the Worker, not straight to OpenRouter, so what is measured is
    what the app gets: the same prompt, schema, model fallback list and repair
@@ -14,7 +15,7 @@
    transformHeader, no dynamicTyping) — a differently parsed file is a different
    dataset. Files over the app's 40MB cap are still evaluated here.
 
-   Quota: one request per file (a dossier on a wide file takes one per 25 columns;
+   Quota: one request per file (a review on a wide file takes one per 25 columns;
    the repair round can add one). Answers are cached in <out>/<file>.json, keyed
    on the payload AND the task's prompt file, so a re-run only spends requests on
    what changed or failed. A rate-limit response stops the run.
@@ -33,10 +34,9 @@ import Papa from "papaparse";
 
 import { analyzeDataset, detectColumnRoles, detectTarget } from "../src/components/utils/core/index.js";
 import { transformHeader } from "../src/lib/csvIntake.js";
-import { buildDossierPayload, verifyDossier } from "../src/lib/ai/dossier.js";
 import { askDossier } from "../src/lib/ai/askDossier.js";
 import { buildLeakagePayload, verifyLeakage } from "../src/lib/ai/leakage.js";
-import { findCleaningCandidates, buildCleaningPayload, verifyCleaningRules } from "../src/lib/ai/cleaning.js";
+import { findCleaningCandidates } from "../src/lib/ai/cleaning.js";
 import { buildReviewPayload, verifyReview } from "../src/lib/ai/review.js";
 import { EXPECTATIONS } from "./ai-eval/expectations.mjs";
 import { LEAKAGE_EXPECTATIONS } from "./ai-eval/leakage-expectations.mjs";
@@ -45,7 +45,7 @@ import { scoreDossier, scoreLeakage, scoreCleaning } from "./ai-eval/score.mjs";
 
 const args     = process.argv.slice(2);
 const flag     = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
-const taskName = flag("task") ?? "dossier";
+const taskName = flag("task") ?? "review";
 const endpoint = flag("endpoint") ?? "http://127.0.0.1:8787/api/ai";
 const delayMs  = Number(flag("delay") ?? 4000);   // free tier: 20 requests/minute
 const only     = flag("only")?.split(",");
@@ -60,37 +60,6 @@ const cleaningFor = (e) => CLEANING_EXPECTATIONS.find((c) => c.file === e.file);
 /* One entry per task: which answers it is scored against, which files key its cache,
    how a file becomes a payload, and how the answer is asked for, verified and scored. */
 const TASK_DEFS = {
-  dossier: {
-    title: "Column dossier",
-    outDir: "reports/ai-eval",
-    expectations: EXPECTATIONS,
-    promptFiles: ["worker/dossierPrompt.js", "src/lib/ai/dossierSchema.js"],
-    named: (e) => [...(e.targets ?? []), ...Object.keys(e.roles ?? {}), ...Object.keys(e.subtypes ?? {})],
-    prepare: (e, data, columns) => {
-      const roles = detectColumnRoles(data, columns, null);
-      return { roles, engineTargetGuess: detectTarget(columns, data), payload: buildDossierPayload(data, columns, roles) };
-    },
-    // Through askDossier, as the page does — a wide file is measured in the same parts the user gets.
-    ask: (ctx, send) => askDossier(ctx.payload, (part) => send("dossier", part)),
-    verify: (answer, ctx, data, columns) => verifyDossier(answer, { data, columns, roles: ctx.roles }),
-    score: (e, verified, ctx) => scoreDossier(e, verified, ctx.engineTargetGuess),
-    record: (ctx) => ({ engineTargetGuess: ctx.engineTargetGuess }),
-    line: (s) => `top target ${s.checks.find((c) => c.kind === "target@1")?.got ?? "n/a"} · withheld ${s.hygiene.withheld} · undescribed ${s.hygiene.undescribed}`,
-    measures: (all, ok) => {
-      const withTarget = ok.filter((r) => r.score.engineTargetOk !== null);
-      const engineRight = withTarget.filter((r) => r.score.engineTargetOk).length;
-      return [
-        ["Target, top pick (AI)", pctOf(all.filter((c) => c.kind === "target@1"))],
-        ["Target, top pick (engine's detectTarget)", withTarget.length ? `${Math.round((100 * engineRight) / withTarget.length)}% (${engineRight}/${withTarget.length})` : "n/a"],
-        ["Target, any of top 3 (AI)", pctOf(all.filter((c) => c.kind === "target@3"))],
-        ["Roles", pctOf(all.filter((c) => c.kind === "role"))],
-        ["Subtypes", pctOf(all.filter((c) => c.kind === "subtype"))],
-      ];
-    },
-    columns: ["AI top target", "Engine target", "Withheld", "Undescribed", "Contradicted roles"],
-    cells: (r) => [r.score.checks.find((c) => c.kind === "target@1")?.got ?? "—", r.record.engineTargetGuess, r.score.hygiene.withheld, r.score.hygiene.undescribed, r.score.hygiene.contradictedRoles],
-  },
-
   leakage: {
     title: "Leakage review",
     outDir: "reports/ai-eval-leakage",
@@ -118,40 +87,18 @@ const TASK_DEFS = {
     cells: (r) => [r.score.hygiene.findings, Object.entries(r.score.hygiene.verdicts).map(([k, v]) => `${k} ${v}`).join(", ") || "—", r.score.hygiene.withheld, r.score.hygiene.engineOnly],
   },
 
-  cleaning: {
-    title: "Cleaning proposals",
-    outDir: "reports/ai-eval-cleaning",
-    expectations: CLEANING_EXPECTATIONS,
-    promptFiles: ["worker/cleaningPrompt.js", "src/lib/ai/cleaningSchema.js"],
-    named: (e) => [...(e.rules ?? []).map((r) => r.column), ...Object.keys(e.forbidden ?? {})],
-    // The same scan the Quality tab runs, on the file as uploaded, without a dossier.
-    prepare: (e, data, columns) => {
-      const candidates = findCleaningCandidates(data, columns, detectColumnRoles(data, columns, null));
-      return { candidates, payload: buildCleaningPayload(candidates, data.length, null), skip: candidates.length ? null : "no candidates — nothing is asked" };
-    },
-    ask: (ctx, send) => send("cleaning", ctx.payload),
-    verify: (answer, ctx, data, columns) => verifyCleaningRules(answer, { data, columns, candidates: ctx.candidates }),
-    score: (e, verified) => scoreCleaning(e, verified),
-    record: (ctx) => ({ candidateColumns: ctx.candidates.map((c) => c.name) }),
-    line: (s) => `rules ${s.hygiene.rules} · effective ${s.hygiene.effective} · withheld ${s.hygiene.withheld}`,
-    measures: (all) => [
-      ["Expected rules proposed", pctOf(all.filter((c) => c.kind === "rule"))],
-      ["Factors and bounds right", pctOf(all.filter((c) => c.kind === "factor"))],
-      ["Wrong rules declined", pctOf(all.filter((c) => c.kind === "declined" || c.kind === "quiet"))],
-    ],
-    columns: ["Candidate columns", "Rules", "Effective", "Withheld"],
-    cells: (r) => [r.record.candidateColumns?.join(", ") || "—", r.score.hygiene.rules, r.score.hygiene.effective, r.score.hygiene.withheld],
-  },
-
-  /* B+D in one request (vecto-plan.md item 16). Runs over the dossier's 18 files; the
-     8 with a cleaning expectation are also scored on rules, with the same scorers as
-     the separate tasks, so its B and D measures compare directly with day 1. */
   review: {
     title: "Column review (B+D)",
     outDir: "reports/ai-eval-review",
     expectations: EXPECTATIONS,
     promptFiles: ["worker/reviewPrompt.js", "src/lib/ai/reviewSchema.js", "src/lib/ai/dossierSchema.js", "src/lib/ai/cleaningSchema.js"],
-    named: (e) => [...TASK_DEFS.dossier.named(e), ...(cleaningFor(e) ? TASK_DEFS.cleaning.named(cleaningFor(e)) : [])],
+    named: (e) => {
+      const d = cleaningFor(e);
+      return [
+        ...(e.targets ?? []), ...Object.keys(e.roles ?? {}), ...Object.keys(e.subtypes ?? {}),
+        ...(d ? [...(d.rules ?? []).map((r) => r.column), ...Object.keys(d.forbidden ?? {})] : []),
+      ];
+    },
     prepare: (e, data, columns) => {
       const roles = detectColumnRoles(data, columns, null);
       const candidates = findCleaningCandidates(data, columns, roles);
@@ -166,18 +113,30 @@ const TASK_DEFS = {
       return { ...b, passed: checks.filter((c) => c.ok).length, total: checks.length, checks, hygiene: { ...b.hygiene, ...(d?.hygiene ?? { rules: verified.cleaning.rules.length }) } };
     },
     record: (ctx) => ({ engineTargetGuess: ctx.engineTargetGuess, candidateColumns: ctx.candidates.map((c) => c.name) }),
-    line: (s) => `${TASK_DEFS.dossier.line(s)} · rules ${s.hygiene.rules}`,
+    line: (s) => `top target ${s.checks.find((c) => c.kind === "target@1")?.got ?? "n/a"} · withheld ${s.hygiene.withheld} · undescribed ${s.hygiene.undescribed} · rules ${s.hygiene.rules}`,
     measures: (all, ok) => {
       const isB = (c) => ["target@1", "target@3", "role", "subtype"].includes(c.kind);
+      const withTarget = ok.filter((r) => r.score.engineTargetOk !== null);
+      const engineRight = withTarget.filter((r) => r.score.engineTargetOk).length;
       return [
         ["B checks (day 1: 99%, 188/189)", pctOf(all.filter(isB))],
         ["D checks (day 1: 100%, 19/19)", pctOf(all.filter((c) => !isB(c)))],
-        ...TASK_DEFS.dossier.measures(all, ok),
-        ...TASK_DEFS.cleaning.measures(all),
+        ["Target, top pick (AI)", pctOf(all.filter((c) => c.kind === "target@1"))],
+        ["Target, top pick (engine's detectTarget)", withTarget.length ? `${Math.round((100 * engineRight) / withTarget.length)}% (${engineRight}/${withTarget.length})` : "n/a"],
+        ["Target, any of top 3 (AI)", pctOf(all.filter((c) => c.kind === "target@3"))],
+        ["Roles", pctOf(all.filter((c) => c.kind === "role"))],
+        ["Subtypes", pctOf(all.filter((c) => c.kind === "subtype"))],
+        ["Expected rules proposed", pctOf(all.filter((c) => c.kind === "rule"))],
+        ["Factors and bounds right", pctOf(all.filter((c) => c.kind === "factor"))],
+        ["Wrong rules declined", pctOf(all.filter((c) => c.kind === "declined" || c.kind === "quiet"))],
       ];
     },
     columns: ["AI top target", "Engine target", "Withheld", "Undescribed", "Contradicted roles", "Candidate columns", "Rules"],
-    cells: (r) => [...TASK_DEFS.dossier.cells(r), r.record.candidateColumns?.join(", ") || "—", r.score.hygiene.rules],
+    cells: (r) => [
+      r.score.checks.find((c) => c.kind === "target@1")?.got ?? "—", r.record.engineTargetGuess,
+      r.score.hygiene.withheld, r.score.hygiene.undescribed, r.score.hygiene.contradictedRoles,
+      r.record.candidateColumns?.join(", ") || "—", r.score.hygiene.rules,
+    ],
   },
 };
 
