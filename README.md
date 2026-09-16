@@ -48,12 +48,14 @@ changes the report only when you accept a suggestion.
   split an honest evaluation needs. Every proposed formula is evaluated on the rows, and a
   total that differs only by a few fixed amounts (an unrecorded surcharge) is recognised as
   such; group claims are measured; timing claims are shown as questions. Advisory only.
-- **AI cleaning proposals (optional)** — on the Quality tab, the engine first scans the file
-  for values that look dirty (numbers written with a unit or bound such as `42 Lac` or
-  `125+`, one category spelled several ways, placeholders such as `-999`); a language model
-  then proposes rules in a closed format. Each rule is applied to a copy and measured before
-  it can be accepted, accepted rules re-run the analysis on the original rows, the report
-  says it was built from cleaned data, and the rules export as a pandas snippet.
+- **AI cleaning proposals (optional)** — the engine scans the file for values that look
+  dirty (numbers written with a unit or bound such as `42 Lac` or `125+`, one category
+  spelled several ways, placeholders such as `-999`) and a language model proposes rules in
+  a closed format, as the second half of the column review above. The Quality tab shows the
+  same proposal and can run that scan and ask for itself, for a report reached without a
+  review. Each rule is applied to a copy and measured before it can be accepted, accepted
+  rules run the analysis on the original rows, the report says it was built from cleaned
+  data, and the rules export as a pandas snippet.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
   behind each decision, the thresholds and estimators it uses, and what it cannot decide
 
@@ -115,10 +117,9 @@ Workers.
 `POST /api/ai` with `{ "task": "<name>", "payload": { ... } }` forwards a server-defined
 prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }`. The
 client only names a task; prompts, JSON schemas and token limits live in the Worker. Tasks:
-`ping` (deployment check), `review` (dossier and cleaning rules in one request, on the
-target picker), `leakage` (Target Signal tab), and the two tasks `review` replaces while it
-is evaluated: `dossier` and `cleaning` (the Quality tab's "ask again"). The
-analysis itself still runs entirely in the browser.
+`ping` (deployment check), `review` (the column dossier and cleaning rules in one request,
+from the target picker or the Quality tab) and `leakage` (Target Signal tab). The analysis
+itself still runs entirely in the browser.
 
 - **Models** — `AI_MODELS` in `wrangler.jsonc`, comma-separated, tried in order by
   OpenRouter's fallback. An empty value switches the endpoint off.
@@ -140,14 +141,14 @@ analysis itself still runs entirely in the browser.
 
 `tools/ai-eval.mjs` runs an AI task through the real `/api/ai` endpoint over the local test
 corpus and scores each answer against known answers written before the first run:
-`--task=dossier` (default) against `tools/ai-eval/expectations.mjs` (targets, roles,
-subtypes), `--task=leakage` against `tools/ai-eval/leakage-expectations.mjs` (known leaks,
-legitimate predictors that must not be flagged, split strategy), and `--task=cleaning`
-against `tools/ai-eval/cleaning-expectations.mjs` (rules and factors, rules that must be declined),
-and `--task=review` against both, with the dossier and cleaning scores reported apart.
+`--task=review` (default) against both `tools/ai-eval/expectations.mjs` (targets, roles,
+subtypes) and `tools/ai-eval/cleaning-expectations.mjs` (rules and factors, rules that must
+be declined), with the two scores reported apart as "B checks" and "D checks"; and
+`--task=leakage` against `tools/ai-eval/leakage-expectations.mjs` (known leaks, legitimate
+predictors that must not be flagged, split strategy).
 Answers are verified exactly as the page verifies them, cached by payload hash in
-`reports/ai-eval/`, and summarised in `reports/ai-eval/summary.md`, including the engine's
-own target guess for comparison.
+`reports/ai-eval-review/`, and summarised in that directory's `summary.md`, including the
+engine's own target guess for comparison.
 
 ```bash
 npx wrangler dev                                   # terminal 1, reads .dev.vars
