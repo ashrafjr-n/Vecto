@@ -289,96 +289,15 @@ function Home() {
           </div>
         </section>
 
-        {/* ── DOTTED CANVAS — also pinned, opaque and taller than any viewport
-            so it always fully covers the hero once it catches up to the top;
-            it then gets covered the same way by the content panel below it. */}
-        <section className="dot-grid sticky top-0 z-20 min-h-screen bg-paper px-6 py-24 sm:px-10 sm:py-36">
-          <div className="mx-auto max-w-2xl">
+        {/* ── REVEAL SPACER — no content of its own; it just reserves scroll
+            distance so the fixed dropzone layer gets a moment fully uncovered
+            before the content panel below scrolls up over it in turn. ───── */}
+        <div className="min-h-[70vh]" aria-hidden="true" />
 
-            <div
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-              onDrop={onDrop}
-              onClick={() => !isParsing && inputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-20 text-center transition-colors sm:py-24 ${
-                isDragOver
-                  ? "border-accent bg-accent-tint"
-                  : "border-line-strong bg-paper-sunken hover:border-ink-faint"
-              }`}
-            >
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={(e) => handleFile(e.target.files[0])}
-              />
-
-              {isParsing ? (
-                <>
-                  <LoaderCircle size={28} className="animate-spin text-accent-ink" />
-                  <div className="mt-6 text-[17px] text-ink">Parsing file…</div>
-                </>
-              ) : (
-                <>
-                  <UploadCloud size={28} className="text-ink-faint" />
-                  <div className="mt-6 text-[22px] font-medium tracking-tight text-ink sm:text-[26px]">
-                    {isDragOver ? "Drop to upload" : "Drag and drop a CSV file"}
-                  </div>
-                  <div className="mt-2 text-[14px] text-ink-soft">or click to browse</div>
-                </>
-              )}
-            </div>
-
-            <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint">
-              CSV only · Up to {MAX_SIZE_MB}MB · Processed locally, never uploaded
-            </p>
-
-            {malformed && (
-              <div className="mt-6 rounded-2xl border border-warning/25 bg-warning-tint px-5 py-4">
-                <div className="flex items-start gap-3">
-                  <FileWarning size={16} className="mt-0.5 shrink-0 text-warning" />
-                  <div>
-                    <div className="text-[13px] font-semibold text-warning">
-                      {malformed.count.toLocaleString()} row{malformed.count > 1 ? "s" : ""} could not be read cleanly.
-                    </div>
-                    <div className="mt-1 text-[13px] leading-relaxed text-ink-soft">
-                      {malformed.totalRows.toLocaleString()} rows parsed. The affected lines
-                      {" "}({malformed.sampleRows.join(", ")}
-                      {malformed.count > malformed.sampleRows.length ? ", …" : ""}) have a
-                      different column count than the header, usually from an unescaped comma
-                      or quote. They are still analysed, so the report may be skewed.
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate("/analyze")}
-                  className="mt-4 w-full rounded-xl bg-ink px-4 py-2.5 text-[13px] font-semibold text-paper-sunken transition-opacity hover:opacity-90"
-                >
-                  Analyze anyway
-                </button>
-              </div>
-            )}
-
-            {error && (
-              <div className="mt-6 flex items-start gap-3 rounded-2xl border border-critical/25 bg-critical-tint px-5 py-4">
-                <TriangleAlert size={16} className="mt-0.5 shrink-0 text-critical" />
-                <div>
-                  <div className="text-[13px] font-semibold text-critical">{ERRORS[error].title}</div>
-                  <div className="text-[13px] text-ink-soft">{ERRORS[error].desc}</div>
-                </div>
-              </div>
-            )}
-
-          </div>
-        </section>
-
-        {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero. Not
-            sticky itself (it's the longest section on the page — pinning it
-            would freeze scrolling through it) but positioned above the pinned
-            dropzone (z-30) so it still rises up and covers it as it scrolls
-            past normally. ─────────────────────────────────────────────── */}
+        {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero.
+            Scrolls normally, like the hero; being positioned above the fixed
+            dropzone layer (z-30 > z-0) is what lets it rise up and cover it
+            as it scrolls past, the same way the hero did earlier. ───────── */}
         <section className={`relative z-30 bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
           <div className="mx-auto max-w-[1400px]">
 
