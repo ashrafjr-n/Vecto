@@ -410,7 +410,13 @@ function Home() {
 
       </main>
 
-      <Footer />
+      {/* Footer is plain static content — no position of its own — so without
+          an explicit stacking level it would paint behind the fixed dropzone
+          layer (any positioned element outranks static content, regardless
+          of DOM order). relative + z-10 puts it back above. */}
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </div>
   );
 }
