@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -117,6 +117,17 @@ function Home() {
   /* Set when the CSV parsed but some rows were ragged — a warning, not a
      rejection: the readable rows are already handed off and analysable. */
   const [malformed,  setMalformed]  = useState(null);
+
+  /* Scroll-snap assist: past a certain point through the hero → dropzone →
+     content-panel transition, the scroll finishes the move on its own instead
+     of leaving the user to land it by hand. Scoped to Home's own lifetime —
+     the document is the actual scrolling element, so this reaches outside
+     React on mount and cleans up on unmount, same as any DOM subscription. */
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("snap-y", "snap-mandatory");
+    return () => root.classList.remove("snap-y", "snap-mandatory");
+  }, []);
 
   const handleFile = useCallback((file) => {
     if (!file) return;
