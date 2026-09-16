@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -95,39 +95,36 @@ const SPECIMEN_REPORT = [
 
 const index2 = (i) => String(i + 1).padStart(2, "0");
 
+/* Shared, restrained reveal for section groups further down the page: fade
+   and ease up a short distance, once, the first time each group is scrolled
+   into view. One motion language reused everywhere beats a different trick
+   per section. */
+const REVEAL = {
+  initial: { opacity: 0, y: 24 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-80px" },
+  transition: { duration: 0.5, ease: "easeOut" },
+};
+
 function Home() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
-  /* Spans the hero and the reveal spacer — the scroll distance over which the
-     fixed dropzone box gets its own subtle motion (see the useScroll below). */
-  const revealRef = useRef(null);
-  /* The box itself never scrolls (it's in the fixed layer), but it isn't
-     inert either: it eases in from slightly below center as the hero clears,
-     rests at dead center for the reveal, then eases slightly further up as
-     the content panel arrives to cover it. Center is its resting place, not
-     a single frame it passes through. */
-  const { scrollYProgress: revealProgress } = useScroll({
-    target: revealRef,
+  /* The hero eases out — fading and drifting up slightly — as it scrolls
+     past, instead of cutting off hard at the viewport edge. Purely visual;
+     scroll stays entirely in the user's hands. */
+  const heroRef = useRef(null);
+  const { scrollYProgress: heroProgress } = useScroll({
+    target: heroRef,
     offset: ["start start", "end start"],
   });
-  const dropzoneBoxY = useTransform(revealProgress, [0, 0.3, 0.7, 1], [36, 0, 0, -20]);
+  const heroOpacity = useTransform(heroProgress, [0, 1], [1, 0.5]);
+  const heroY = useTransform(heroProgress, [0, 1], [0, -32]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
   const [error,      setError]      = useState(null);
   /* Set when the CSV parsed but some rows were ragged — a warning, not a
      rejection: the readable rows are already handed off and analysable. */
   const [malformed,  setMalformed]  = useState(null);
-
-  /* Scroll-snap assist: past a certain point through the hero → dropzone →
-     content-panel transition, the scroll finishes the move on its own instead
-     of leaving the user to land it by hand. Scoped to Home's own lifetime —
-     the document is the actual scrolling element, so this reaches outside
-     React on mount and cleans up on unmount, same as any DOM subscription. */
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.add("snap-y", "snap-mandatory");
-    return () => root.classList.remove("snap-y", "snap-mandatory");
-  }, []);
 
   const handleFile = useCallback((file) => {
     if (!file) return;
@@ -183,151 +180,138 @@ function Home() {
     <div className="night min-h-screen bg-paper text-ink">
       <Header />
 
-      {/* ── FIXED DROPZONE LAYER — the dotted canvas and the upload card live
-          here, truly fixed to the viewport: they never scroll, never slide,
-          and the card sits exactly centered from the very first paint. The
-          hero (and later the content panel) scroll normally in front of it,
-          at a higher stacking level, so this layer only ever gets revealed
-          or covered — it never moves itself. ───────────────────────────── */}
-      <div className="dot-grid fixed inset-0 z-0 flex items-center justify-center overflow-y-auto px-6 py-16 sm:px-10">
-        <motion.div style={{ y: dropzoneBoxY }} className="mx-auto w-full max-w-2xl">
-
-          <div
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-            onClick={() => !isParsing && inputRef.current?.click()}
-            className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-20 text-center transition-colors sm:py-24 ${
-              isDragOver
-                ? "border-accent bg-accent-tint"
-                : "border-line-strong bg-paper-sunken hover:border-ink-faint"
-            }`}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files[0])}
-            />
-
-            {isParsing ? (
-              <>
-                <LoaderCircle size={28} className="animate-spin text-accent-ink" />
-                <div className="mt-6 text-[17px] text-ink">Parsing file…</div>
-              </>
-            ) : (
-              <>
-                <UploadCloud size={28} className="text-ink-faint" />
-                <div className="mt-6 text-[22px] font-medium tracking-tight text-ink sm:text-[26px]">
-                  {isDragOver ? "Drop to upload" : "Drag and drop a CSV file"}
-                </div>
-                <div className="mt-2 text-[14px] text-ink-soft">or click to browse</div>
-              </>
-            )}
-          </div>
-
-          <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint">
-            CSV only · Up to {MAX_SIZE_MB}MB · Processed locally, never uploaded
-          </p>
-
-          {malformed && (
-            <div className="mt-6 rounded-2xl border border-warning/25 bg-warning-tint px-5 py-4">
-              <div className="flex items-start gap-3">
-                <FileWarning size={16} className="mt-0.5 shrink-0 text-warning" />
-                <div>
-                  <div className="text-[13px] font-semibold text-warning">
-                    {malformed.count.toLocaleString()} row{malformed.count > 1 ? "s" : ""} could not be read cleanly.
-                  </div>
-                  <div className="mt-1 text-[13px] leading-relaxed text-ink-soft">
-                    {malformed.totalRows.toLocaleString()} rows parsed. The affected lines
-                    {" "}({malformed.sampleRows.join(", ")}
-                    {malformed.count > malformed.sampleRows.length ? ", …" : ""}) have a
-                    different column count than the header, usually from an unescaped comma
-                    or quote. They are still analysed, so the report may be skewed.
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate("/analyze")}
-                className="mt-4 w-full rounded-xl bg-ink px-4 py-2.5 text-[13px] font-semibold text-paper-sunken transition-opacity hover:opacity-90"
-              >
-                Analyze anyway
-              </button>
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-6 flex items-start gap-3 rounded-2xl border border-critical/25 bg-critical-tint px-5 py-4">
-              <TriangleAlert size={16} className="mt-0.5 shrink-0 text-critical" />
-              <div>
-                <div className="text-[13px] font-semibold text-critical">{ERRORS[error].title}</div>
-                <div className="text-[13px] text-ink-soft">{ERRORS[error].desc}</div>
-              </div>
-            </div>
-          )}
-
-        </motion.div>
-      </div>
-
       <main>
 
-        <div ref={revealRef}>
-
-          {/* ── HERO — normal flow, scrolls away like any other content. The
-              fixed dropzone layer behind it (lower stacking level) is what
-              makes this read as "the hero flies up to reveal what's behind
-              it" rather than a section sliding in from below. ──────────── */}
-          <section className={`relative z-10 snap-start bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}>
-            <div className="mx-auto max-w-[1400px]">
-
-              <SectionLabel mark="01">Client-side dataset audit</SectionLabel>
-
-              <h1 className="mt-12 max-w-[19ch] text-[2.5rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-6xl lg:text-[5.25rem]">
-                A structural audit of your dataset, in the browser.
-              </h1>
-
-              <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                  Upload a CSV and pick a target column. Vecto checks column roles, data
-                  quality, correlations and leakage, then returns a weighted health score.
-                </p>
-                <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                  Nothing is uploaded — parsing and analysis run locally, in this tab. An
-                  optional AI assistant can send a column summary, never row data, only
-                  when you ask. Every number in the report carries its reasoning, and
-                  every score held back says why.
-                </p>
-              </div>
-
-              <div className="mt-16 grid grid-cols-1 border-t border-line sm:grid-cols-3">
-                {DIAGNOSTICS.map((d) => (
-                  <div key={d.label} className="border-b border-line py-8 pr-8 sm:border-b-0">
-                    <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
-                    <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">{d.label}</div>
-                  </div>
-                ))}
-              </div>
-
-            </div>
-          </section>
-
-          {/* ── REVEAL SPACER — no content of its own; it just reserves scroll
-              distance so the fixed dropzone layer gets a moment fully uncovered
-              before the content panel below scrolls up over it in turn. ──── */}
-          <div className="min-h-[70vh] snap-start" aria-hidden="true" />
-
-        </div>
-
-        {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero.
-            Scrolls normally, like the hero; being positioned above the fixed
-            dropzone layer (z-30 > z-0) is what lets it rise up and cover it
-            as it scrolls past, the same way the hero did earlier. ───────── */}
-        <section className={`relative z-30 snap-start bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
+        {/* ── HERO PANEL — normal scroll throughout. It fades and eases up
+            slightly as it scrolls past instead of cutting off hard, the one
+            piece of motion tied directly to scroll position. ────────────── */}
+        <motion.section
+          ref={heroRef}
+          style={{ opacity: heroOpacity, y: heroY }}
+          className={`bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}
+        >
           <div className="mx-auto max-w-[1400px]">
 
-            <div>
+            <SectionLabel mark="01">Client-side dataset audit</SectionLabel>
+
+            <h1 className="mt-12 max-w-[19ch] text-[2.5rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-6xl lg:text-[5.25rem]">
+              A structural audit of your dataset, in the browser.
+            </h1>
+
+            <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
+                Upload a CSV and pick a target column. Vecto checks column roles, data
+                quality, correlations and leakage, then returns a weighted health score.
+              </p>
+              <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
+                Nothing is uploaded — parsing and analysis run locally, in this tab. An
+                optional AI assistant can send a column summary, never row data, only
+                when you ask. Every number in the report carries its reasoning, and
+                every score held back says why.
+              </p>
+            </div>
+
+            <div className="mt-16 grid grid-cols-1 border-t border-line sm:grid-cols-3">
+              {DIAGNOSTICS.map((d) => (
+                <div key={d.label} className="border-b border-line py-8 pr-8 sm:border-b-0">
+                  <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
+                  <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">{d.label}</div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </motion.section>
+
+        {/* ── DOTTED CANVAS — the negative space between the two panels, and
+            where the actual interaction lives ──────────────────────────── */}
+        <section className="dot-grid px-6 py-24 sm:px-10 sm:py-36">
+          <motion.div {...REVEAL} className="mx-auto max-w-2xl">
+
+            <div
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
+              onClick={() => !isParsing && inputRef.current?.click()}
+              className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-20 text-center transition-colors sm:py-24 ${
+                isDragOver
+                  ? "border-accent bg-accent-tint"
+                  : "border-line-strong bg-paper-sunken hover:border-ink-faint"
+              }`}
+            >
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => handleFile(e.target.files[0])}
+              />
+
+              {isParsing ? (
+                <>
+                  <LoaderCircle size={28} className="animate-spin text-accent-ink" />
+                  <div className="mt-6 text-[17px] text-ink">Parsing file…</div>
+                </>
+              ) : (
+                <>
+                  <UploadCloud size={28} className="text-ink-faint" />
+                  <div className="mt-6 text-[22px] font-medium tracking-tight text-ink sm:text-[26px]">
+                    {isDragOver ? "Drop to upload" : "Drag and drop a CSV file"}
+                  </div>
+                  <div className="mt-2 text-[14px] text-ink-soft">or click to browse</div>
+                </>
+              )}
+            </div>
+
+            <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint">
+              CSV only · Up to {MAX_SIZE_MB}MB · Processed locally, never uploaded
+            </p>
+
+            {malformed && (
+              <div className="mt-6 rounded-2xl border border-warning/25 bg-warning-tint px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <FileWarning size={16} className="mt-0.5 shrink-0 text-warning" />
+                  <div>
+                    <div className="text-[13px] font-semibold text-warning">
+                      {malformed.count.toLocaleString()} row{malformed.count > 1 ? "s" : ""} could not be read cleanly.
+                    </div>
+                    <div className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                      {malformed.totalRows.toLocaleString()} rows parsed. The affected lines
+                      {" "}({malformed.sampleRows.join(", ")}
+                      {malformed.count > malformed.sampleRows.length ? ", …" : ""}) have a
+                      different column count than the header, usually from an unescaped comma
+                      or quote. They are still analysed, so the report may be skewed.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/analyze")}
+                  className="mt-4 w-full rounded-xl bg-ink px-4 py-2.5 text-[13px] font-semibold text-paper-sunken transition-opacity hover:opacity-90"
+                >
+                  Analyze anyway
+                </button>
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-6 flex items-start gap-3 rounded-2xl border border-critical/25 bg-critical-tint px-5 py-4">
+                <TriangleAlert size={16} className="mt-0.5 shrink-0 text-critical" />
+                <div>
+                  <div className="text-[13px] font-semibold text-critical">{ERRORS[error].title}</div>
+                  <div className="text-[13px] text-ink-soft">{ERRORS[error].desc}</div>
+                </div>
+              </div>
+            )}
+
+          </motion.div>
+        </section>
+
+        {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero ── */}
+        <section className={`bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
+          <div className="mx-auto max-w-[1400px]">
+
+            <motion.div {...REVEAL}>
               <SectionLabel mark="02">Why it's built this way</SectionLabel>
               <div className="mt-10 grid gap-x-14 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
                 {TALKING_POINTS.map((p, i) => (
@@ -338,9 +322,9 @@ function Home() {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
-            <div className="mt-24 sm:mt-32">
+            <motion.div {...REVEAL} className="mt-24 sm:mt-32">
               <SectionLabel mark="03">What happens to your dataset</SectionLabel>
               <div className="mt-10 grid grid-cols-1 border-t border-line sm:grid-cols-2 lg:grid-cols-5">
                 {PROCESS_FLOW.map((step, i) => (
@@ -361,12 +345,12 @@ function Home() {
                 How each stage works — thresholds, estimators and limits
                 <ArrowRight size={14} />
               </Link>
-            </div>
+            </motion.div>
 
             {/* Headline and lead share the top row so neither half is empty; the six
                 layers sit below as an even 3 × 2 grid, each cell opened by its own
                 hairline — the stats row's grammar, not a list crowded into one column. */}
-            <div className="mt-24 sm:mt-32">
+            <motion.div {...REVEAL} className="mt-24 sm:mt-32">
               <SectionLabel mark="04">Six diagnostic layers</SectionLabel>
               <div className="mt-10 grid gap-x-16 gap-y-6 lg:grid-cols-2 lg:items-end">
                 <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
@@ -386,9 +370,9 @@ function Home() {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
-            <div className="mt-24 sm:mt-32">
+            <motion.div {...REVEAL} className="mt-24 sm:mt-32">
               <SectionLabel mark="05">From raw CSV to clear decisions</SectionLabel>
               {/* Before / after as one recessed specimen. Hairline rows and a large mono
                   figure — the hero's stat grammar — instead of icon badges in a card
@@ -429,20 +413,14 @@ function Home() {
               <p className="mt-16 max-w-[20ch] text-[2rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-5xl">
                 Stop staring at columns. Start understanding your dataset.
               </p>
-            </div>
+            </motion.div>
 
           </div>
         </section>
 
       </main>
 
-      {/* Footer is plain static content — no position of its own — so without
-          an explicit stacking level it would paint behind the fixed dropzone
-          layer (any positioned element outranks static content, regardless
-          of DOM order). relative + z-10 puts it back above. */}
-      <div className="relative z-10">
-        <Footer />
-      </div>
+      <Footer />
     </div>
   );
 }
