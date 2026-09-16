@@ -268,7 +268,7 @@ function Home() {
               fixed dropzone layer behind it (lower stacking level) is what
               makes this read as "the hero flies up to reveal what's behind
               it" rather than a section sliding in from below. ──────────── */}
-          <section className={`relative z-10 bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}>
+          <section className={`relative z-10 snap-start bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}>
             <div className="mx-auto max-w-[1400px]">
 
               <SectionLabel mark="01">Client-side dataset audit</SectionLabel>
@@ -308,7 +308,7 @@ function Home() {
           {/* ── REVEAL SPACER — no content of its own; it just reserves scroll
               distance so the fixed dropzone layer gets a moment fully uncovered
               before the content panel below scrolls up over it in turn. ──── */}
-          <div className="min-h-[70vh]" aria-hidden="true" />
+          <div className="min-h-[70vh] snap-start" aria-hidden="true" />
 
         </div>
 
@@ -316,7 +316,7 @@ function Home() {
             Scrolls normally, like the hero; being positioned above the fixed
             dropzone layer (z-30 > z-0) is what lets it rise up and cover it
             as it scrolls past, the same way the hero did earlier. ───────── */}
-        <section className={`relative z-30 bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
+        <section className={`relative z-30 snap-start bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
           <div className="mx-auto max-w-[1400px]">
 
             <div>
