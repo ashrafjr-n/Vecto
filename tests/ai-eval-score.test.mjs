@@ -41,6 +41,8 @@ const leakVerified = {
     { column: "total", category: "derived_from_target", verdict: "partial" },
     { column: "alive", category: "recorded_after_outcome", verdict: "question" },
     { column: "fare", category: "group_leak", verdict: "question" },
+    // A column no expectation names: scored nowhere, so it has to be LISTED or it is invisible.
+    { column: "carat", category: "derived_from_target", verdict: "unchecked" },
   ],
   split: { strategy: "grouped" },
   withheld: [{ column: "ghost" }],
@@ -53,6 +55,11 @@ check("a leak raised only in the wrong category is not found", !lc["leak:alive"]
 check("a clean column raised in ANY category fails; one never raised passes", !lc["clean:fare"].ok && lc["clean:sex"].ok);
 check("a wrong split strategy fails", !lc["split:split strategy"].ok);
 check("leakage hygiene counts verdicts", ls.hygiene.verdicts.partial === 1 && ls.hygiene.verdicts.question === 2 && ls.passed === 2 && ls.total === 5);
+check("a finding on an unlabelled column is listed, not scored",
+  ls.unchecked.length === 1 && ls.unchecked[0].column === "carat" && ls.hygiene.unchecked === 1
+  && ls.total === 5 && !ls.checks.some((c) => c.name === "carat"));
+check("a finding on a labelled column is never listed as unlabelled",
+  !ls.unchecked.some((u) => ["total", "alive", "fare", "sex"].includes(u.column)));
 
 const cleanExpect = {
   rules: [
