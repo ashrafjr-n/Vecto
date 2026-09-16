@@ -1,8 +1,8 @@
 /* The column-review prompt (B+D merged), in its own file so tools/ai-eval.mjs keys
-   cached answers on it. Its two sections keep the wording of dossierPrompt.js and
-   cleaningPrompt.js, which scored 99% and 100% on day 1 — item 16 gates this task
-   against those numbers, so the instructions differ only where one answer must now
-   carry both. Those two files are deleted once the gate passes. */
+   cached answers on it. Its two sections keep the wording of the separate phase-B and
+   phase-D prompts, which scored 99% and 100% on day 1; this task held those numbers
+   on 2026-09-16 (B 187/189, D 19/19) and replaced them, so those files are gone. The
+   instructions differ from them only where one answer must now carry both. */
 
 import { DOSSIER_ROLES, DOSSIER_SUBTYPES } from "../src/lib/ai/dossierSchema.js";
 import { RULE_TYPES } from "../src/lib/ai/cleaningSchema.js";

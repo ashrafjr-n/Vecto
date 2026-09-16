@@ -1,5 +1,5 @@
 /* The semantic-leakage prompt (AI phase C), in its own file for the same reason as
-   dossierPrompt.js: tools/ai-eval.mjs keys cached answers on the text the model
+   reviewPrompt.js: tools/ai-eval.mjs keys cached answers on the text the model
    sees. The profile holds no cell values — see buildLeakagePayload(). */
 
 import { LEAK_CATEGORIES, FORMULA_OPS } from "../src/lib/ai/leakageSchema.js";
