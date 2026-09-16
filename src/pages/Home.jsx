@@ -17,6 +17,7 @@ import { validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader } from "
 const PANEL_RADIUS_BOTTOM = "rounded-b-[2.5rem] sm:rounded-b-[4.5rem] lg:rounded-b-[7rem]";
 const PANEL_RADIUS_TOP    = "rounded-t-[2.5rem] sm:rounded-t-[4.5rem] lg:rounded-t-[7rem]";
 
+
 const ERRORS = {
   format: {
     title: "Unsupported file format.",
@@ -159,9 +160,12 @@ function Home() {
 
       <main>
 
-        {/* ── HERO PANEL — large surface, bottom corners curve away into the
-            dotted canvas below it ───────────────────────────────────────── */}
-        <section className={`bg-paper-sunken px-6 pt-28 pb-20 sm:px-10 sm:pt-36 sm:pb-28 ${PANEL_RADIUS_BOTTOM}`}>
+        {/* ── HERO — pinned (sticky) at the top. It has no travel room of its own,
+            so it never "unsticks" on its own terms: it just stays glued to the
+            top of the viewport until the dropzone panel below, sticky in turn
+            and later in paint order, scrolls up far enough to paint over it —
+            the hero reads as flying up and away to reveal what's behind it. ── */}
+        <section className={`sticky top-0 z-10 bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}>
           <div className="mx-auto max-w-[1400px]">
 
             <SectionLabel mark="01">Client-side dataset audit</SectionLabel>
@@ -198,9 +202,10 @@ function Home() {
           </div>
         </section>
 
-        {/* ── DOTTED CANVAS — the negative space between the two panels, and
-            where the actual interaction lives ──────────────────────────── */}
-        <section className="dot-grid px-6 py-24 sm:px-10 sm:py-36">
+        {/* ── DOTTED CANVAS — also pinned, opaque and taller than any viewport
+            so it always fully covers the hero once it catches up to the top;
+            it then gets covered the same way by the content panel below it. */}
+        <section className="dot-grid sticky top-0 z-20 min-h-screen bg-paper px-6 py-24 sm:px-10 sm:py-36">
           <div className="mx-auto max-w-2xl">
 
             <div
@@ -282,8 +287,12 @@ function Home() {
           </div>
         </section>
 
-        {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero ── */}
-        <section className={`bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
+        {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero. Not
+            sticky itself (it's the longest section on the page — pinning it
+            would freeze scrolling through it) but positioned above the pinned
+            dropzone (z-30) so it still rises up and covers it as it scrolls
+            past normally. ─────────────────────────────────────────────── */}
+        <section className={`relative z-30 bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
           <div className="mx-auto max-w-[1400px]">
 
             <div>
