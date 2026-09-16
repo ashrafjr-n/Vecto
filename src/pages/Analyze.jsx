@@ -258,7 +258,7 @@ function Analyze() {
                   result={analysisResult}
                   onReset={handleReset}
                   ai={{
-                    data: analysisData, originalData: csvData, dossier,
+                    data: analysisData, originalData: csvData, dossier, onDossier: setDossier,
                     leakageReview, onLeakageReview: setLeakageReview,
                     cleaning, onCleaning: setCleaning, cleaningRules, onApplyCleaning: handleApplyCleaning,
                   }}
