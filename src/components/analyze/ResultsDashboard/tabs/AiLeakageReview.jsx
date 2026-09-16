@@ -30,10 +30,21 @@ const VERDICT = {
   confirmed:    { severity: "critical", label: "Data confirms it" },
   partial:      { severity: "warning",  label: "Partly supported" },
   question:     { severity: "info",     label: "Question for you" },
-  unchecked:    { severity: "info",     label: "Not checkable" },
+  unchecked:    { severity: "info",     label: "For you to judge" },
   contradicted: { severity: "success",  label: "Data disagrees" },
 };
-const VERDICT_ORDER = ["confirmed", "partial", "question", "unchecked", "contradicted"];
+const VERDICT_ORDER = ["confirmed", "partial", "contradicted", "question", "unchecked"];
+
+/* A claim the engine could MEASURE against the rows, versus one that rests on what the
+   model thinks a column means. Only the first kind is reported as a concern.
+
+   Every false accusation in the day-2 eval was the second kind — a `derived_from_target`
+   with no formula to evaluate (diamonds x/y/z "derived from price" are a diamond's physical
+   dimensions; ai_student `Pre_Semester_GPA` precedes the target it was said to come from).
+   Rendered beside a measured leak they read as verdicts, and an unfalsifiable claim stated
+   as a verdict costs the user a good feature. They are questions, and they are asked as
+   questions. */
+const MEASURED = ["confirmed", "partial", "contradicted"];
 
 const SPLIT_LABEL = {
   random:       "A random split is appropriate",
@@ -112,8 +123,27 @@ function AiLeakageReview({ result, data, dossier, review, onReview }) {
   );
 }
 
+function FindingRow({ f }) {
+  return (
+    <li className="px-4 py-3.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-[13px] text-ink">{f.column}</span>
+        <span className="text-[11.5px] text-ink-faint">{CATEGORY_LABEL[f.category]}</span>
+        <span className="ml-auto"><StatusBadge severity={VERDICT[f.verdict].severity}>{VERDICT[f.verdict].label}</StatusBadge></span>
+      </div>
+      {f.reason && <p className="mt-1.5 text-[13px] leading-relaxed text-ink-soft">{f.reason}</p>}
+      <p className="mt-1.5 text-[12px] leading-relaxed text-ink">
+        <span className="text-ink-faint">{f.measurement ? "Checked: " : ""}</span>{f.verdictText}
+      </p>
+      {f.engineFlagged && <p className="mt-1 text-[11.5px] text-ink-faint">The engine&apos;s own leakage check flags this column too.</p>}
+    </li>
+  );
+}
+
 function ReviewResult({ review, target, onAskAgain }) {
-  const findings = [...review.findings].sort((a, b) => VERDICT_ORDER.indexOf(a.verdict) - VERDICT_ORDER.indexOf(b.verdict));
+  const sorted = [...review.findings].sort((a, b) => VERDICT_ORDER.indexOf(a.verdict) - VERDICT_ORDER.indexOf(b.verdict));
+  const findings = sorted.filter((f) => MEASURED.includes(f.verdict));
+  const questions = sorted.filter((f) => !MEASURED.includes(f.verdict));
 
   return (
     <div className="mt-5 space-y-6">
@@ -139,27 +169,30 @@ function ReviewResult({ review, target, onAskAgain }) {
 
       <section>
         <h3 className="text-[11px] font-medium text-ink-faint">
-          {findings.length === 0 ? "No leakage concern was raised" : `${findings.length} concern${findings.length > 1 ? "s" : ""} raised against ${target}`}
+          {findings.length === 0 ? "No leakage concern was measured" : `${findings.length} concern${findings.length > 1 ? "s" : ""} measured against ${target}`}
         </h3>
         {findings.length > 0 && (
           <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-paper">
-            {findings.map((f) => (
-              <li key={`${f.column}|${f.category}`} className="px-4 py-3.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-[13px] text-ink">{f.column}</span>
-                  <span className="text-[11.5px] text-ink-faint">{CATEGORY_LABEL[f.category]}</span>
-                  <span className="ml-auto"><StatusBadge severity={VERDICT[f.verdict].severity}>{VERDICT[f.verdict].label}</StatusBadge></span>
-                </div>
-                {f.reason && <p className="mt-1.5 text-[13px] leading-relaxed text-ink-soft">{f.reason}</p>}
-                <p className="mt-1.5 text-[12px] leading-relaxed text-ink">
-                  <span className="text-ink-faint">{f.measurement ? "Checked: " : ""}</span>{f.verdictText}
-                </p>
-                {f.engineFlagged && <p className="mt-1 text-[11.5px] text-ink-faint">The engine&apos;s own leakage check flags this column too.</p>}
-              </li>
-            ))}
+            {findings.map((f) => <FindingRow key={`${f.column}|${f.category}`} f={f} />)}
           </ul>
         )}
       </section>
+
+      {questions.length > 0 && (
+        <section>
+          <h3 className="text-[11px] font-medium text-ink-faint">
+            {questions.length} question{questions.length > 1 ? "s" : ""} the data cannot answer
+          </h3>
+          <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
+            These rest on what the columns are taken to mean — when they were recorded, whether a
+            value repeats an entity rather than a category, whether one number is built from
+            another. Nothing here was measured, and none of it is evidence against a column.
+          </p>
+          <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-paper">
+            {questions.map((f) => <FindingRow key={`${f.column}|${f.category}`} f={f} />)}
+          </ul>
+        </section>
+      )}
 
       {review.engineOnly.length > 0 && (
         <section className="text-[12.5px] leading-relaxed text-ink-soft">
