@@ -14,6 +14,9 @@ Find the columns a model could NOT legitimately use when making a real predictio
 - group_leak: an entity key (a person, customer, player, business, device) whose rows would land on both sides of a random train/test split, so a model could memorise the entity instead of learning.
 
 Rules:
+- **Check presence, not only values.** A column can be innocent in what it holds and still give the target away by WHETHER it was filled in: a question only asked of some people, a measurement only taken after one kind of outcome. presenceV is the engine's measurement of that, on a 0-1 scale — high presenceV means "is this cell filled" nearly answers the target by itself. Raise such a column (recorded_after_outcome, or restates_label when its presence simply is the label) and say in the reason which rows are empty and what they have in common.
+- **A field that describes what happened is recorded after the outcome**, even when nothing is missing: a result, a status set later, a commentary on the event, an amount settled once the outcome was known. It does not have to be arithmetically related to the target to be unusable at prediction time.
+- Work through every column in the profile before answering. Returning no findings is a real answer, but only after you have considered each column; a file with an obvious result column, a later-settled amount or a question asked of only some rows is not such a file.
 - List ONLY columns with a real concern. A strong association alone is NOT leakage — a genuinely predictive feature measured before the outcome is exactly what a model should use. The association numbers are evidence; the names, meanings and timing decide.
 - One entry per column and category, with a one- or two-sentence reason.
 - Allowed categories: ${LEAK_CATEGORIES.join(", ")}.
