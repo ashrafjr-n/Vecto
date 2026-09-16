@@ -65,14 +65,27 @@ export function scoreLeakage(expect, verified) {
 
   const verdicts = {};
   for (const f of verified.findings) verdicts[f.verdict] = (verdicts[f.verdict] ?? 0) + 1;
+
+  /* Findings on columns the expectations never labelled. They are NOT scored — writing an
+     expectation after reading an answer is fitting the labels to the model — but they are
+     listed, because "legitimate predictors left alone" only ever counted LABELLED clean
+     columns, so a false accusation on an unlabelled column scored nothing at all. Day 2
+     hid four that way (diamonds x/y/z, ai_student Pre_Semester_GPA). Read them by hand. */
+  const labelled = new Set([...Object.keys(expect.leaks ?? {}), ...(expect.clean ?? [])]);
+  const unchecked = verified.findings
+    .filter((f) => !labelled.has(f.column))
+    .map((f) => ({ column: f.column, category: f.category, verdict: f.verdict }));
+
   return {
     passed: checks.filter((c) => c.ok).length,
     total: checks.length,
     checks,
+    unchecked,
     hygiene: {
       findings: verified.findings.length,
       withheld: verified.withheld.length,
       engineOnly: verified.engineOnly.length,
+      unchecked: unchecked.length,
       verdicts,
     },
   };

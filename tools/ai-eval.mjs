@@ -279,6 +279,13 @@ function summarize(results) {
     "",
     ...ok.flatMap((r) => r.score.checks.filter((c) => !c.ok)
       .map((c) => `- **${r.file}** ${c.kind} \`${c.name}\`: got \`${JSON.stringify(c.got)}\`, want one of \`${c.want.join(" | ")}\``)),
+    /* Not failures and not passes: claims about columns no expectation names. They score
+       nothing either way, so they are only visible if they are printed. */
+    ...(ok.some((r) => r.score.unchecked?.length)
+      ? ["", "## Findings on unlabelled columns — read by hand, do not add expectations to fit them", "",
+        ...ok.flatMap((r) => (r.score.unchecked ?? [])
+          .map((u) => `- **${r.file}** \`${u.column}\` raised as ${u.category} (verdict: ${u.verdict})`))]
+      : []),
     "",
   ].join("\n");
 }
