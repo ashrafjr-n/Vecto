@@ -4,7 +4,7 @@
    rule is applied (never in place), how a proposed rule is checked and measured
    before it is offered, and the pandas export. No network. */
 
-import { parseAffixed, findCleaningCandidates, buildCleaningPayload, applyCleaningRules, verifyCleaningRules, cleaningRulesToPandas } from "../src/lib/ai/cleaning.js";
+import { parseAffixed, findCleaningCandidates, applyCleaningRules, verifyCleaningRules, cleaningRulesToPandas } from "../src/lib/ai/cleaning.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 
 let failures = 0;
@@ -47,9 +47,8 @@ check("-999 at the edge of a numeric column is a sentinel", kinds("income").incl
 check("levels equal up to punctuation collide", kinds("division").includes("level_collision"));
 check("a point between digits is kept: 85 Lac and 8.5 Lac do not collide", !kinds("price_label").includes("level_collision"));
 check("a letter-prefixed code column is not a candidate", kinds("code").length === 0 && kinds("label").length === 0);
-const cleanPayload = buildCleaningPayload(cands, ROWS.length, { columns: [{ name: "amount", meaning: "listing price", unit: "INR" }] });
-check("the payload carries candidates, not rows, plus dossier meaning when present",
-  !JSON.stringify(cleanPayload).includes('"weight":"') && cleanPayload.columns.find((c) => c.name === "amount").meaning === "listing price");
+/* The candidates now travel on their column inside the review payload — no rows
+   either way; tests/ai-review.test.mjs owns that check. */
 
 console.log("\nAPPLY\n");
 
