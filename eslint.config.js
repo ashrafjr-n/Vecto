@@ -5,10 +5,11 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  // '.vite' is Vite's local dep pre-bundle cache — generated, not project code.
+  // '.vite' is Vite's local dep pre-bundle cache and '.wrangler' wrangler dev's
+  // generated Worker bundle — both generated, not project code.
   // Without it `npm run lint` reported 448 errors from bundled vendor files and
   // was useless as a gate, so the real signal had to be run by hand.
-  globalIgnores(['dist', '.vite']),
+  globalIgnores(['dist', '.vite', '.wrangler']),
   {
     // .mjs included: the tests/ suite was matched by no config block at all and
     // was therefore never linted.
