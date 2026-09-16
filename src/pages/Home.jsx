@@ -158,14 +158,101 @@ function Home() {
     <div className="night min-h-screen bg-paper text-ink">
       <Header />
 
+      {/* ── FIXED DROPZONE LAYER — the dotted canvas and the upload card live
+          here, truly fixed to the viewport: they never scroll, never slide,
+          and the card sits exactly centered from the very first paint. The
+          hero (and later the content panel) scroll normally in front of it,
+          at a higher stacking level, so this layer only ever gets revealed
+          or covered — it never moves itself. ───────────────────────────── */}
+      <div className="dot-grid fixed inset-0 z-0 flex items-center justify-center overflow-y-auto px-6 py-16 sm:px-10">
+        <div className="mx-auto w-full max-w-2xl">
+
+          <div
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            onClick={() => !isParsing && inputRef.current?.click()}
+            className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-20 text-center transition-colors sm:py-24 ${
+              isDragOver
+                ? "border-accent bg-accent-tint"
+                : "border-line-strong bg-paper-sunken hover:border-ink-faint"
+            }`}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => handleFile(e.target.files[0])}
+            />
+
+            {isParsing ? (
+              <>
+                <LoaderCircle size={28} className="animate-spin text-accent-ink" />
+                <div className="mt-6 text-[17px] text-ink">Parsing file…</div>
+              </>
+            ) : (
+              <>
+                <UploadCloud size={28} className="text-ink-faint" />
+                <div className="mt-6 text-[22px] font-medium tracking-tight text-ink sm:text-[26px]">
+                  {isDragOver ? "Drop to upload" : "Drag and drop a CSV file"}
+                </div>
+                <div className="mt-2 text-[14px] text-ink-soft">or click to browse</div>
+              </>
+            )}
+          </div>
+
+          <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint">
+            CSV only · Up to {MAX_SIZE_MB}MB · Processed locally, never uploaded
+          </p>
+
+          {malformed && (
+            <div className="mt-6 rounded-2xl border border-warning/25 bg-warning-tint px-5 py-4">
+              <div className="flex items-start gap-3">
+                <FileWarning size={16} className="mt-0.5 shrink-0 text-warning" />
+                <div>
+                  <div className="text-[13px] font-semibold text-warning">
+                    {malformed.count.toLocaleString()} row{malformed.count > 1 ? "s" : ""} could not be read cleanly.
+                  </div>
+                  <div className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                    {malformed.totalRows.toLocaleString()} rows parsed. The affected lines
+                    {" "}({malformed.sampleRows.join(", ")}
+                    {malformed.count > malformed.sampleRows.length ? ", …" : ""}) have a
+                    different column count than the header, usually from an unescaped comma
+                    or quote. They are still analysed, so the report may be skewed.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/analyze")}
+                className="mt-4 w-full rounded-xl bg-ink px-4 py-2.5 text-[13px] font-semibold text-paper-sunken transition-opacity hover:opacity-90"
+              >
+                Analyze anyway
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-6 flex items-start gap-3 rounded-2xl border border-critical/25 bg-critical-tint px-5 py-4">
+              <TriangleAlert size={16} className="mt-0.5 shrink-0 text-critical" />
+              <div>
+                <div className="text-[13px] font-semibold text-critical">{ERRORS[error].title}</div>
+                <div className="text-[13px] text-ink-soft">{ERRORS[error].desc}</div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+
       <main>
 
-        {/* ── HERO — pinned (sticky) at the top. It has no travel room of its own,
-            so it never "unsticks" on its own terms: it just stays glued to the
-            top of the viewport until the dropzone panel below, sticky in turn
-            and later in paint order, scrolls up far enough to paint over it —
-            the hero reads as flying up and away to reveal what's behind it. ── */}
-        <section className={`sticky top-0 z-10 bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}>
+        {/* ── HERO — normal flow, scrolls away like any other content. The
+            fixed dropzone layer behind it (lower stacking level) is what
+            makes this read as "the hero flies up to reveal what's behind
+            it" rather than a section sliding in from below. ────────────── */}
+        <section className={`relative z-10 bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}>
           <div className="mx-auto max-w-[1400px]">
 
             <SectionLabel mark="01">Client-side dataset audit</SectionLabel>
