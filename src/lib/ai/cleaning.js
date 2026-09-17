@@ -54,10 +54,15 @@ export function parseAffixed(raw) {
 /* Two levels collide when they are equal after dropping everything but letters and
    digits — "R-JR" / "R JR" / "RJR", "Las Vegas" / "LasVegas", events' broken
    encodings "adria¡n" / "adrian". A point BETWEEN digits is kept: house_prices'
-   "85 Lac" and "8.5 Lac" are different amounts, and collided without it. */
+   "85 Lac" and "8.5 Lac" are different amounts, and collided without it. So are a
+   comma between digits, a minus that starts a number and < > =: AirQualityUCI's
+   "-1,4" / "1,4" and "-200" / "20,0", and adult's "<=50K" / ">50K", collided and were
+   merged by the model. Each kept symbol gets its own private-use placeholder. */
 const collisionKey = (v) => normalizeValue(v)
-  .replace(/(\d)\.(?=\d)/g, "$1\uE000")          // private-use placeholder for the kept point
-  .replace(/[^\p{L}\p{N}\uE000]/gu, "");
+  .replace(/(\d)([.,])(?=\d)/g, (_, d, sep) => d + (sep === "." ? "\uE000" : "\uE001"))
+  .replace(/(^|[^\p{L}\p{N}])-(?=\d)/gu, "$1\uE002")
+  .replace(/[<>=]/g, (c) => ({ "<": "\uE003", ">": "\uE004", "=": "\uE005" })[c])
+  .replace(/[^\p{L}\p{N}\uE000-\uE005]/gu, "");
 
 export function findCleaningCandidates(data, columns, roles) {
   const out = [];
@@ -261,9 +266,16 @@ function sanitize(r, column, candidate, data, withheld) {
   const merges = (Array.isArray(r.merges) ? r.merges : [])
     .map((m) => ({ from: text(m?.from, 60), to: text(m?.to, 60) }))
     .filter((m) => {
-      const ok = levels.has(normalizeValue(m.from)) && levels.has(normalizeValue(m.to));
-      if (!ok) withheld.push({ column, reason: `merge "${m.from}" → "${m.to}" dropped — both sides must be levels that occur in the column` });
-      return ok;
+      if (!levels.has(normalizeValue(m.from)) || !levels.has(normalizeValue(m.to))) {
+        withheld.push({ column, reason: `merge "${m.from}" → "${m.to}" dropped — both sides must be levels that occur in the column` });
+        return false;
+      }
+      // The model is asked to merge within a collision group; a pair outside one is two values.
+      if (collisionKey(m.from) !== collisionKey(m.to)) {
+        withheld.push({ column, reason: `merge "${m.from}" → "${m.to}" dropped — the two levels differ by more than case, spacing or punctuation` });
+        return false;
+      }
+      return true;
     });
   return merges.length ? { column, type: r.type, affixes: [], values: [], merges } : null;
 }
