@@ -116,8 +116,9 @@ export function scoreCleaning(expect, verified) {
       add("factor", `${e.column} covers "${affix}"`, factor.has(affix), [...factor.keys()], [affix]);
     }
   }
-  // A file expected to need nothing must get nothing that changes values.
-  if ((expect.rules ?? []).length === 0) add("quiet", "no rule proposed", effective.length === 0, effective.map((r) => r.column), ["(none)"]);
+  // A file expected to need nothing must get nothing that changes values. Only an explicit
+  // `rules: []` says that; an entry with just `forbidden` leaves other rules unscored.
+  if (Array.isArray(expect.rules) && expect.rules.length === 0) add("quiet", "no rule proposed", effective.length === 0, effective.map((r) => r.column), ["(none)"]);
   for (const [column, types] of Object.entries(expect.forbidden ?? {})) {
     const hit = effective.find((r) => r.column === column && types.includes(r.type));
     add("declined", column, !hit, hit?.type ?? null, ["(not proposed)"]);
