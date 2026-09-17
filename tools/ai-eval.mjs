@@ -24,8 +24,10 @@
      npx wrangler dev                               (terminal 1 — reads .dev.vars)
      node --max-old-space-size=8192 tools/ai-eval.mjs [--task=leakage] [--only=titanic,smoking]
           [--endpoint=http://127.0.0.1:8787/api/ai] [--out=reports/ai-eval]
-          [--delay=4000] [--fresh] [--rescore]
-     --fresh    ignore cached answers        --rescore  never call; rescore the cache */
+          [--delay=4000] [--fresh] [--rescore] [--set=validation]
+     --fresh    ignore cached answers        --rescore  never call; rescore the cache
+     --set=X    score tools/ai-eval/X-expectations.mjs instead of the tuning corpus, into
+                <out>-X (vecto-plan item 19: validation and test sets, never tuned on) */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -51,11 +53,15 @@ const delayMs  = Number(flag("delay") ?? 4000);   // free tier: 20 requests/minu
 const only     = flag("only")?.split(",");
 const fresh    = args.includes("--fresh");
 const rescore  = args.includes("--rescore");
+const set      = flag("set");
+const { EXPECTATIONS: REVIEW_SET, LEAKAGE_EXPECTATIONS: LEAKAGE_SET, CLEANING_EXPECTATIONS: CLEANING_SET } = set
+  ? await import(`./ai-eval/${set}-expectations.mjs`)
+  : { EXPECTATIONS, LEAKAGE_EXPECTATIONS, CLEANING_EXPECTATIONS };
 const CALL_TIMEOUT_MS = 300_000;   // run 1: events.csv passed 240 s on nemotron-3-ultra
 
 const pctOf = (list) => (list.length ? `${Math.round((100 * list.filter((c) => c.ok).length) / list.length)}% (${list.filter((c) => c.ok).length}/${list.length})` : "n/a");
 
-const cleaningFor = (e) => CLEANING_EXPECTATIONS.find((c) => c.file === e.file);
+const cleaningFor = (e) => CLEANING_SET.find((c) => c.file === e.file);
 
 /* One entry per task: which answers it is scored against, which files key its cache,
    how a file becomes a payload, and how the answer is asked for, verified and scored. */
@@ -63,7 +69,7 @@ const TASK_DEFS = {
   leakage: {
     title: "Leakage review",
     outDir: "reports/ai-eval-leakage",
-    expectations: LEAKAGE_EXPECTATIONS,
+    expectations: LEAKAGE_SET,
     promptFiles: ["worker/leakagePrompt.js", "src/lib/ai/leakageSchema.js"],
     named: (e) => [e.target, ...Object.keys(e.leaks ?? {}), ...(e.clean ?? [])],
     /* Reviewed WITHOUT a dossier: the harder case, and it keeps this score
@@ -90,7 +96,7 @@ const TASK_DEFS = {
   review: {
     title: "Column review (B+D)",
     outDir: "reports/ai-eval-review",
-    expectations: EXPECTATIONS,
+    expectations: REVIEW_SET,
     promptFiles: ["worker/reviewPrompt.js", "src/lib/ai/reviewSchema.js", "src/lib/ai/dossierSchema.js", "src/lib/ai/cleaningSchema.js"],
     named: (e) => {
       const d = cleaningFor(e);
@@ -142,7 +148,7 @@ const TASK_DEFS = {
 
 const def = TASK_DEFS[taskName];
 if (!def) throw new Error(`unknown --task=${taskName} (use ${Object.keys(TASK_DEFS).join(" or ")})`);
-const outDir = flag("out") ?? def.outDir;
+const outDir = flag("out") ?? (set ? `${def.outDir}-${set}` : def.outDir);
 
 /* The cache key covers the PROMPT as well as the payload. Keyed on the payload
    alone, a prompt change would silently re-score the old prompt's answers. */
