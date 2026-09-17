@@ -150,9 +150,14 @@ Answers are verified exactly as the page verifies them, cached by payload hash i
 `reports/ai-eval-review/`, and summarised in that directory's `summary.md`, including the
 engine's own target guess for comparison.
 
+`--set=validation` and `--set=test` score held-out files from new domains instead, against
+`tools/ai-eval/validation-expectations.mjs` and `test-expectations.mjs` (written from each
+file's published dictionary before any request), into `reports/ai-eval-<task>-<set>/`. They
+are never used to tune a prompt, and the test set is run once.
+
 ```bash
 npx wrangler dev                                   # terminal 1, reads .dev.vars
-node --max-old-space-size=8192 tools/ai-eval.mjs   # [--task=leakage] [--only=titanic] [--fresh] [--rescore]
+node --max-old-space-size=8192 tools/ai-eval.mjs   # [--task=leakage] [--set=validation] [--only=titanic] [--fresh] [--rescore]
 ```
 
 One request per file, or one per 25 columns for a wider file (the same parts the page sends);
