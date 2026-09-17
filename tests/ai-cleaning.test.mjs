@@ -47,6 +47,21 @@ check("-999 at the edge of a numeric column is a sentinel", kinds("income").incl
 check("levels equal up to punctuation collide", kinds("division").includes("level_collision"));
 check("a point between digits is kept: 85 Lac and 8.5 Lac do not collide", !kinds("price_label").includes("level_collision"));
 check("a letter-prefixed code column is not a candidate", kinds("code").length === 0 && kinds("label").length === 0);
+
+/* Measured on the item-19 test set: AirQualityUCI writes decimal commas and -200 for missing,
+   adult writes "<=50K" / ">50K". Dropping every symbol made those collide, and the model merged
+   "-1,4" into "1,4" and "-200" into "20,0" (744 rows). A sign, a comma between digits and a
+   comparison are part of the value. */
+const SIGNED = Array.from({ length: 60 }, (_, i) => ({
+  temp: ["-200", "20,0", "1,4", "-1,4", "2,6", "26"][i % 6],
+  income: i % 2 ? "<=50K" : ">50K",
+  code: i % 2 ? "13-111-053" : "13 / 111 / 053",
+}));
+const signedCands = findCleaningCandidates(SIGNED, ["temp", "income", "code"], { temp: "categorical", income: "binary", code: "categorical" });
+const signedKinds = (col) => signedCands.find((c) => c.name === col)?.candidates.map((c) => c.kind) ?? [];
+check("a leading minus, a decimal comma and a comparison keep levels apart",
+  signedKinds("temp").length === 0 && signedKinds("income").length === 0);
+check("a hyphen between digits is still a separator: 13-111-053 and 13 / 111 / 053 collide", signedKinds("code").includes("level_collision"));
 /* The candidates now travel on their column inside the review payload — no rows
    either way; tests/ai-review.test.mjs owns that check. */
 
@@ -97,6 +112,14 @@ check("a placeholder value that does not occur is dropped", rule("income", "trea
 check("a merge into a level that does not exist is dropped", rule("division", "merge_levels").merges.length === 1 && rule("division", "merge_levels").measurement.levelsAfter === 2);
 check("a second rule for the same column and type keeps the first", v.rules.filter((r) => r.column === "amount").length === 1);
 check("a rule that changes nothing is kept but not effective", rule("label", "merge_levels")?.effective === false);
+const signedMerge = verifyCleaningRules(
+  { rules: [{ column: "temp", type: "merge_levels", reason: "x", affixes: [], values: [], merges: [{ from: "-1,4", to: "1,4" }, { from: "-200", to: "20,0" }] },
+    { column: "code", type: "merge_levels", reason: "x", affixes: [], values: [], merges: [{ from: "13 / 111 / 053", to: "13-111-053" }] }] },
+  { data: SIGNED, columns: ["temp", "income", "code"], candidates: signedCands },
+);
+check("a merge whose two sides do not collide is withheld, even when both levels exist",
+  !signedMerge.rules.some((r) => r.column === "temp") && signedMerge.withheld.filter((w) => w.column === "temp").length === 2
+  && signedMerge.rules.find((r) => r.column === "code")?.effective === true);
 check("unknown columns and rule types are withheld", v.withheld.some((w) => w.column === "ghost") && v.withheld.some((w) => /"rewrite"/.test(w.reason)));
 
 console.log("\nEXPORT\n");
