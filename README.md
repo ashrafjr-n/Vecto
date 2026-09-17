@@ -277,3 +277,5 @@ JavaScript; nothing is transmitted, stored, or logged anywhere.
 ## License
 
 Private project. All rights reserved.
+
+<!-- vn -->
