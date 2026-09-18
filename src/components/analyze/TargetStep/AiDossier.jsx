@@ -151,6 +151,14 @@ function DossierResult({ dossier, overrides, onToggleOverride, onUseTarget, curr
 
       <section>
         <h3 className="text-[11px] font-medium text-ink-faint">Suggested targets</h3>
+        {/* The one measured claim the panel makes, so it must stay the held-out figure:
+           10 new-domain files with published dictionaries, run once, expectations written
+           first (vecto-plan item 19). The tuning corpus reads 15/16 and is not quotable. */}
+        <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
+          On 10 files with published data dictionaries, never used to write this prompt, the
+          first suggestion matched the documented target 10 times out of 10 — the engine&rsquo;s own
+          guess matched 5. Ten files is a small test; check the reason before you accept one.
+        </p>
         {dossier.targets.length === 0 ? (
           <p className="mt-2 text-[13px] text-ink-soft">No usable target was suggested.</p>
         ) : (
