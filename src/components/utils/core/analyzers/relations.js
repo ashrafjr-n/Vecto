@@ -3,6 +3,7 @@ import {
   mean, isNumeric, isMissing, normalizeValue, toNumber,
   spearmanOf, correlationPValue, rankEta,
   cramersV, mutualInformation, discretize, sampleIndices, rankColumn, pearsonOf,
+  oddsRatio, RARE_BINARY_MAX,
 } from "../helpers.js";
 import { detectColumnRoles } from "../detectors/roles.js";
 import { ROLE } from "../roles.constants.js";
@@ -285,6 +286,18 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           ? mutualInformation(discretize(miIdx.map(k => data[k][col])), targetLevels)
           : null;
 
+        /* A rare binary feature against a binary target: phi is bounded by the
+           marginals, so a flag on 1% of rows reads "weak" even when it decides the
+           outcome. The odds ratio is not bounded that way, and its interval says how
+           much of it is noise. Only for this pair and only when the feature IS rare —
+           above RARE_BINARY_MAX phi can move freely and needs nothing beside it. */
+        let odds = null;
+        if (colIsBinary && isBinaryTarget) {
+          const exposedRows = xs.reduce((t, v) => t + v, 0);
+          const minorityShare = Math.min(exposedRows, pairCount - exposedRows) / pairCount;
+          if (minorityShare <= RARE_BINARY_MAX) odds = oddsRatio(xs, ys);
+        }
+
         targetCorrelations[col] = {
           metric:   "pearson",
           value:    r2(r),
@@ -294,6 +307,10 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
           n:        pairCount,
           // Non-null only where both correlations were weak — see above.
           mi:       mi ? r2(mi.normalized) : null,
+          /* Non-null only for a RARE binary feature against a binary target, where
+             the correlation above cannot separate "no effect" from "too rare to
+             show one". Level 1 of each side is what it is about. */
+          oddsRatio: odds,
         };
 
       } else if (colIsNumeric) {

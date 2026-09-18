@@ -119,6 +119,26 @@ assertType(withTarget.relationships.unscoredColumns, "array",
 assertType(withTarget.relationships.categoricalAssociations, "array",
   "relationships.categoricalAssociations (always an array, [] when nothing qualifies)");
 
+/* A targetCorrelations entry is an OBJECT, not a number — the shape that once let
+   health.js do Math.abs(entry) and pin a whole dimension to a constant while this
+   suite stayed green. Its keys depend on the metric: only the Pearson branch can
+   carry `mi` and `oddsRatio`. */
+const tcEntries = Object.values(withTarget.relationships.targetCorrelations);
+const pearsonEntry = tcEntries.find((e) => e?.metric === "pearson");
+if (pearsonEntry) {
+  assertKeysExact(pearsonEntry, [
+    "metric", "value", "absValue", "spearman", "pValue", "n", "mi", "oddsRatio",
+  ], "targetCorrelations[col] (metric \"pearson\")");
+} else {
+  failures++;
+  console.log("FAIL  expected at least one metric:\"pearson\" targetCorrelations entry");
+}
+for (const [col, e] of Object.entries(withTarget.relationships.targetCorrelations)) {
+  for (const k of ["metric", "value", "absValue", "pValue", "n"]) {
+    if (!(k in e)) { failures++; console.log(`FAIL  targetCorrelations["${col}"] is missing "${k}"`); }
+  }
+}
+
 assertType(withTarget.classBalance, "object", "classBalance (target set → non-null)");
 if (withTarget.classBalance) {
   assertKeysExact(withTarget.classBalance, [

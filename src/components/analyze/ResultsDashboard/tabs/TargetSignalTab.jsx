@@ -111,7 +111,38 @@ function SignalRow({ col, entry, index, rows }) {
           </span>
         )}
       </div>
+
+      {/* A rare flag's correlation is capped by how rare it is, so a small number
+          here does not mean a small effect. The interval is the point: one that
+          spans 1 says the data cannot tell this feature from no effect at all. */}
+      {entry.oddsRatio && <RareBinaryOdds odds={entry.oddsRatio} col={col} />}
     </div>
+  );
+}
+
+/* The second number a rare binary feature needs. Phi cannot exceed roughly the
+   square root of the rarity, so "weak" and "too rare to show an effect" arrive as
+   the same value — see oddsRatio() in helpers.js. Whether the 95% interval crosses
+   1 is the whole verdict, so it is said in words, not left for the reader to
+   compare two decimals. */
+function RareBinaryOdds({ odds, col }) {
+  const spansOne = odds.ciLow <= 1 && odds.ciHigh >= 1;
+  const fmt = (v) => (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(2));
+
+  return (
+    <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
+      <span className="text-ink-soft">
+        Present on {odds.exposedRows.toLocaleString()} of {odds.n.toLocaleString()} rows
+      </span>
+      {" — too rare for the correlation above to move. Odds ratio "}
+      <span className="font-mono text-ink">{fmt(odds.value)}</span>
+      {", 95% CI "}
+      <span className="font-mono">{fmt(odds.ciLow)}–{fmt(odds.ciHigh)}</span>
+      {spansOne
+        ? ". The interval spans 1, so this is consistent with no effect: the small correlation is what too few rows looks like, not evidence against the column."
+        : `. The interval excludes 1, so the effect is real and the small correlation above understates it — the odds of the outcome are ${fmt(odds.value)}× higher where ${col} is present.`}
+      {odds.corrected && " One cell of the table was empty, so 0.5 was added to every cell (Haldane–Anscombe) — the value is a floor, not a measurement."}
+    </p>
   );
 }
 
