@@ -13,6 +13,7 @@ function AiPayloadPreview({ build }) {
   const [preview, setPreview] = useState(null);
 
   return (
+    <>
     <details
       className="mt-3 text-[12.5px] text-ink-soft"
       onToggle={(e) => { if (e.currentTarget.open && !preview) setPreview(JSON.stringify(build(), null, 2)); }}
@@ -25,11 +26,14 @@ function AiPayloadPreview({ build }) {
           {preview}
         </pre>
       )}
-      <p className="mt-2 text-[11.5px] leading-relaxed text-ink-faint">
-        The answer is kept in this browser so the same question costs no second request.
-        It is stored only here, never sent anywhere, and you can clear it below.
-      </p>
     </details>
+    {/* Outside <details>: it is read while deciding whether to ask, not after opening
+        the payload, so it must not need a click to appear. */}
+    <p className="mt-2 text-[11.5px] leading-relaxed text-ink-faint">
+      The answer is kept in this browser so the same question costs no second request.
+      It is stored only here, never sent anywhere, and you can clear it below.
+    </p>
+    </>
   );
 }
 
