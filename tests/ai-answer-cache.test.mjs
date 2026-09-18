@@ -81,5 +81,37 @@ check("without crypto.subtle nothing is stored", cachedCount() === 0);
 check("without crypto.subtle every read is a miss", (await readCached("review", payload)) === null);
 Object.defineProperty(globalThis, "crypto", realCrypto);
 
+// --- through requestAi: the acceptance criterion, that a repeat costs no request ---
+
+stubStorage();
+const { requestAi } = await import("../src/lib/ai/requestAi.js");
+
+let calls = 0;
+const serve = (status, body) => {
+  calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response(JSON.stringify(body), { status }); };
+};
+
+clearCache();
+serve(200, { task: "review", model: "m/one", result: { columns: [] } });
+const first = await requestAi("review", payload);
+check("the first ask reaches the endpoint", calls === 1 && first.result !== null && first.cached === false);
+
+const second = await requestAi("review", payload);
+check("the same ask again spends no request", calls === 1);
+check("and answers from the cache", second.cached === true && second.model === "m/one");
+
+await requestAi("review", { columns: [] });
+check("a different file still asks", calls === 2);
+
+// A failure must never be stored: the next ask has to be able to succeed.
+clearCache();
+serve(502, { error: "upstream_error" });
+const failed = await requestAi("leakage", payload);
+check("an endpoint error is returned, not thrown", failed.error !== null && failed.result === null);
+check("an error is not cached", cachedCount() === 0);
+
+clearCache();
+
 console.log(failures === 0 ? "\nall answer-cache checks passed" : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);
