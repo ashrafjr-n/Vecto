@@ -12,7 +12,18 @@
 
    Acceptable sets are deliberately generous where a column is genuinely
    ambiguous (a year can be numeric or temporal) and strict where the audit
-   settled the question (a repeated MeetID is a key, not a measurement). */
+   settled the question (a repeated MeetID is a key, not a measurement).
+
+     sensitive { column: [acceptable values] } — vecto-plan items 28/29, written
+               2026-09-18 BEFORE the `sensitive` field exists in the schema, so no
+               model answer could have influenced them. A value is one of the closed
+               list in item 29, or null for "not a sensitive attribute". Only
+               UNAMBIGUOUS columns are labelled; everything else is left unscored.
+
+   The nulls matter as much as the values, and three of them are the point of the
+   exercise: a penguin's `sex`, a diamond's `color` and a car's `origin` all carry a
+   sensitive-sounding NAME on a row that is not a person. A model that labels those
+   is reading column names, not the dataset. */
 
 export const EXPECTATIONS = [
   {
@@ -26,12 +37,22 @@ export const EXPECTATIONS = [
       PassengerId: ["identifier"], Name: ["entity_name", "identifier"], SibSp: ["count"],
       Parch: ["count"], Fare: ["measurement"], Pclass: ["code", "category"], Embarked: ["code", "category"],
     },
+    // Rows are people. Fare and Pclass are wealth signals but not hardship — left unscored.
+    sensitive: { Sex: ["sex_gender"], Age: ["age"], Fare: null, Survived: null },
   },
   {
     file: "smoking.csv",
     targets: ["smoke"],
     roles: { column_1: ["identifier"], smoke: ["binary"], age: ["numeric"], amt_weekends: ["numeric"], amt_weekdays: ["numeric"] },
     subtypes: { column_1: ["identifier"], amt_weekends: ["count", "measurement"], gross_income: ["category", "code"] },
+    /* A UK smoking survey: the densest sensitive file in the corpus. `smoke` is the
+       target and is health data whether or not it is the label. `gross_income` is an
+       income bracket, which is what financial_hardship is for. */
+    sensitive: {
+      gender: ["sex_gender"], age: ["age"], ethnicity: ["race_ethnicity"],
+      nationality: ["nationality_origin"], gross_income: ["financial_hardship"],
+      smoke: ["health"], region: null,
+    },
   },
   {
     file: "powerlifting/meets.csv",
@@ -44,6 +65,10 @@ export const EXPECTATIONS = [
     roles: { MeetID: ["identifier"], Sex: ["binary"], Age: ["numeric"], BodyweightKg: ["numeric"], TotalKg: ["numeric"] },
     // MeetID repeats (a key into meets.csv); WeightClassKg holds "125+" open classes.
     subtypes: { MeetID: ["foreign_key", "identifier"], Name: ["entity_name", "identifier"], BodyweightKg: ["measurement"], WeightClassKg: ["category", "code", "measurement"] },
+    /* Bodyweight is deliberately NOT labelled health: in a weight-class sport it is a
+       competition category, and whether that makes it health data is exactly the kind
+       of judgement this eval does not score. */
+    sensitive: { Sex: ["sex_gender"], Age: ["age"], Equipment: null },
   },
   {
     file: "football-events/events.csv",
@@ -70,6 +95,8 @@ export const EXPECTATIONS = [
     targets: ["Post_Semester_GPA", "Burnout_Risk_Level", "Skill_Retention_Score"],
     roles: { Student_ID: ["identifier"], Paid_Subscription: ["binary"], Post_Semester_GPA: ["numeric"], Weekly_GenAI_Hours: ["numeric"] },
     subtypes: { Student_ID: ["identifier"], Weekly_GenAI_Hours: ["measurement"], Tool_Diversity: ["count", "measurement"], Burnout_Risk_Level: ["category", "code"] },
+    // Exam anxiety and burnout risk are mental-health measures about a named student.
+    sensitive: { Anxiety_Level_During_Exams: ["health"], Burnout_Risk_Level: ["health"], Year_of_Study: null },
   },
   {
     file: "archive (1)/train.csv",
@@ -88,6 +115,8 @@ export const EXPECTATIONS = [
     targets: ["price"],
     roles: { carat: ["numeric"], cut: ["categorical"], color: ["categorical"], clarity: ["categorical"], price: ["numeric"] },
     subtypes: { carat: ["measurement"], x: ["measurement"], price: ["measurement"], cut: ["category", "code"] },
+    // A diamond's `color` is a grading letter D-J. A row is a stone, not a person.
+    sensitive: { color: null, clarity: null, cut: null },
   },
   {
     file: "heldout/flights.csv",
@@ -100,12 +129,16 @@ export const EXPECTATIONS = [
     targets: ["mpg"],
     roles: { mpg: ["numeric"], weight: ["numeric"], origin: ["categorical"], horsepower: ["numeric"] },
     subtypes: { mpg: ["measurement"], weight: ["measurement"], name: ["entity_name", "category"], origin: ["category", "code"] },
+    // `origin` is where the car was built (usa/europe/japan), not a person's origin.
+    sensitive: { origin: null, name: null },
   },
   {
     file: "heldout/penguins.csv",
     targets: ["species"],
     roles: { species: ["categorical"], island: ["categorical"], sex: ["binary"], body_mass_g: ["numeric"] },
     subtypes: { body_mass_g: ["measurement"], bill_length_mm: ["measurement"], species: ["category"] },
+    // A penguin's sex. The strongest trap in the corpus: the name is sensitive, the row is a bird.
+    sensitive: { sex: null, species: null, island: null },
   },
   {
     file: "heldout/sonar.csv",
@@ -125,6 +158,9 @@ export const EXPECTATIONS = [
     targets: ["survived"],
     roles: { survived: ["binary"], sex: ["binary"], age: ["numeric"], fare: ["numeric"], alive: ["binary"], deck: ["categorical"] },
     subtypes: { sibsp: ["count"], fare: ["measurement"], pclass: ["code", "category"], alive: ["flag", "category"] },
+    /* The seaborn copy: `who` is man/woman/child and `adult_male` is a flag derived from
+       sex and age, so both carry the same attribute the source columns do. */
+    sensitive: { sex: ["sex_gender"], age: ["age"], who: ["sex_gender", "age"], adult_male: ["sex_gender"], deck: null },
   },
   {
     file: "heldout/yelp.csv",
