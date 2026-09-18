@@ -264,6 +264,23 @@ function CleaningSection({ proposal, candidates, acceptedRules, onToggleRule }) 
   );
 }
 
+/* A sensitive attribute is stated, never judged. The engine has no standing to say
+   whether a column may be used — that is law, consent and purpose, none of which are in
+   the file — so this reads as a label and stops. It is an AI claim like any other and
+   is not colour-coded: status colours stay reserved for measured findings. */
+const SENSITIVE_LABEL = {
+  sex_gender:         "sex or gender",
+  race_ethnicity:     "race or ethnicity",
+  religion:           "religion",
+  health:             "health",
+  sexual_orientation: "sexual orientation",
+  age:                "age",
+  nationality_origin: "nationality or origin",
+  disability:         "disability",
+  political_opinion:  "political opinion",
+  financial_hardship: "financial circumstances",
+};
+
 function ColumnRow({ col, accepted, onToggle }) {
   const facts = [
     col.subtype && col.subtype.replace("_", " "),
@@ -298,6 +315,15 @@ function ColumnRow({ col, accepted, onToggle }) {
           Contradicted by the data: "{col.subtype}", but {col.subtypeContradiction}.
         </p>
       )}
+      {col.sensitive && SENSITIVE_LABEL[col.sensitive] && (
+        <p className="mt-1.5 text-[12px] text-ink-soft">
+          <span className="rounded border border-dashed border-line-strong px-1.5 py-0.5 text-[11px] text-ink-faint">
+            personal data
+          </span>
+          {" "}Read by the model as {SENSITIVE_LABEL[col.sensitive]}. Whether it may be used is your call — the engine does not decide it, and nothing here changes the analysis.
+        </p>
+      )}
+
       {col.evidence.length > 0 && (
         <ul className="mt-1.5 space-y-0.5 text-[11.5px] leading-relaxed text-ink-faint">
           {col.evidence.map((e, i) => <li key={i}>— {e}</li>)}

@@ -15,7 +15,7 @@ import { isMissing, isNumeric, normalizeValue, sharePct, minMax, median } from "
 import { isTemporalColumn } from "../../components/utils/core/detectors/temporal.js";
 import { usableTargetColumns } from "../../components/utils/core/detectors/target.js";
 import { ROLE } from "../../components/utils/core/roles.constants.js";
-import { DOSSIER_ROLES, DOSSIER_SUBTYPES, DOSSIER_CONFIDENCE, DOSSIER_TASKS, DOSSIER_MAX_COLUMNS } from "./dossierSchema.js";
+import { DOSSIER_ROLES, DOSSIER_SUBTYPES, DOSSIER_CONFIDENCE, DOSSIER_SENSITIVE, DOSSIER_TASKS, DOSSIER_MAX_COLUMNS } from "./dossierSchema.js";
 
 const DISTINCT_CAP = 20000;   // same ceiling as roles.js CARD_CAP
 const TOP_VALUES = 8;
@@ -167,6 +167,11 @@ export function verifyDossier(response, { data, columns, roles }) {
       unit: text(entry.unit, 40) || null,
       validRange: hasRange ? { min: finiteOrNull(range.min), max: finiteOrNull(range.max) } : null,
       outOfRange: hasRange && facts.numbers.length ? countOutside(facts.numbers, range) : null,
+      /* pick() returns null for anything off the list, which is also the "not a
+         sensitive attribute" answer — the two collapse on purpose. An invented value
+         must not reach the page, and the safe fallback for a claim about a person is
+         to make no claim. */
+      sensitive: pick(entry.sensitive, DOSSIER_SENSITIVE),
       confidence: pick(entry.confidence, DOSSIER_CONFIDENCE),
       evidence: evidence.kept,
     });

@@ -113,5 +113,26 @@ check("an effective forbidden rule fails the declined check", !cc["declined:Park
         r3.checks.find((c) => c.kind === "relevance").ok === false);
 }
 
+/* ── item 29: `sensitive`, where null is an answer ── */
+{
+  const dossier = (cols) => ({ columns: cols, targets: [], withheld: [], undescribed: [] });
+  const verified = dossier([
+    { name: "sex",    role: "binary",      subtype: "flag",     sensitive: "sex_gender", agrees: true, roleContradiction: null },
+    { name: "origin", role: "categorical", subtype: "category", sensitive: null,          agrees: true, roleContradiction: null },
+    { name: "color",  role: "categorical", subtype: "category", sensitive: "race_ethnicity", agrees: true, roleContradiction: null },
+  ]);
+  const r = scoreDossier({ sensitive: { sex: ["sex_gender"], origin: null, color: null } }, verified, null);
+  const by = Object.fromEntries(r.checks.map((c) => [c.name, c]));
+  check("a named sensitive attribute passes", by.sex.ok === true);
+  check("a correct null passes as a real check", by.origin.ok === true);
+  check("inventing an attribute for a non-person column fails", by.color.ok === false);
+  check("all three are scored, none skipped", r.total === 3);
+  check("flagged columns are counted for the smell test", r.hygiene.sensitiveFlagged === 2);
+
+  const missed = scoreDossier({ sensitive: { sex: ["sex_gender"] } },
+    dossier([{ name: "sex", role: "binary", subtype: "flag", sensitive: null, agrees: true, roleContradiction: null }]), null);
+  check("missing a real sensitive attribute fails", missed.checks[0].ok === false);
+}
+
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-eval-score checks passed");
 process.exit(failures ? 1 : 0);
