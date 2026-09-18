@@ -6,7 +6,14 @@
 
    The eval hashes this file as bytes, so ANY edit here — a comment included — makes
    every cached answer unusable and the next run re-asks all 18 files. Change it when
-   the prompt changes, not to tidy the prose. */
+   the prompt changes, not to tidy the prose.
+
+   2026-09-18 (vecto-plan item 26): `evidence` is asked for only where it does work — a
+   role that differs from engineRole, or confidence below high. It was 19% of the answer's
+   characters and, on a column the engine and the model already agree about, it justified
+   a reading nobody doubted. It is NOT removed: it is the only field whose content is
+   checked against the column's real values (checkEvidence), so it is a fabrication
+   detector, and it is kept exactly where a fabrication would matter. */
 
 import { DOSSIER_ROLES, DOSSIER_SUBTYPES } from "../src/lib/ai/dossierSchema.js";
 import { RULE_TYPES } from "../src/lib/ai/cleaningSchema.js";
@@ -34,7 +41,7 @@ Decline when the affix is not a unit or bound (a count of things with a label, a
 - unit: the unit of measure if the name or values show one, otherwise null.
 - validRange: for a numeric column, the plausible range {min, max} a correct value could take (either may be null); null for any other column.
 - confidence: low, medium or high.
-- evidence: up to 3 short strings. When you quote a value, copy it exactly as it appears in the profile, inside double quotes.
+- evidence: return [] when your role is the same as engineRole AND your confidence is high — the engine already read those columns the same way, so there is nothing to justify. Otherwise up to 3 short strings saying what in the profile decided it. When you quote a value, copy it exactly as it appears in the profile, inside double quotes.
 
 3. For the whole dataset:
 - rowGrain: what one row represents, as a short phrase.
