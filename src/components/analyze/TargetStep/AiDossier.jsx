@@ -21,7 +21,7 @@ import { ruleKey } from "../shared/cleaningRuleText.js";
    The verified answer, the accepted overrides and the accepted rules are owned by
    Analyze.jsx, not here: Cancel on the processing step unmounts this component,
    and a finished answer costs a request from a small daily quota. */
-function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOverridesChange, onUseTarget, currentTarget, cleaning, onCleaning, acceptedRules, onAcceptedRulesChange }) {
+function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOverridesChange, onUseTarget, currentTarget, cleaning, onCleaning, acceptedRules, onAcceptedRulesChange, onOptIn }) {
   const [status, setStatus]   = useState("idle");   // idle | loading | error
   const [failure, setFailure] = useState(null);
   const runRef = useRef(null);
@@ -34,6 +34,10 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
   const payload = () => buildReviewPayload(data, columns, roles, scan());
 
   const handleAsk = async () => {
+    /* This click is the opt-in: from here on, the leakage review may start by itself
+       when a report is built (vecto-plan item 24). It is recorded on the click, not
+       on a successful answer — a failed first request is still a choice to use AI. */
+    onOptIn?.();
     const run = new AbortController();
     runRef.current = run;
     setStatus("loading");

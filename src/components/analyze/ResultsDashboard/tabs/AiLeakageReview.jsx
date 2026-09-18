@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from "react";
 import { RotateCcw, Sparkles } from "lucide-react";
 
-import { buildLeakagePayload, verifyLeakage } from "../../../../lib/ai/leakage.js";
-import { requestAi } from "../../../../lib/ai/requestAi.js";
+import { buildLeakagePayload } from "../../../../lib/ai/leakage.js";
 import AiPanel          from "../../shared/AiPanel.jsx";
 import AiPayloadPreview from "../../shared/AiPayloadPreview.jsx";
 import StatusBadge      from "../../shared/StatusBadge.jsx";
@@ -14,8 +12,12 @@ import StatusBadge      from "../../shared/StatusBadge.jsx";
 
    Every checkable claim arrives with a measurement made on the rows here (see
    verifyLeakage). The review is advisory: it changes no flag, score or piece of
-   advice. The answer is held by Analyze.jsx, so switching tabs does not spend
-   another request. */
+   advice.
+
+   This component only renders. The request, its answer, its status and its abort
+   all live in Analyze.jsx, because C starts by itself once the report is built and
+   this panel does not exist until the Target Signal tab is opened — by which time
+   the answer is often already here. Switching tabs spends nothing either way. */
 
 const CATEGORY_LABEL = {
   derived_from_target:    "Derived from the target",
@@ -52,37 +54,8 @@ const SPLIT_LABEL = {
   time_ordered: "Split by time, on",
 };
 
-function AiLeakageReview({ result, data, dossier, review, onReview }) {
-  const [status, setStatus]   = useState("idle");
-  const [failure, setFailure] = useState(null);
-  const runRef = useRef(null);
-
-  useEffect(() => () => runRef.current?.abort(), []);
-
+function AiLeakageReview({ result, dossier, review, status, failure, onAsk, onCancel }) {
   const payload = () => buildLeakagePayload(result, dossier);
-
-  const handleAsk = async () => {
-    const run = new AbortController();
-    runRef.current = run;
-    setStatus("loading");
-    setFailure(null);
-
-    const reply = await requestAi("leakage", payload(), run.signal);
-    if (reply.aborted) return;
-    const verified = reply.error ? null : verifyLeakage(reply.result, { data, result });
-    if (reply.error || verified.error) {
-      setFailure({ error: reply.error ?? verified.error, detail: reply.detail });
-      setStatus("error");
-      return;
-    }
-    onReview({ ...verified, model: reply.model });
-    setStatus("idle");
-  };
-
-  const handleCancel = () => {
-    runRef.current?.abort();
-    setStatus("idle");
-  };
 
   return (
     <AiPanel
@@ -90,8 +63,8 @@ function AiLeakageReview({ result, data, dossier, review, onReview }) {
       size="report"
       status={status}
       failure={failure}
-      onCancel={handleCancel}
-      loadingText="Waiting for the model — free models can take a minute."
+      onCancel={onCancel}
+      loadingText="Reviewing the report for leakage — free models can take a minute. Nothing else waits for it."
     >
       {!review && (
         <>
@@ -109,7 +82,7 @@ function AiLeakageReview({ result, data, dossier, review, onReview }) {
           <AiPayloadPreview build={payload} />
           <button
             type="button"
-            onClick={handleAsk}
+            onClick={onAsk}
             className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line-strong px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
           >
             <Sparkles size={14} />
@@ -118,7 +91,7 @@ function AiLeakageReview({ result, data, dossier, review, onReview }) {
         </>
       )}
 
-      {review && <ReviewResult review={review} target={result.meta.target} onAskAgain={handleAsk} />}
+      {review && <ReviewResult review={review} target={result.meta.target} onAskAgain={onAsk} />}
     </AiPanel>
   );
 }

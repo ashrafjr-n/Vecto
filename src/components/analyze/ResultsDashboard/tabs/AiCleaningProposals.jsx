@@ -58,6 +58,8 @@ function AiCleaningProposals({ result, ai }) {
   const payload = () => buildReviewPayload(originalData, columns, rolesOf(), candidates ?? []);
 
   const handleAsk = async () => {
+    // Also an opt-in: a re-run from here builds a new report, which C may then review.
+    ai.onOptIn?.();
     const run = new AbortController();
     runRef.current = run;
     setStatus("loading");
