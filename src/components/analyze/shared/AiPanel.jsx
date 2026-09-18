@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { LoaderCircle, TriangleAlert, X } from "lucide-react";
 import AiBadge from "./AiBadge.jsx";
+import { cachedCount, clearCache } from "../../../lib/ai/answerCache.js";
 
 /* The frame every AI feature sits in: the dashed border that marks AI output
    (see AiBadge), a header, and the loading and error states — so a slow or failed
@@ -46,7 +48,34 @@ function AiPanel({ title, size = "page", status, failure, loadingText, onCancel,
       )}
 
       {status !== "loading" && children}
+
+      <CacheNote />
     </div>
+  );
+}
+
+/* Where the user is told that answers are kept, and where they get rid of them.
+   It sits in the shared frame so all three features say it once and identically —
+   the count is every stored answer, not this panel's. Read on render: the panel
+   re-renders when a request finishes, which is the only moment the count moves
+   without a click. */
+function CacheNote() {
+  const [cleared, setCleared] = useState(0);
+  const count = cachedCount();
+  if (count === 0) return null;
+  return (
+    <p className="mt-6 border-t border-line pt-3.5 text-[11.5px] leading-relaxed text-ink-faint">
+      {count} answer{count > 1 ? "s" : ""} from earlier in this browser {count > 1 ? "are" : "is"} kept
+      here, so asking again about the same file costs no request. They never leave this
+      browser.{" "}
+      <button
+        type="button"
+        onClick={() => { clearCache(); setCleared(cleared + 1); }}
+        className="font-medium text-ink-soft underline decoration-line-strong underline-offset-2 hover:text-ink"
+      >
+        Clear them
+      </button>
+    </p>
   );
 }
 
