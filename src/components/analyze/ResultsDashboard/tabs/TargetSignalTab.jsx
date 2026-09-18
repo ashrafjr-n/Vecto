@@ -334,10 +334,12 @@ function TargetSignalTab({ result, ai }) {
       {!targetProblem && ai?.data && (
         <AiLeakageReview
           result={result}
-          data={ai.data}
           dossier={ai.dossier}
           review={ai.leakageReview}
-          onReview={ai.onLeakageReview}
+          status={ai.leakageStatus ?? "idle"}
+          failure={ai.leakageFailure}
+          onAsk={() => { ai.onOptIn?.(); ai.onRunLeakage?.(); }}
+          onCancel={ai.onCancelLeakage}
         />
       )}
 

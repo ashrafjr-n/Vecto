@@ -13,6 +13,8 @@ const ResultsDashboard = lazy(() =>
 import { detectTarget, generateSampleData } from "../components/utils/core/index.js";
 import { runAnalysis, runAnalysisSync } from "../lib/runAnalysis.js";
 import { applyCleaningRules } from "../lib/ai/cleaning.js";
+import { buildLeakagePayload, verifyLeakage } from "../lib/ai/leakage.js";
+import { requestAi } from "../lib/ai/requestAi.js";
 
 const stepVariants = {
   initial:  { opacity: 0, y: 16 },
@@ -110,8 +112,18 @@ function Analyze() {
      and a finished answer costs a request from a small daily quota. */
   const [dossier,        setDossier]        = useState(null);
   const [roleOverrides,  setRoleOverrides]  = useState({});
-  // The AI leakage review of the CURRENT report — cleared whenever a new analysis starts.
+  /* The AI leakage review of the CURRENT report — cleared whenever a new analysis
+     starts. The REQUEST lives here rather than in the panel because the panel only
+     mounts when the Target Signal tab is open, and C is meant to be already running
+     by the time the user gets there. */
   const [leakageReview,  setLeakageReview]  = useState(null);
+  const [leakageStatus,  setLeakageStatus]  = useState("idle");
+  const [leakageFailure, setLeakageFailure] = useState(null);
+  /* Whether the user has asked for anything AI in this session. C starts by itself
+     only after that: an automatic first request would send a column profile to a
+     third party for someone who never opted in. Cleared by nothing — leaving the
+     page is what ends the session. */
+  const [aiOptedIn,      setAiOptedIn]      = useState(false);
   /* Cleaning (AI phase D). `cleaningRules` are the rules the CURRENT report was built
      with, and `analysisData` the rows it was built from — both set only when an
      analysis completes, so a cancelled re-run leaves the report and its provenance
@@ -125,12 +137,14 @@ function Analyze() {
   const [acceptedRules,  setAcceptedRules]  = useState([]);
   // The running analysis's AbortController, so Cancel and unmount can stop it.
   const runRef = useRef(null);
+  // The same, for the leakage request, which outlives the click that started it.
+  const leakRunRef = useRef(null);
 
   /* Leaving the page mid-analysis (back button, header link) would otherwise
      leave the worker computing a report nobody will see. This is a cleanup on
      unmount — synchronising with the worker outside React — not an effect
      watching `step`, which stays forbidden (see CLAUDE.md). */
-  useEffect(() => () => runRef.current?.abort(), []);
+  useEffect(() => () => { runRef.current?.abort(); leakRunRef.current?.abort(); }, []);
 
   if (!entry) return <Navigate to="/" replace />;
 
@@ -140,9 +154,45 @@ function Analyze() {
      work and the spinner's floor run concurrently, so a slow analysis costs its
      own time and a fast one still shows a spinner rather than a single flashed
      frame. */
+  /* Phase C. Called by the results handler below (automatically, once the user has
+     opted into AI) and by the panel's own button. It takes `result` and `rows` as
+     arguments rather than reading state: at the moment the analysis lands, the state
+     holding them has not been set yet.
+
+     A target that never varies or is unique per row has no timing to reason about,
+     so C is not asked about it — the same rule that hides the panel in
+     TargetSignalTab. Failures stay in `leakageFailure` and are shown only inside the
+     panel; nothing else on the report depends on this. */
+  const runLeakageReview = (result, rows) => {
+    const { meta } = result;
+    if (!meta.target || meta.targetIsConstant || meta.targetIsIdentifier) return;
+
+    leakRunRef.current?.abort();
+    const run = new AbortController();
+    leakRunRef.current = run;
+    setLeakageStatus("loading");
+    setLeakageFailure(null);
+
+    requestAi("leakage", buildLeakagePayload(result, dossier), run.signal).then((reply) => {
+      if (reply.aborted) return;
+      const verified = reply.error ? null : verifyLeakage(reply.result, { data: rows, result });
+      if (reply.error || verified.error) {
+        setLeakageFailure({ error: reply.error ?? verified.error, detail: reply.detail });
+        setLeakageStatus("error");
+        return;
+      }
+      setLeakageReview({ ...verified, model: reply.model });
+      setLeakageStatus("idle");
+    });
+  };
+
   const startAnalysis = (selectedTarget, rules) => {
     setTarget(selectedTarget);
+    // A review of the previous report, and any request still fetching one, are both stale.
+    leakRunRef.current?.abort();
     setLeakageReview(null);
+    setLeakageStatus("idle");
+    setLeakageFailure(null);
     setStep("processing");
 
     // Rules always apply to the file as uploaded, never to an already-cleaned copy.
@@ -166,6 +216,9 @@ function Analyze() {
         setAnalysisData(rows);
         setCleaningRules(rules);
         setStep("results");
+        /* Started here, in the same handler that produced the report, rather than in
+           an effect watching `step` — see the note on the one useEffect above. */
+        if (aiOptedIn) runLeakageReview(result, rows);
       }, remaining);
     });
   };
@@ -209,6 +262,7 @@ function Analyze() {
                   roleOverrides, onRoleOverridesChange: setRoleOverrides,
                   cleaning, onCleaning: setCleaning,
                   acceptedRules, onAcceptedRulesChange: setAcceptedRules,
+                  onOptIn: () => setAiOptedIn(true),
                 }}
               />
             </motion.div>
@@ -259,8 +313,11 @@ function Analyze() {
                   onReset={handleReset}
                   ai={{
                     data: analysisData, originalData: csvData, dossier, onDossier: setDossier,
-                    leakageReview, onLeakageReview: setLeakageReview,
+                    leakageReview, leakageStatus, leakageFailure,
+                    onRunLeakage: () => runLeakageReview(analysisResult, analysisData),
+                    onCancelLeakage: () => { leakRunRef.current?.abort(); setLeakageStatus("idle"); },
                     cleaning, onCleaning: setCleaning, cleaningRules, onApplyCleaning: handleApplyCleaning,
+                    onOptIn: () => setAiOptedIn(true),
                   }}
                 />
               </Suspense>

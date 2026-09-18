@@ -70,7 +70,7 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
 
 /* `ai` (from Analyze.jsx) carries the column review state: dossier, role overrides, cleaning, accepted rules. */
 function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack, ai }) {
-  const { dossier, onDossier, roleOverrides, onRoleOverridesChange, cleaning, onCleaning, acceptedRules, onAcceptedRulesChange } = ai;
+  const { dossier, onDossier, roleOverrides, onRoleOverridesChange, cleaning, onCleaning, acceptedRules, onAcceptedRulesChange, onOptIn } = ai;
   const [mode,     setMode]     = useState("auto");
   const [selected, setSelected] = useState(initialTarget || columns[0] || "");
 
@@ -210,6 +210,7 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack, ai }) 
             onCleaning={onCleaning}
             acceptedRules={acceptedRules}
             onAcceptedRulesChange={onAcceptedRulesChange}
+            onOptIn={onOptIn}
           />
         </div>
       </section>
