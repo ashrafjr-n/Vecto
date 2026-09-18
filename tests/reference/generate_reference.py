@@ -293,8 +293,52 @@ def rank_eta_reference(path: str) -> dict:
     return out
 
 
+def odds_ratio_reference(path: str) -> dict:
+    """Odds ratio for a rare binary feature against a binary outcome (item 27):
+    the sample OR, its Wald 95% interval on the log scale, and lift.
+
+    Haldane-Anscombe: 0.5 is added to every cell ONLY when some cell is zero —
+    unconditional correction would shrink every estimate toward 1. statsmodels
+    (Table2x2) would give the same numbers but is deliberately not installed, so
+    this is written out from the definitions, as the medcouple reference is."""
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    y = df["outcome"].astype(int).to_numpy()
+    out = {}
+    for col in df.columns:
+        if col == "outcome":
+            continue
+        x = df[col].astype(int).to_numpy()
+        a = int(((x == 1) & (y == 1)).sum())
+        b = int(((x == 1) & (y == 0)).sum())
+        c = int(((x == 0) & (y == 1)).sum())
+        d = int(((x == 0) & (y == 0)).sum())
+        corrected = 0 in (a, b, c, d)
+        k = 0.5 if corrected else 0.0
+        A, B, C, D = a + k, b + k, c + k, d + k
+        orv = (A * D) / (B * C)
+        se = np.sqrt(1 / A + 1 / B + 1 / C + 1 / D)
+        z = 1.959963984540054
+        n = a + b + c + d
+        base = (a + c) / n
+        out[col] = {
+            "a": a, "b": b, "c": c, "d": d,
+            "corrected": bool(corrected),
+            "odds_ratio": float(orv),
+            "ci_low": float(np.exp(np.log(orv) - z * se)),
+            "ci_high": float(np.exp(np.log(orv) + z * se)),
+            "lift": float((a / (a + b)) / base),
+            "n": n,
+            "exposed_rows": a + b,
+            "minority_share": float(min(a + b, c + d) / n),
+        }
+    return out
+
+
 def main():
     expected = {}
+
+    # odds_ratio.csv — odds ratio, Wald CI and lift for rare binary features (item 27)
+    expected["odds_ratio"] = {"columns": odds_ratio_reference(os.path.join(DATA, "odds_ratio.csv"))}
 
     # rank_eta.csv — Kruskal-Wallis H / p and the rank-based η (stage 10e)
     expected["rank_eta"] = {"pairs": rank_eta_reference(os.path.join(DATA, "rank_eta.csv"))}

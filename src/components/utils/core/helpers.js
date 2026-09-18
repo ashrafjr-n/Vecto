@@ -431,6 +431,67 @@ export function rankEta(values, labels) {
    out here so feature-to-feature categorical pairs get the identical treatment
    instead of a second, subtly different implementation.
    Returns null when the table is too small or degenerate to mean anything. */
+/* A binary feature is "rare" below this share of the rows it was measured on.
+   Not tuned: 10% is where a 2x2 table starts to have a cell small enough that the
+   correlation is bounded by the margins rather than by the relationship. Above it
+   phi is free to move and needs no second number beside it. */
+export const RARE_BINARY_MAX = 0.10;
+
+/* Odds ratio for a binary feature against a binary target, with a 95% confidence
+   interval, lift and n.
+
+   Why it exists: phi — the Pearson r of two 0/1 columns, which is what the target
+   scan reports for this pair — is bounded by the marginals. A flag present on 1% of
+   rows cannot reach 0.3 however perfectly it predicts, so "weak association" and
+   "rare but decisive" arrive as the same small number and the reader cannot tell
+   them apart. The odds ratio is not bounded that way. The interval is the other
+   half of the answer: on a rare feature most of the apparent effect is usually
+   sampling noise, and an interval spanning 1 says exactly that.
+
+   Haldane-Anscombe: a zero cell makes the ratio 0 or infinite and the standard
+   error undefined. 0.5 is then added to EVERY cell — but only then. Adding it
+   unconditionally would shrink every estimate toward 1 for no reason, so
+   `corrected` reports which of the two happened.
+
+   `exposed` and `outcome` are aligned arrays of 0/1 (the encoding relations.js
+   already builds). Level 1 of each side is the one the ratio is about;
+   `exposedRows` is how many rows carry it. Returns null when the table cannot
+   support an estimate. */
+export function oddsRatio(exposed, outcome) {
+  const n = Math.min(exposed.length, outcome.length);
+  if (n < 20) return null;
+
+  let a = 0, b = 0, c = 0, d = 0;   // a: exposed & outcome, b: exposed only, c: outcome only, d: neither
+  for (let i = 0; i < n; i++) {
+    if (exposed[i] === 1) { if (outcome[i] === 1) a++; else b++; }
+    else                  { if (outcome[i] === 1) c++; else d++; }
+  }
+  // Every margin must exist, or there is no comparison to make.
+  if (a + b === 0 || c + d === 0 || a + c === 0 || b + d === 0) return null;
+
+  const corrected = a === 0 || b === 0 || c === 0 || d === 0;
+  const k = corrected ? 0.5 : 0;
+  const [A, B, C, D] = [a + k, b + k, c + k, d + k];
+
+  const or = (A * D) / (B * C);
+  const se = Math.sqrt(1 / A + 1 / B + 1 / C + 1 / D);
+  const z = 1.959963984540054;   // two-sided 95%
+
+  /* Lift is a plain ratio of proportions, so it reads the RAW cells: correcting a
+     proportion would report a rate no row has. */
+  const baseRate = (a + c) / n;
+
+  return {
+    value:  or,
+    ciLow:  Math.exp(Math.log(or) - z * se),
+    ciHigh: Math.exp(Math.log(or) + z * se),
+    lift:   baseRate > 0 ? (a / (a + b)) / baseRate : null,
+    n,
+    exposedRows: a + b,
+    corrected,
+  };
+}
+
 export function cramersV(labelsA, labelsB) {
   const n = Math.min(labelsA.length, labelsB.length);
   if (n < 5) return null;

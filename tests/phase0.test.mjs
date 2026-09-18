@@ -11,7 +11,7 @@ import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { getVisualizations } from "../src/components/utils/core/analyzers/stats.js";
-import { etaCorrelation, medcouple, adjustedFences, quantileSorted, rankEta } from "../src/components/utils/core/helpers.js";
+import { etaCorrelation, medcouple, adjustedFences, quantileSorted, rankEta, oddsRatio } from "../src/components/utils/core/helpers.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -336,6 +336,35 @@ for (const [key, want] of Object.entries(expected.rank_eta.pairs)) {
     && Math.abs(res.value - want.rank_eta) <= TOL && res.k === want.k;
   if (!pass) failures++;
   console.log(`${pass ? "PASS" : "FAIL"}  ${key.padEnd(11)} H=${res.H.toFixed(6)} p=${res.pValue.toExponential(4)} rank η=${res.value.toFixed(6)} (raw η ${want.raw_eta.toFixed(3)})`);
+}
+
+/* ── Item 27 — odds ratio, Wald CI and lift for rare binary features, vs numpy ──
+   The fixture is built so the point of the measure is visible: `rare_decisive` and
+   `rare_null` are both on 1.5% of rows and both score a tiny phi, and only the odds
+   ratio separates them. `rare_perfect` has a zero cell, which is the Haldane-Anscombe
+   case; `common_strong` is not rare and the engine attaches nothing to it. */
+const orf = parseCsv(join(__dirname, "reference", "datasets", "odds_ratio.csv"));
+console.log("\nItem 27 — odds ratio / lift for rare binary features vs numpy\n");
+for (const [col, want] of Object.entries(expected.odds_ratio.columns)) {
+  const xs = orf.rows.map(r => Number(r[col]));
+  const ys = orf.rows.map(r => Number(r.outcome));
+  const res = oddsRatio(xs, ys);
+  const close = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+  const pass = res !== null
+    && close(res.value, want.odds_ratio)
+    && close(res.ciLow, want.ci_low) && close(res.ciHigh, want.ci_high)
+    && close(res.lift, want.lift)
+    && res.n === want.n && res.exposedRows === want.exposed_rows
+    && res.corrected === want.corrected;
+  if (!pass) failures++;
+  console.log(`${pass ? "PASS" : "FAIL"}  ${col.padEnd(14)} OR=${res?.value.toFixed(4)} CI [${res?.ciLow.toFixed(3)}, ${res?.ciHigh.toFixed(3)}] lift=${res?.lift.toFixed(3)}${want.corrected ? " (Haldane-Anscombe)" : ""}`);
+}
+{
+  // A table with an empty margin is not an estimate of anything.
+  const none = oddsRatio(new Array(100).fill(0), new Array(100).fill(1));
+  const pass = none === null;
+  if (!pass) failures++;
+  console.log(`${pass ? "PASS" : "FAIL"}  an absent margin returns null, not Infinity`);
 }
 
 /* ── Step 2a — identifier-numeric detection (the false-positive battleground) ──

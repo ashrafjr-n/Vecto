@@ -195,6 +195,66 @@
       }
     }
   },
+  "odds_ratio": {
+    "columns": {
+      "common_strong": {
+        "a": 432,
+        "b": 368,
+        "c": 320,
+        "ci_high": 3.8996635820700982,
+        "ci_low": 2.6724531546471844,
+        "corrected": false,
+        "d": 880,
+        "exposed_rows": 800,
+        "lift": 1.4361702127659575,
+        "minority_share": 0.4,
+        "n": 2000,
+        "odds_ratio": 3.2282608695652173
+      },
+      "rare_decisive": {
+        "a": 25,
+        "b": 5,
+        "c": 727,
+        "ci_high": 22.428396877013324,
+        "ci_low": 3.2584811409094696,
+        "corrected": false,
+        "d": 1243,
+        "exposed_rows": 30,
+        "lift": 2.2163120567375887,
+        "minority_share": 0.015,
+        "n": 2000,
+        "odds_ratio": 8.548830811554334
+      },
+      "rare_null": {
+        "a": 12,
+        "b": 18,
+        "c": 740,
+        "ci_high": 2.3134939926285583,
+        "ci_low": 0.5307571937369954,
+        "corrected": false,
+        "d": 1230,
+        "exposed_rows": 30,
+        "lift": 1.0638297872340425,
+        "minority_share": 0.015,
+        "n": 2000,
+        "odds_ratio": 1.1081081081081081
+      },
+      "rare_perfect": {
+        "a": 20,
+        "b": 0,
+        "c": 732,
+        "ci_high": 1157.1276476266407,
+        "ci_low": 4.2203481454773515,
+        "corrected": true,
+        "d": 1248,
+        "exposed_rows": 20,
+        "lift": 2.6595744680851063,
+        "minority_share": 0.01,
+        "n": 2000,
+        "odds_ratio": 69.88191126279864
+      }
+    }
+  },
   "outliers": {
     "columns": {
       "left_skewed": {
@@ -266,7 +326,7 @@
         "n": 600,
         "p": 0.5392825865217297,
         "rank_eta": 0.0,
-        "raw_eta": 0.44571788461955897
+        "raw_eta": 0.44571788461955886
       }
     }
   },
