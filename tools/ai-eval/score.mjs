@@ -1,3 +1,5 @@
+import { LEAK_CATEGORIES } from "../../src/lib/ai/leakageSchema.js";
+
 /* Scores one verified dossier against one expectation. Pure — no I/O — so the
    scoring rule is testable on its own (tests/ai-eval-score.test.mjs).
 
@@ -45,10 +47,22 @@ export function scoreDossier(expect, verified, engineTargetGuess) {
    if it was not raised at all, in any category: flagging a real predictor as
    leakage is the failure that would do the most damage, because a user would
    drop a good feature on the model's word. */
+/* A LEAKAGE category is an accusation: it says a column cannot be used at prediction
+   time. A RELEVANCE category (vecto-plan item 31) is the opposite kind of statement —
+   it says a column's statistics and its meaning disagree, and it is always rendered as
+   a question. Scoring them together would make every relevance remark on a legitimate
+   predictor read as a false accusation and sink "clean columns left alone", which is
+   the one metric that has never failed. They are split here BEFORE item 31 adds the
+   categories, so the bar cannot move under the change it was meant to measure. */
+const isLeak = (category) => LEAK_CATEGORIES.includes(category);
+
 export function scoreLeakage(expect, verified) {
   const checks = [];
   const add = (kind, name, ok, got, want) => checks.push({ kind, name, ok, got, want });
-  const raised = (col) => verified.findings.filter((f) => f.column === col).map((f) => f.category);
+  const categoriesOn = (col, keep) =>
+    verified.findings.filter((f) => f.column === col && keep(f.category)).map((f) => f.category);
+  const raised = (col) => categoriesOn(col, isLeak);
+  const relevanceOn = (col) => categoriesOn(col, (c) => !isLeak(c));
 
   for (const [col, want] of Object.entries(expect.leaks ?? {})) {
     const got = raised(col);
@@ -57,6 +71,14 @@ export function scoreLeakage(expect, verified) {
   for (const col of expect.clean ?? []) {
     const got = raised(col);
     add("clean", col, got.length === 0, got, ["(not raised)"]);
+  }
+  /* Relevance is scored on its own axis: a column here is a legitimate predictor whose
+     numbers understate it (or the reverse), so the answer wanted is a relevance remark,
+     never a leak category. Absent until item 31 ships the categories, at which point
+     these checks start counting without the leak bars moving. */
+  for (const [col, want] of Object.entries(expect.relevance ?? {})) {
+    const got = relevanceOn(col);
+    add("relevance", col, got.some((c) => want.includes(c)), got, want);
   }
   if (expect.split) {
     const got = verified.split?.strategy ?? null;
@@ -71,10 +93,12 @@ export function scoreLeakage(expect, verified) {
      listed, because "legitimate predictors left alone" only ever counted LABELLED clean
      columns, so a false accusation on an unlabelled column scored nothing at all. Day 2
      hid four that way (diamonds x/y/z, ai_student Pre_Semester_GPA). Read them by hand. */
-  const labelled = new Set([...Object.keys(expect.leaks ?? {}), ...(expect.clean ?? [])]);
+  const labelled = new Set([
+    ...Object.keys(expect.leaks ?? {}), ...(expect.clean ?? []), ...Object.keys(expect.relevance ?? {}),
+  ]);
   const unchecked = verified.findings
     .filter((f) => !labelled.has(f.column))
-    .map((f) => ({ column: f.column, category: f.category, verdict: f.verdict }));
+    .map((f) => ({ column: f.column, category: f.category, verdict: f.verdict, leak: isLeak(f.category) }));
 
   return {
     passed: checks.filter((c) => c.ok).length,
@@ -83,6 +107,9 @@ export function scoreLeakage(expect, verified) {
     unchecked,
     hygiene: {
       findings: verified.findings.length,
+      // Split so item 31's categories cannot be mistaken for a rise in accusations.
+      leakFindings: verified.findings.filter((f) => isLeak(f.category)).length,
+      relevanceFindings: verified.findings.filter((f) => !isLeak(f.category)).length,
       withheld: verified.withheld.length,
       engineOnly: verified.engineOnly.length,
       unchecked: unchecked.length,

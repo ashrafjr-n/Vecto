@@ -32,6 +32,11 @@ export const EXPECTATIONS = [
       trestbps: ["measurement"], chol: ["measurement"], thalach: ["measurement"], ca: ["count"],
       fbs: ["flag"], exang: ["flag"], num: ["code", "category"],
     },
+    /* Every clinical measurement here is a health attribute about a patient, and the
+       target is a diagnosis. Labelled on the four that need no cardiology to read. */
+    sensitive: {
+      age: ["age"], sex: ["sex_gender"], chol: ["health"], trestbps: ["health"], num: ["health"],
+    },
   },
   {
     file: "newdomain/04-education/StudentsPerformance.csv",
@@ -43,6 +48,13 @@ export const EXPECTATIONS = [
     subtypes: {
       "race/ethnicity": ["category", "code"], "parental level of education": ["category"],
       "math score": ["measurement"], "reading score": ["measurement"],
+    },
+    /* `lunch` is "standard"/"free or reduced" — a means-tested benefit, so it is an
+       income proxy and not merely a meal. Deliberately labelled: a proxy is the case
+       the closed list exists for. */
+    sensitive: {
+      gender: ["sex_gender"], "race/ethnicity": ["race_ethnicity"],
+      lunch: ["financial_hardship"], "math score": null,
     },
   },
   {

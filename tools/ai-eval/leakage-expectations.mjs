@@ -11,6 +11,20 @@
              strongly associated with the target, which is exactly the trap
      split   acceptable strategies (omitted where more than one is defensible)
 
+     relevance { column: [acceptable relevance categories] } — vecto-plan items 28/31,
+             written 2026-09-18 BEFORE those categories exist in the schema, so no model
+             answer could have shaped them. A relevance remark is NOT an accusation: it
+             says the column's numbers and its meaning disagree, and it always renders as
+             a question. `scoreLeakage` scores it on its own axis, and a leak category
+             never satisfies a relevance expectation or the reverse.
+
+             Deliberately short. Every entry below is a column whose engine association
+             with the target is quoted beside it, and whose weakness has a known cause —
+             not a column that merely feels important. Nothing is labelled
+             `implausible_despite_signal`: the corpus has no case where a strong number
+             is clearly meaningless AND is not already a leak, and inventing one would be
+             labelling to fill a category.
+
    meets.csv and the mobile test.csv have no target and are not in this set. */
 
 export const LEAKAGE_EXPECTATIONS = [
@@ -81,6 +95,14 @@ export const LEAKAGE_EXPECTATIONS = [
     leaks: {},
     clean: ["carat", "cut", "color", "clarity", "depth"],
     split: ["random"],
+    /* The 4Cs ARE how a diamond is priced, yet carat (r 0.92) absorbs almost all of it,
+       leaving cut 0.13, color 0.16, clarity 0.22 and depth 0.01 looking negligible.
+       That is the textbook case of a real predictor with a weak marginal number. */
+    relevance: {
+      depth: ["plausible_despite_weak_signal"],
+      cut:   ["plausible_despite_weak_signal"],
+      clarity: ["plausible_despite_weak_signal"],
+    },
   },
   {
     file: "heldout/mpg.csv",
@@ -122,6 +144,10 @@ export const LEAKAGE_EXPECTATIONS = [
     leaks: {},
     clean: ["month"],
     split: ["time_ordered"],
+    /* Air travel is strongly seasonal, and everyone knows it — but the 1949-60 growth
+       trend dominates so completely that month scores η 0.03 against passengers. The
+       number says "no signal"; the meaning says "obvious signal". */
+    relevance: { month: ["plausible_despite_weak_signal"] },
   },
   {
     file: "heldout/sonar.csv",

@@ -79,6 +79,13 @@ export const EXPECTATIONS = [
       fnlwgt: ["measurement", "other"], "education-num": ["code", "category"], "capital-gain": ["measurement"],
       "hours-per-week": ["measurement", "count"], occupation: ["category"], income: ["category", "flag", "code"],
     },
+    /* The canonical sensitive-attribute file (UCI Adult). `marital-status` and
+       `relationship` are personal but are not in the closed list, so they are left
+       unscored rather than forced into a value that does not fit. */
+    sensitive: {
+      age: ["age"], sex: ["sex_gender"], race: ["race_ethnicity"],
+      "native-country": ["nationality_origin"], "hours-per-week": null, fnlwgt: null,
+    },
   },
   {
     file: "newdomain/12-marine/abalone.csv",

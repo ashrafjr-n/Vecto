@@ -85,5 +85,33 @@ check("a unit ladder is judged by ratio, whatever the base unit", cc['factor:Are
 check("a rule that changes nothing does not count as proposed", !cc["rule:Weight"].ok && !cc['factor:Weight covers "+"']);
 check("an effective forbidden rule fails the declined check", !cc["declined:Parking"].ok);
 
+/* ── item 28: a relevance category is not an accusation ── */
+{
+  const verified = {
+    findings: [
+      { column: "depth", category: "plausible_despite_weak_signal", verdict: "question" },
+      { column: "total", category: "derived_from_target",           verdict: "confirmed" },
+    ],
+    split: { strategy: "random" },
+    withheld: [], engineOnly: [],
+  };
+  const r = scoreLeakage({ leaks: { total: ["derived_from_target"] }, clean: ["depth"] }, verified);
+  check("a relevance remark does not fail a labelled clean column",
+        r.checks.find((c) => c.kind === "clean" && c.name === "depth").ok === true);
+  check("a leak on the same answer still scores", r.checks.find((c) => c.kind === "leak").ok === true);
+  check("leak and relevance findings are counted apart",
+        r.hygiene.leakFindings === 1 && r.hygiene.relevanceFindings === 1);
+
+  const r2 = scoreLeakage({ relevance: { depth: ["plausible_despite_weak_signal"] } }, verified);
+  check("a relevance expectation is scored on its own axis",
+        r2.checks.find((c) => c.kind === "relevance")?.ok === true);
+  check("a relevance-labelled column is not listed as unlabelled",
+        !r2.unchecked.some((u) => u.column === "depth"));
+
+  const r3 = scoreLeakage({ relevance: { total: ["plausible_despite_weak_signal"] } }, verified);
+  check("a leak category never satisfies a relevance expectation",
+        r3.checks.find((c) => c.kind === "relevance").ok === false);
+}
+
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-eval-score checks passed");
 process.exit(failures ? 1 : 0);
