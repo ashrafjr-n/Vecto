@@ -122,7 +122,9 @@ from the target picker or the Quality tab) and `leakage` (Target Signal tab). Th
 itself still runs entirely in the browser.
 
 - **Models** — `AI_MODELS` in `wrangler.jsonc`, comma-separated, tried in order by
-  OpenRouter's fallback. An empty value switches the endpoint off.
+  OpenRouter's fallback. An empty value switches the endpoint off. It currently holds a
+  single model, chosen on measured accuracy: the alternatives either returned no findings
+  on datasets with documented leakage or were never available on the free tier.
 - **Key in production** — Cloudflare dashboard → the `vecto` Worker → Settings → Variables
   and Secrets → Add, type **Secret**, name `OPENROUTER_API_KEY`. Or
   `npx wrangler secret put OPENROUTER_API_KEY`. Never a build variable, never `VITE_*`.
