@@ -56,6 +56,9 @@ changes the report only when you accept a suggestion.
   review. Each rule is applied to a copy and measured before it can be accepted, accepted
   rules run the analysis on the original rows, the report says it was built from cleaned
   data, and the rules export as a pandas snippet.
+- **Rare flags get a second number** — a binary feature present on a small share of rows
+  cannot show a large correlation however well it predicts, so where one appears the report
+  adds an odds ratio with its 95% interval and says in words whether the interval crosses 1.
 - **Answers are reused, not re-bought** — an AI answer is stored in the viewer's own
   browser, keyed on the task and the exact bytes that were sent, so asking the same
   question about the same file again costs no request. Nothing is stored on a server, the
