@@ -56,6 +56,10 @@ changes the report only when you accept a suggestion.
   review. Each rule is applied to a copy and measured before it can be accepted, accepted
   rules run the analysis on the original rows, the report says it was built from cleaned
   data, and the rules export as a pandas snippet.
+- **Answers are reused, not re-bought** — an AI answer is stored in the viewer's own
+  browser, keyed on the task and the exact bytes that were sent, so asking the same
+  question about the same file again costs no request. Nothing is stored on a server, the
+  panels say so, and a button clears the lot.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
   behind each decision, the thresholds and estimators it uses, what it cannot decide, and
   how well the optional AI assistant scores on files its prompts were never tuned on
@@ -226,7 +230,8 @@ src/
                               /methodology (how the engine works)
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
-    ai/                       AI client (requestAi); per feature a payload builder, a verifier
+    ai/                       AI client (requestAi) and its browser answer cache; per
+                              feature a payload builder, a verifier
                               and a schema shared with the Worker (dossier, leakage,
                               cleaning)
   content/
