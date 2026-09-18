@@ -149,6 +149,30 @@ export const PRINCIPLES = [
   },
 ];
 
+/* How well the optional AI assistant actually does, measured. Every figure here is
+   from vecto-plan items 19 (validation and test sets, expectations committed before
+   any request) and 17 (the owner's blind labels) — NOT from the corpus the prompts
+   were tuned on, which scores higher and would flatter the assistant. Update these
+   only from a recorded run; a rounder number here is a worse number. */
+export const AI_MEASURED = [
+  {
+    title: "Choosing the target",
+    text: "On 10 files never used to write the prompt — new domains, each with a published data dictionary, run once — the assistant's first suggestion matched the documented target 10 times out of 10. The engine's own name-and-shape guess matched 5 of 10 on the same files. On a separate 8-file set used while the prompt was still moving: 7 of 7 against the engine's 2 of 7.",
+  },
+  {
+    title: "Describing columns",
+    text: "On that same 10-file run, 213 of 214 checks passed: roles 118 of 118, subtypes 75 of 76. The one miss called a census sampling weight a count. Cleaning rules were the weaker half at 9 of 11, both misses on one file that writes decimals with commas — the cause was a bug in the engine's own scan, since fixed.",
+  },
+  {
+    title: "A person labelled the same columns blind",
+    text: "60 columns from 17 files, shown only what the model is shown — the name and a profile, no dictionary, no engine role. The labeller answered \u201cnot sure\u201d for 55% of them. Where they did decide (n = 36), their role agreed with the model at \u03ba 0.86 and with the written expectations at \u03ba 0.93. Half of these columns are undecidable from what the model sees, so the scores above rest on files that arrived with documentation.",
+  },
+  {
+    title: "Leakage is the weaker task",
+    text: "92% of checks on the files the prompt was written against, but only 11 of 14 known leaks were raised. On the 10-file held-out run it scored 88% and raised 4 of 12, under an earlier model setting. It also raises columns that turn out to be legitimate \u2014 which is why a claim the engine cannot measure is shown as a question, never as a verdict.",
+  },
+];
+
 /* What the engine does not decide. Stated for the reader who will otherwise find
    each one the hard way. */
 export const LIMITS = [

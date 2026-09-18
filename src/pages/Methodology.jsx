@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
-import { METHODOLOGY_INTRO, PHASES, PRINCIPLES, LIMITS } from "../content/methodology.js";
+import { METHODOLOGY_INTRO, PHASES, PRINCIPLES, AI_MEASURED, LIMITS } from "../content/methodology.js";
 
 const index2 = (i) => String(i + 1).padStart(2, "0");
 
@@ -115,7 +115,33 @@ function Methodology() {
             </div>
 
             <div className="mt-24 sm:mt-32">
-              <SectionLabel mark="04">Limits</SectionLabel>
+              <SectionLabel mark="04">The AI assistant, measured</SectionLabel>
+              <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
+                <div>
+                  <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
+                    How well the optional assistant does.
+                  </h2>
+                  <p className="mt-5 max-w-[42ch] text-[13.5px] leading-[1.75] text-ink-soft">
+                    Scored against answers written before the files were ever sent, on files the
+                    prompts were never tuned on. Nothing below is a rounded or a best figure.
+                  </p>
+                </div>
+                <div className="border-t border-line">
+                  {AI_MEASURED.map((item, i) => (
+                    <div key={item.title} className="flex items-baseline gap-5 border-b border-line py-5 sm:gap-8">
+                      <span className="font-mono text-[11px] text-ink-faint">{index2(i)}</span>
+                      <div>
+                        <div className="text-[15px] font-medium tracking-tight text-ink">{item.title}</div>
+                        <p className="mt-1.5 text-[13.5px] leading-[1.7] text-ink-soft">{item.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-24 sm:mt-32">
+              <SectionLabel mark="05">Limits</SectionLabel>
               <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
                 <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
                   What the engine does not decide.
