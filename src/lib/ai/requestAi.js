@@ -4,6 +4,8 @@
    network, a cancel — comes back as one shape, because an AI failure must never
    be able to break the page it sits on. The engine report does not depend on it. */
 
+import { readCached, writeCached } from "./answerCache.js";
+
 /* Free models are slow: measured on the eval, nemotron-3-ultra took 24–95 s per
    dossier (openpowerlifting 95 s), and a 120 s limit would have failed real files. */
 const TIMEOUT_MS = 180_000;
@@ -19,11 +21,16 @@ const MESSAGES = {
   payload_too_large: "This dataset's profile is too large to send in one request.",
 };
 
-/* → { result, model, error, detail, aborted } — `error` is a sentence for the user,
-   `detail` the provider's own message when there is one. */
+/* → { result, model, error, detail, aborted, cached } — `error` is a sentence for the
+   user, `detail` the provider's own message when there is one. */
 export async function requestAi(task, payload, signal) {
   const timeout = AbortSignal.timeout(TIMEOUT_MS);
   const fail = (error, detail = null) => ({ result: null, model: null, error, detail, aborted: false });
+
+  /* An answer this browser already has, for this exact task and payload. Only a
+     success is ever stored, so a cached reply can never be an error replayed. */
+  const cached = await readCached(task, payload);
+  if (cached) return { ...cached, error: null, detail: null, aborted: false, cached: true };
 
   try {
     const res = await fetch("/api/ai", {
@@ -34,7 +41,9 @@ export async function requestAi(task, payload, signal) {
     });
     const body = await res.json().catch(() => null);
     if (res.ok && body && "result" in body) {
-      return { result: body.result, model: body.model ?? null, error: null, detail: null, aborted: false };
+      const answer = { result: body.result, model: body.model ?? null };
+      await writeCached(task, payload, answer);
+      return { ...answer, error: null, detail: null, aborted: false, cached: false };
     }
     if (!body?.error) {
       return fail(`No AI endpoint answered at /api/ai (HTTP ${res.status}). Locally, run the Worker with \`npx wrangler dev\`.`);
