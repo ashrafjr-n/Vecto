@@ -16,7 +16,13 @@
     // Tried in order by OpenRouter's `models` fallback. Each is the free variant of a
     // paid model, so dropping ":free" later changes billing, not behaviour.
     // Empty string = AI switched off (the endpoint answers 503 ai_disabled).
-    "AI_MODELS": "nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free"
+    //
+    // ONE model since 2026-09-18 (vecto-plan item 20). super answered leakage files in
+    // 1-7 s with ZERO findings on documented leaks (corpus, validation and test all show
+    // it) and gemma has never answered a single request (overloaded, then 429). Measured:
+    // leakage 87% -> 92% on ultra alone. The cost is latency (median 70-95 s) and no
+    // fallback: an overloaded ultra is now an upstream_error, which is free and retryable.
+    "AI_MODELS": "nvidia/nemotron-3-ultra-550b-a55b:free"
   }
   // OPENROUTER_API_KEY is a Worker SECRET (dashboard or `wrangler secret put`), and
   // `.dev.vars` locally — never a var here, never VITE_*.
