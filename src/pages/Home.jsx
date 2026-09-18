@@ -205,9 +205,9 @@ function Home() {
               </p>
               <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
                 Nothing is uploaded — parsing and analysis run locally, in this tab. An
-                optional AI assistant can send a column summary, never row data, only
-                when you ask. Every number in the report carries its reasoning, and
-                every score held back says why.
+                optional AI assistant can send a column summary, never row data, and only
+                once you have asked for it. Every number in the report carries its
+                reasoning, and every score held back says why.
               </p>
             </div>
 

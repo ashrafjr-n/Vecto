@@ -145,7 +145,7 @@ export const PRINCIPLES = [
   },
   {
     title: "Deterministic and local",
-    text: "Parsing and analysis run in this browser tab, in a background worker. No file is uploaded — the optional AI assistant sends only summaries of the file, never its rows, and only when asked — and sampling is deterministic, so the same file and target always produce the same report.",
+    text: "Parsing and analysis run in this browser tab, in a background worker. No file is uploaded — the optional AI assistant sends only summaries of the file, never its rows, and never before you have asked for it once; after that, the leakage review of a new report runs by itself. Sampling is deterministic, so the same file and target always produce the same report.",
   },
 ];
 
