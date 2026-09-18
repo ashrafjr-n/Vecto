@@ -57,7 +57,8 @@ changes the report only when you accept a suggestion.
   rules run the analysis on the original rows, the report says it was built from cleaned
   data, and the rules export as a pandas snippet.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
-  behind each decision, the thresholds and estimators it uses, and what it cannot decide
+  behind each decision, the thresholds and estimators it uses, what it cannot decide, and
+  how well the optional AI assistant scores on files its prompts were never tuned on
 
 ## Getting started
 
@@ -229,11 +230,12 @@ src/
                               and a schema shared with the Worker (dossier, leakage,
                               cleaning)
   content/
-    methodology.js            copy for /methodology — thresholds quoted from the engine
+    methodology.js            copy for /methodology — thresholds quoted from the engine,
+                              AI figures quoted from held-out eval runs
   pages/
     Home.jsx                  intro + the functional CSV dropzone
     Analyze.jsx                3-step machine: Target → Processing → Results
-    Methodology.jsx           the eight engine stages, trust principles and limits
+    Methodology.jsx           engine stages, trust principles, measured AI accuracy, limits
   components/
     layout/Header.jsx         fixed, full-width, shared by every page
     common/                   shared primitives (ErrorBoundary, SectionLabel)
