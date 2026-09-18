@@ -102,6 +102,7 @@ const TASK_DEFS = {
       const d = cleaningFor(e);
       return [
         ...(e.targets ?? []), ...Object.keys(e.roles ?? {}), ...Object.keys(e.subtypes ?? {}),
+        ...Object.keys(e.sensitive ?? {}),
         ...(d ? [...(d.rules ?? []).map((r) => r.column), ...Object.keys(d.forbidden ?? {})] : []),
       ];
     },
@@ -132,6 +133,11 @@ const TASK_DEFS = {
         ["Target, any of top 3 (AI)", pctOf(all.filter((c) => c.kind === "target@3"))],
         ["Roles", pctOf(all.filter((c) => c.kind === "role"))],
         ["Subtypes", pctOf(all.filter((c) => c.kind === "subtype"))],
+        /* Split, because the two halves fail for opposite reasons: missing a real
+           sensitive attribute is under-reading, and labelling a penguin's sex is
+           reading the column NAME. One percentage would hide both. */
+        ["Sensitive, attribute named", pctOf(all.filter((c) => c.kind === "sensitive" && !c.want.includes(null)))],
+        ["Sensitive, correctly left null", pctOf(all.filter((c) => c.kind === "sensitive" && c.want.includes(null)))],
         ["Expected rules proposed", pctOf(all.filter((c) => c.kind === "rule"))],
         ["Factors and bounds right", pctOf(all.filter((c) => c.kind === "factor"))],
         ["Wrong rules declined", pctOf(all.filter((c) => c.kind === "declined" || c.kind === "quiet"))],

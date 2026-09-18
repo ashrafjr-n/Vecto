@@ -23,6 +23,16 @@ export function scoreDossier(expect, verified, engineTargetGuess) {
     }
   }
 
+  /* `sensitive` (item 29). A label of null is an ANSWER, not a missing one, so the
+     expectation `{ col: null }` is a real check: it fails when the model invents an
+     attribute for a penguin's sex or a diamond's colour. `want` is an array of
+     acceptable values or a bare null, and both are scored the same way. */
+  for (const [col, want] of Object.entries(expect.sensitive ?? {})) {
+    const got = byName.get(col)?.sensitive ?? null;
+    const accept = want === null ? [null] : want;
+    add("sensitive", col, accept.includes(got), got, accept);
+  }
+
   const passed = checks.filter((c) => c.ok).length;
   return {
     passed,
@@ -31,6 +41,8 @@ export function scoreDossier(expect, verified, engineTargetGuess) {
     // Not pass/fail — the shape of the answer, reported beside the score.
     hygiene: {
       described: verified.columns.length,
+      // How many columns the model called sensitive at all — a precision/recall smell test.
+      sensitiveFlagged: verified.columns.filter((c) => c.sensitive).length,
       undescribed: verified.undescribed.length,
       withheld: verified.withheld.length,
       contradictedRoles: verified.columns.filter((c) => c.roleContradiction).length,

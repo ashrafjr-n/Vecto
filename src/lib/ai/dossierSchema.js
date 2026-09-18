@@ -16,6 +16,20 @@ export const DOSSIER_SUBTYPES = [
   "category", "flag", "date", "free_text", "other",
 ];
 
+/* Attributes that make a column about a PERSON in a way a model must not use
+   carelessly — vecto-plan item 29. A closed list, never free text: "sensitive" as a
+   free string invites the model to editorialise, and the verifier could only pass it
+   through. null is a first-class answer and the common one.
+
+   It describes what the column RECORDS, not whether using it is wrong: that is the
+   user's call and the engine has no standing to make it. `financial_hardship` covers
+   the means-tested proxies (a free-school-meals flag) as well as income itself,
+   because a proxy carries the attribute whether or not it names it. */
+export const DOSSIER_SENSITIVE = [
+  "sex_gender", "race_ethnicity", "religion", "health", "sexual_orientation",
+  "age", "nationality_origin", "disability", "political_opinion", "financial_hardship",
+];
+
 export const DOSSIER_CONFIDENCE = ["low", "medium", "high"];
 export const DOSSIER_TASKS = ["classification", "regression"];
 
@@ -43,10 +57,13 @@ export const DOSSIER_SCHEMA = {
             required: ["min", "max"],
             additionalProperties: false,
           },
+          /* Nullable enum, not an optional key: the strict schema requires every
+             property, and "not sensitive" is an answer, not an absence. */
+          sensitive: { type: ["string", "null"], enum: [...DOSSIER_SENSITIVE, null] },
           confidence: { type: "string", enum: DOSSIER_CONFIDENCE },
           evidence:   { type: "array", items: { type: "string" } },
         },
-        required: ["name", "meaning", "role", "subtype", "unit", "validRange", "confidence", "evidence"],
+        required: ["name", "meaning", "role", "subtype", "unit", "validRange", "sensitive", "confidence", "evidence"],
         additionalProperties: false,
       },
     },
