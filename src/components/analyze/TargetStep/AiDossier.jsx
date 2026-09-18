@@ -105,6 +105,13 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
             spelling or placeholder with its count and up to 3 examples. No rows, and no
             values from free-text columns.
           </p>
+          {/* Asking here is the opt-in for the whole session, so it is stated here —
+              not in the leakage panel, which by then has already sent its request. */}
+          <p className="mt-3 text-[12.5px] leading-[1.7] text-ink-faint">
+            Asking once also lets the leakage review run by itself when a report is built,
+            so it is ready when you reach it. It sends column names, roles and the engine&apos;s
+            measured associations — again no rows. Nothing is sent until you ask here.
+          </p>
           <AiPayloadPreview build={payload} />
           <button
             type="button"
