@@ -518,9 +518,10 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
 
      "Keep one of" costs the reader a column, so it needs the bar the numeric
      advice uses (|r| ≥ 0.9), not the 0.6 that admits a pair to this block.
-     Measured over all 43 test files: at V 0.6–0.9 the similar-grain pairs carry
-     two facts each — penguins species↔island 0.66, taxis color↔pickup_borough
-     0.62, hotels reserved↔assigned room type 0.78, titanic Ticket↔Cabin 0.79 —
+     Measured over all 43 test files: at V 0.6–0.9 the similar-grain pairs include
+     plain cases of two facts — penguins species↔island 0.66, taxis
+     color↔pickup_borough 0.62, hotels reserved↔assigned room type 0.78, titanic
+     Ticket↔Cabin 0.79 —
      while at ≥ 0.9 they restate each other (pclass↔class, league↔country,
      embarked↔embark_town, all 1.00). Uneven pairs keep 0.6: their advice says the
      columns are NOT interchangeable, so it never costs a column, and the
