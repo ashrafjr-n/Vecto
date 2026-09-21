@@ -117,8 +117,10 @@ check("no target gives no plan", buildPrepPlan(analyzeDataset(data, Object.keys(
 /* ── the scikit-learn script ────────────────────────────────────────────────
    These lock its decisions. That it RUNS was verified by executing the generated
    script in Python (scikit-learn 1.7, pandas 2.2) on titanic, penguins, taxis,
-   meets and smoking, with and without cleaning rules: every one ran, and its
-   feature width matched fitPrep's (33, 9, 57, 20, 47). */
+   meets and smoking, with and without cleaning rules: every one ran. Fitted on the
+   same rows its feature width equals fitPrep's (smoking: 48 both); on its own split
+   it can be a column short when a rare level misses the training side (smoking 47),
+   which is the point of fitting on train only. */
 const script = prepPlanToSklearn(p);
 check("the script splits before it fits, and fits on the training rows only",
   script.indexOf("train_test_split(") < script.indexOf("preprocess.fit(X_train)")
