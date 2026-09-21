@@ -35,12 +35,23 @@ changes the report only when you accept a suggestion.
   ML-ready
 - **AI column review (optional)** — on the target picker, one request asks a language model
   to read a per-column summary and suggest what each column records, a finer subtype, a
-  unit, a plausible range and the likely target, together with cleaning rules for the values
+  unit, a plausible range, **whether the column records a personal attribute** (one value
+  from a closed list — sex or gender, race or ethnicity, health, age, nationality, and so
+  on — or nothing at all) and the likely target, together with cleaning rules for the values
   the engine's scan found dirty (see cleaning proposals below). Every claim is checked against the file before it is shown: quoted values
   must exist, a suggested role the data contradicts is not offered, the plausible range is
   counted by the engine, and an unusable target is withheld. An accepted role becomes an
   explicit input to the analysis and is marked in the report; accepted cleaning rules are
   applied to the upload before the first analysis, so no re-run is needed.
+- **Proxies for personal data** — when the review flags a column as recording a personal
+  attribute, the Relationships tab lists the columns the engine **measured** against it,
+  because dropping a column does not remove the attribute if another column predicts it.
+  On Titanic, `who` is read as age and `adult_male` reproduces it at Cramér's V = 1.00.
+  The card also says how many columns were never compared with it at all — between
+  features the engine measures numeric against numeric and categorical against
+  categorical, never one against the other — so silence is not read as an all-clear. It
+  appears only when something was flagged: there is no "no personal data found" message,
+  because that would be a claim nobody measured.
 - **AI leakage review (optional)** — on the Target Signal tab, a language model reads column
   names, roles and the engine's measured associations (no cell values) and names the
   columns a model could not use at prediction time: derived from the target, recorded after
