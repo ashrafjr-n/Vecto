@@ -8,6 +8,7 @@ import VisualizationsTab from "./tabs/VisualizationsTab.jsx";
 import RelationshipsTab  from "./tabs/RelationshipsTab.jsx";
 import ClassBalanceTab   from "./tabs/ClassBalanceTab.jsx";
 import TargetSignalTab   from "./tabs/TargetSignalTab.jsx";
+import PreparationTab    from "./tabs/PreparationTab.jsx";
 import AiBadge           from "../shared/AiBadge.jsx";
 
 const BASE_TABS = [
@@ -18,6 +19,7 @@ const BASE_TABS = [
   { id: "targetsignal",   label: "Target Signal", requiresTarget: true },
   { id: "relationships",  label: "Relationships"                       },
   { id: "classbalance",   label: "Class Balance", requiresClasses: true },
+  { id: "preparation",    label: "Preparation",   requiresTarget: true },
 ];
 
 function ResultsDashboard({ result, onReset, ai }) {
@@ -171,6 +173,7 @@ function ResultsDashboard({ result, onReset, ai }) {
                 {activeTab === "targetsignal"   && <TargetSignalTab   result={result} ai={ai} />}
                 {activeTab === "relationships"  && <RelationshipsTab  result={result} ai={ai} />}
                 {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
+                {activeTab === "preparation"    && <PreparationTab    result={result} ai={ai} />}
               </motion.div>
             </AnimatePresence>
           </div>
