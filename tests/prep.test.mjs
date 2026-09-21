@@ -5,6 +5,7 @@
 import { assignFolds } from "../src/lib/prep/folds.js";
 import { usableRows, encodeTarget, fitPrep, transformRows, MAX_CATEGORIES } from "../src/lib/prep/encode.js";
 import { buildPrepPlan } from "../src/lib/prep/plan.js";
+import { prepPlanToSklearn } from "../src/lib/prep/sklearn.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 
 let failed = 0;
@@ -112,6 +113,29 @@ const flat = analyzeDataset(data.map(r => ({ ...r, churn: "yes" })), Object.keys
 check("a constant target gives no plan, and says why",
   buildPrepPlan(flat).usable === false && /never varies/.test(buildPrepPlan(flat).reason));
 check("no target gives no plan", buildPrepPlan(analyzeDataset(data, Object.keys(data[0]), null)).usable === false);
+
+/* ── the scikit-learn script ────────────────────────────────────────────────
+   These lock its decisions. That it RUNS was verified by executing the generated
+   script in Python (scikit-learn 1.7, pandas 2.2) on titanic, penguins, taxis,
+   meets and smoking, with and without cleaning rules: every one ran, and its
+   feature width matched fitPrep's (33, 9, 57, 20, 47). */
+const script = prepPlanToSklearn(p);
+check("the script splits before it fits, and fits on the training rows only",
+  script.indexOf("train_test_split(") < script.indexOf("preprocess.fit(X_train)")
+  && !/preprocess\.fit\(X\b|fit_transform\(X\)/.test(script));
+check("the script stratifies a classification target", /stratify=y/.test(script));
+check("every left-out column is named in the script with its reason",
+  p.excluded.every(e => script.includes(`#   ${e.col} — ${e.reason}`)));
+check("an empty imputation group is still defined, so the script never hits a NameError",
+  /^NUMERIC_MOST_FREQUENT = \[\]$/m.test(script) && /^NUMERIC_MEAN = \[/m.test(script));
+check("the missing tokens are the engine's own", script.includes('MISSING = ["", "na", "n/a", "nan", "null", "none", "?"]'));
+const groupedScript = prepPlanToSklearn({ ...p, groupBy: "city", stratify: false });
+check("a grouped plan splits with GroupShuffleSplit on its column, and does not stratify",
+  /GroupShuffleSplit\(n_splits=1, test_size=0\.2, random_state=42\)/.test(groupedScript)
+  && groupedScript.includes('groups = df["city"]') && !/stratify=y/.test(groupedScript));
+check("accepted cleaning rules come before anything is split",
+  (() => { const s = prepPlanToSklearn(p, [{ column: "city", type: "merge_levels", affixes: [], values: [], merges: [{ from: "East", to: "east" }] }]);
+           return s.includes("# merge_levels: city") && s.indexOf("# merge_levels: city") < s.indexOf("train_test_split("); })());
 
 console.log(failed === 0 ? "all prep checks passed" : `${failed} prep check(s) FAILED`);
 process.exit(failed === 0 ? 0 : 1);
