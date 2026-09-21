@@ -15,7 +15,9 @@ import { basename, extname, join } from "node:path";
 import Papa from "papaparse";
 
 import { analyzeDataset, detectTarget } from "../src/components/utils/core/index.js";
-import { inspectParseResult, transformHeader, MAX_SIZE_MB, MAX_SIZE_B } from "../src/lib/csvIntake.js";
+import {
+  inspectParseResult, transformHeader, headerlessVerdict, headerlessRows, MAX_SIZE_MB, MAX_SIZE_B,
+} from "../src/lib/csvIntake.js";
 
 const args    = process.argv.slice(2);
 const files   = args.filter(a => !a.startsWith("--"));
@@ -33,8 +35,17 @@ mkdirSync(outDir, { recursive: true });
 for (const file of files) {
   const name   = basename(file, extname(file));
   const bytes  = statSync(file).size;
-  const parsed = Papa.parse(readFileSync(file, "utf8"), { header: true, skipEmptyLines: true, transformHeader });
-  const intake = inspectParseResult(parsed);
+  const text   = readFileSync(file, "utf8");
+  let parsed   = Papa.parse(text, { header: true, skipEmptyLines: true, transformHeader });
+  let intake   = inspectParseResult(parsed);
+  /* A first row of data is read as data — the answer the app pre-selects. The
+     CLI has nobody to ask, so the choice is recorded instead of made silently. */
+  const headerless = headerlessVerdict(parsed);
+  if (headerless) {
+    const rows = headerlessRows(Papa.parse(text, { skipEmptyLines: true }).data);
+    parsed = { data: rows.data, meta: { fields: rows.fields } };
+    intake = { error: null, malformed: rows.malformed };
+  }
 
   const report = {
     file,
@@ -43,6 +54,7 @@ for (const file of files) {
        not enforced, so an oversized dataset can still be analyzed here. */
     overSizeCap: bytes > MAX_SIZE_B ? `${MAX_SIZE_MB}MB cap exceeded` : null,
     intake,
+    headerless,
     rows: parsed.data.length,
     columns: parsed.meta.fields ?? [],
     target: null,
