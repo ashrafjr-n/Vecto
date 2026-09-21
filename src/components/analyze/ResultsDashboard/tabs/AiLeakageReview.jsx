@@ -4,6 +4,7 @@ import { buildLeakagePayload } from "../../../../lib/ai/leakage.js";
 import AiPanel          from "../../shared/AiPanel.jsx";
 import AiPayloadPreview from "../../shared/AiPayloadPreview.jsx";
 import StatusBadge      from "../../shared/StatusBadge.jsx";
+import { RELEVANCE_CATEGORIES } from "../../../../lib/ai/leakageSchema.js";
 
 /* AI phase C: which columns a model could not use at prediction time. The engine
    already flags near-deterministic associations; what it cannot see is TIMING and
@@ -24,6 +25,10 @@ const CATEGORY_LABEL = {
   recorded_after_outcome: "Recorded after the outcome",
   restates_label:         "Restates the label",
   group_leak:             "Entity repeats across rows",
+  /* Relevance (item 31): worth keeping / worth doubting. Neither is an accusation,
+     and the labels say which way each one points so the row cannot be skimmed as one. */
+  plausible_despite_weak_signal: "Weak number, but it should matter",
+  implausible_despite_signal:    "Strong number, but no reason to matter",
 };
 
 /* Verdict is about the CLAIM: "confirmed" means the data bears the leak out,
@@ -115,8 +120,13 @@ function FindingRow({ f }) {
 
 function ReviewResult({ review, target, onAskAgain }) {
   const sorted = [...review.findings].sort((a, b) => VERDICT_ORDER.indexOf(a.verdict) - VERDICT_ORDER.indexOf(b.verdict));
-  const findings = sorted.filter((f) => MEASURED.includes(f.verdict));
-  const questions = sorted.filter((f) => !MEASURED.includes(f.verdict));
+  /* Three lists, because the three make different kinds of claim and one heading
+     cannot be true of all of them. A relevance remark carries a real measurement and
+     is not an accusation, so it belongs under neither of the other two. */
+  const isRelevance = (f) => RELEVANCE_CATEGORIES.includes(f.category);
+  const findings  = sorted.filter((f) => !isRelevance(f) && MEASURED.includes(f.verdict));
+  const questions = sorted.filter((f) => !isRelevance(f) && !MEASURED.includes(f.verdict));
+  const remarks   = sorted.filter(isRelevance);
 
   return (
     <div className="mt-5 space-y-6">
@@ -163,6 +173,24 @@ function ReviewResult({ review, target, onAskAgain }) {
           </p>
           <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-paper">
             {questions.map((f) => <FindingRow key={`${f.column}|${f.category}`} f={f} />)}
+          </ul>
+        </section>
+      )}
+
+      {remarks.length > 0 && (
+        <section>
+          <h3 className="text-[11px] font-medium text-ink-faint">
+            {remarks.length} remark{remarks.length > 1 ? "s" : ""} on whether the numbers fit the columns
+          </h3>
+          <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
+            These are not leakage and not accusations. Each one asks whether a measured
+            association matches what the column means — a column worth keeping despite a weak
+            number, or a strong number with no reason behind it. The engine's own measurement
+            is quoted in each, including where it disagrees with the claim; the judgement is
+            yours either way.
+          </p>
+          <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-paper">
+            {remarks.map((f) => <FindingRow key={`${f.column}|${f.category}`} f={f} />)}
           </ul>
         </section>
       )}

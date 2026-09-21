@@ -15,7 +15,7 @@
 
 import { isMissing, normalizeValue, toNumber, rankEta } from "../../components/utils/core/helpers.js";
 import { ROLE } from "../../components/utils/core/roles.constants.js";
-import { LEAK_CATEGORIES, FORMULA_OPS, SPLIT_STRATEGIES, LEAKAGE_MAX_COLUMNS } from "./leakageSchema.js";
+import { FINDING_CATEGORIES, FORMULA_OPS, SPLIT_STRATEGIES, LEAKAGE_MAX_COLUMNS } from "./leakageSchema.js";
 
 const sig = (x) => Number(x.toPrecision(4));
 const text = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
@@ -205,7 +205,7 @@ export function verifyLeakage(answer, { data, result }) {
       withheld.push({ column, reason: "is the target itself" });
       continue;
     }
-    if (!LEAK_CATEGORIES.includes(f.category)) {
+    if (!FINDING_CATEGORIES.includes(f.category)) {
       withheld.push({ column, reason: `category "${f.category}" is not one of the allowed categories` });
       continue;
     }
@@ -300,7 +300,56 @@ const CHECKS = {
     verdict: "question",
     verdictText: `Timing cannot be read from the data. Is "${column}" known before "${result.meta.target}" is?`,
   }),
+
+  /* ── Relevance (item 31) ───────────────────────────────────────────────────
+     Both categories are a claim about MEANING with a claim about a NUMBER attached,
+     and only the number is checkable. The engine's own measurement is quoted back so
+     the reader can see whether the premise even holds, and the verdict stays
+     "question" whichever way it falls.
+
+     It is never a verdict because neither direction can be settled by data: a weak
+     number on a column that should matter is either a real effect the sample cannot
+     resolve or no effect at all, and a strong number on a column that should not
+     matter is either a confound or a genuine finding. Rendering either as confirmed
+     would put the model's opinion where the engine's measurement belongs — and on a
+     column that is NOT leaking, an accusation costs the user a good feature. */
+  plausible_despite_weak_signal: ({ column, result }) =>
+    relevanceCheck(column, result, "weak", `Is "${column}" weak here because the effect is small, or because this sample cannot resolve it?`),
+
+  implausible_despite_signal: ({ column, result }) =>
+    relevanceCheck(column, result, "strong", `Does "${column}" have a reason to predict "${result.meta.target}", or is something else behind the number?`),
 };
+
+/* The measured half of a relevance remark. `expect` is what the model's claim implies
+   the engine should have measured; when the engine measured the opposite, that is said
+   plainly and the finding still renders — as a question, with the number beside it. */
+const RELEVANCE_WEAK = 0.3;   // the engine's own bar for reporting an association at all
+
+function relevanceCheck(column, result, expect, ask) {
+  const { relationships } = result;
+  const tc = relationships.targetCorrelations?.[column];
+  if (!tc) {
+    const unscored = (relationships.unscoredColumns ?? []).find((u) => u.col === column);
+    return {
+      measurement: null,
+      verdict: "unchecked",
+      verdictText: unscored
+        ? `The engine could not measure "${column}" against the target: ${unscored.reason}`
+        : `The engine has no measured association for "${column}" to read this against.`,
+    };
+  }
+  const value = tc.absValue ?? 0;
+  const measured = `${METRIC_LABEL[tc.metric] ?? tc.metric} ${tc.value.toFixed(2)} (n ${tc.n.toLocaleString()})`;
+  const isWeak = value < RELEVANCE_WEAK;
+  const holds = expect === "weak" ? isWeak : !isWeak;
+  return {
+    measurement: { value, metric: tc.metric, n: tc.n },
+    verdict: "question",
+    verdictText: holds
+      ? `The engine measured ${measured}, which matches the claim. ${ask}`
+      : `The claim says the signal is ${expect}, but the engine measured ${measured}. ${ask}`,
+  };
+}
 
 const OP_SYMBOL = { sum: "+", difference: "−", product: "×", ratio: "÷" };
 const METRIC_LABEL = { pearson: "Pearson r", cramers_v: "Cramér's V", eta: "rank η" };

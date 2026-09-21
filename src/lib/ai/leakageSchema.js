@@ -12,6 +12,21 @@ export const LEAK_CATEGORIES = [
   "group_leak",              // an entity key that lets a random split memorise the entity
 ];
 
+/* Relevance, which is the opposite question to leakage: not "could this column not be
+   used", but "does the NUMBER match what the column means" (vecto-plan item 31).
+
+   They are kept apart from LEAK_CATEGORIES, and every consumer that asks "is this an
+   accusation" asks that list — the eval's scorer most of all, where a `clean` column may
+   fail only on a LEAK category. A remark that a good predictor is worth keeping must never
+   be counted as a false accusation of the column it defends. */
+export const RELEVANCE_CATEGORIES = [
+  "plausible_despite_weak_signal",   // the engine measured little, but the column should still matter
+  "implausible_despite_signal",      // the engine measured a lot, and the column has no reason to matter
+];
+
+/* Everything the model may put in `category`. LEAK_CATEGORIES stays the leak-only list. */
+export const FINDING_CATEGORIES = [...LEAK_CATEGORIES, ...RELEVANCE_CATEGORIES];
+
 /* A proposed arithmetic relationship, in a closed format the engine can evaluate —
    never code. result = op(terms):
      sum         result = t1 + t2 + …
@@ -33,7 +48,7 @@ export const LEAKAGE_SCHEMA = {
         type: "object",
         properties: {
           column:   { type: "string" },
-          category: { type: "string", enum: LEAK_CATEGORIES },
+          category: { type: "string", enum: FINDING_CATEGORIES },
           reason:   { type: "string" },
           formula: {
             type: ["object", "null"],

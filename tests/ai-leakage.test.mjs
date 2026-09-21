@@ -6,6 +6,7 @@
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { buildLeakagePayload, verifyLeakage, evaluateFormula, measureGroupLeak } from "../src/lib/ai/leakage.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
+import { LEAK_CATEGORIES, FINDING_CATEGORIES } from "../src/lib/ai/leakageSchema.js";
 
 let failures = 0;
 function check(name, ok) {
@@ -122,6 +123,39 @@ check("the engine flags total (r ≈ 1) — the fixture really exercises engineO
   result.relationships.leakageSuspects.some((l) => l.col === "total"));
 check("an engine leakage flag the model did not mention is listed; a mentioned one is not",
   silent.engineOnly.some((e) => e.column === "total") && !v.engineOnly.some((e) => e.column === "total"));
+
+/* ── Relevance categories (vecto-plan item 31) ────────────────────────────────
+   The claim is about meaning; only the number attached to it is checkable. What must
+   hold whichever way the number falls: the verdict is a QUESTION, the engine's own
+   measurement is quoted, and a disagreement is said out loud instead of being dropped. */
+const rel = (category, column) => verifyLeakage(
+  { findings: [{ column, category, reason: "", formula: null }], split: null },
+  { data: ROWS, result }).findings[0];
+
+const weakOnWeak = rel("plausible_despite_weak_signal", "rating");
+check("a relevance remark is a question, never a verdict", weakOnWeak.verdict === "question");
+check("it quotes the engine's own measurement", /Pearson r |Cramér's V |rank η /.test(weakOnWeak.verdictText));
+check("a weak-signal claim on a weak column is said to match", /matches the claim/.test(weakOnWeak.verdictText));
+
+const strongOnWeak = rel("implausible_despite_signal", "rating");
+check("a strong-signal claim on a weak column is contradicted in words, not dropped",
+  strongOnWeak.verdict === "question" && /but the engine measured/.test(strongOnWeak.verdictText));
+
+const strongOnStrong = rel("implausible_despite_signal", "total");
+check("a strong-signal claim on a strong column is said to match",
+  strongOnStrong.verdict === "question" && /matches the claim/.test(strongOnStrong.verdictText));
+
+const relevanceUnscored = verifyLeakage(
+  { findings: [{ column: "trip_id", category: "plausible_despite_weak_signal", reason: "", formula: null }], split: null },
+  { data: ROWS, result }).findings[0];
+check("a column the engine never scored is unchecked, with the engine's reason",
+  relevanceUnscored.verdict === "unchecked" && /could not measure|no measured association/.test(relevanceUnscored.verdictText));
+
+check("a relevance category is still not a leak category",
+  !LEAK_CATEGORIES.includes("plausible_despite_weak_signal") && FINDING_CATEGORIES.includes("plausible_despite_weak_signal"));
+check("an invented relevance-sounding category is still withheld",
+  !verifyLeakage({ findings: [{ column: "rating", category: "probably_fine", reason: "", formula: null }], split: null },
+    { data: ROWS, result }).findings.length);
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-leakage checks passed");
 process.exit(failures ? 1 : 0);
