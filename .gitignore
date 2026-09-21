@@ -31,3 +31,7 @@ vecto-brain/
 # OpenRouter key for local runs and must never be committed
 .wrangler/
 .dev.vars
+
+# Knowledge graph built by the graphify skill — regenerated from the source on every
+# commit by its post-commit hook, 1.8MB, and never read by the app or the build.
+graphify-out/
