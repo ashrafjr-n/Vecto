@@ -16,14 +16,17 @@ const INFREQUENT = "\u0000infrequent";
 const numberOf = (v) => (isMissing(v) ? NaN : toNumber(v));
 const levelOf  = (v) => (isMissing(v) ? null : normalizeValue(v));
 
-/* Rows a model can use: the target recorded (it is never imputed), and — when
-   the file has duplicate rows — only the first copy, or a row could sit in train
-   and test at once. → array of row indices. */
+/* Rows a model can use: the target recorded (it is never imputed) — and, for a
+   regression target, recorded as a number, since a column the engine calls
+   numeric may still hold a few values that are not — and, when the file has
+   duplicate rows, only the first copy, or a row could sit in train and test at
+   once. → array of row indices. */
 export function usableRows(plan, rows) {
   const seen = plan.dropDuplicates ? new Set() : null;
   const keep = [];
   for (let i = 0; i < rows.length; i++) {
     if (isMissing(rows[i][plan.target])) continue;
+    if (plan.task === "regression" && Number.isNaN(numberOf(rows[i][plan.target]))) continue;
     if (seen) {
       const key = JSON.stringify(Object.values(rows[i]));
       if (seen.has(key)) continue;
@@ -60,9 +63,31 @@ function mostFrequent(counts) {
   return best;
 }
 
+/* Quantile cut points of the training values, duplicates removed. */
+function quantileEdges(values, bins) {
+  const sorted = values.slice().sort((a, b) => a - b);
+  const edges = [];
+  for (let j = 1; j < bins; j++) {
+    const e = sorted[Math.floor((j * sorted.length) / bins)];
+    if (edges.length === 0 || e > edges[edges.length - 1]) edges.push(e);
+  }
+  return edges;
+}
+
+/* Number of edges ≤ x — the bin x falls in. */
+function binOf(edges, x) {
+  let lo = 0, hi = edges.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (edges[mid] <= x) lo = mid + 1; else hi = mid; }
+  return lo;
+}
+
 /* → a fitted plan: [{ kind, col, … }], each part knowing its own output width.
-   `features` narrows the plan to some columns (the one-column check in item 36). */
-export function fitPrep(plan, rows, trainIdx, features = null) {
+   `features` narrows the plan to some columns (the one-column check in item 36).
+   `bins` replaces each number by its training-quantile bin, one-hot, with a
+   column of its own for missing: a straight line cannot see a U-shape, and a
+   check for "does this column alone give the answer away" must see any shape.
+   The pipeline itself never bins — this is a measurement option only. */
+export function fitPrep(plan, rows, trainIdx, features = null, { bins = 0 } = {}) {
   const use = (col) => !features || features.includes(col);
   const parts = [];
 
@@ -70,6 +95,11 @@ export function fitPrep(plan, rows, trainIdx, features = null) {
     const values = [];
     for (const i of trainIdx) { const x = numberOf(rows[i][col]); if (!Number.isNaN(x)) values.push(x); }
     if (values.length === 0) continue;             // nothing to learn from — SimpleImputer drops it too
+    if (bins) {
+      const edges = quantileEdges(values, bins);
+      parts.push({ kind: "bins", col, edges, width: edges.length + 2 });   // bins + the missing column
+      continue;
+    }
     let fill;
     if (impute === "median") fill = median(values.slice().sort((a, b) => a - b));
     else if (impute === "mean") fill = values.reduce((s, x) => s + x, 0) / values.length;
@@ -111,6 +141,9 @@ export function transformRows(fitted, rows, idx) {
       if (p.kind === "numeric") {
         const x = numberOf(v);
         X[c] = ((Number.isNaN(x) ? p.fill : x) - p.mean) / p.scale;
+      } else if (p.kind === "bins") {
+        const x = numberOf(v);
+        X[c + (Number.isNaN(x) ? p.edges.length + 1 : binOf(p.edges, x))] = 1;
       } else if (p.kind === "missing") {
         X[c] = isMissing(v) ? 1 : 0;
       } else {
