@@ -19,7 +19,8 @@ import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
 import { analyzeDataset, ANALYSIS_PHASES, detectTarget } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
-import { validateFile, inspectParseResult, transformHeader, MAX_SIZE_B } from "../src/lib/csvIntake.js";
+import { validateFile, inspectParseResult, transformHeader, headerlessVerdict, headerlessRows, MAX_SIZE_B } from "../src/lib/csvIntake.js";
+import Papa from "papaparse";
 import { runAnalysis, runAnalysisSync } from "../src/lib/runAnalysis.js";
 import { normalizeValue, valueFrequencies, cramersV, mutualInformation, toNumber, quantile, median,
          discretize, sampleIndices, pearson, spearman } from "../src/components/utils/core/helpers.js";
@@ -135,6 +136,28 @@ check("non-CSV file is rejected",
 
 check("valid CSV file is accepted",
   validateFile({ name: "data.csv", type: "text/csv", size: 1000 }) === null);
+
+/* Headerless files: the first row must not silently become the column names. */
+const headerParse = (text) => Papa.parse(text, { header: true, skipEmptyLines: true, transformHeader });
+check("a first row of decimals is read as data, not names",
+  JSON.stringify(headerlessVerdict(headerParse("0.02,0.0371,-1.5,R\n0.4,0.5,0.6,M\n")))
+    === JSON.stringify({ dataLike: 3, total: 4 }));
+check("a duplicated decimal header is judged by what the file says, not PapaParse's rename",
+  headerlessVerdict(headerParse("0.02,0.02,R\n0.4,0.5,M\n"))?.dataLike === 2);
+check("whole-number headers (years, pandas indices) stay names",
+  headerlessVerdict(headerParse("country,2019,2020,2021\nQA,1,2,3\n")) === null
+  && headerlessVerdict(headerParse("0,1,2\n0.5,1.5,2.5\n")) === null);
+check("an ordinary header is not flagged",
+  headerlessVerdict(headerParse("age,fare,survived\n22,7.25,0\n")) === null);
+(() => {
+  const { data, fields, malformed } = headerlessRows(
+    Papa.parse("0.02,0.03,R\n0.4,0.5,M\n0.6,M\n", { skipEmptyLines: true }).data);
+  check("headerless rows keep the first row and are keyed column_N",
+    fields.join() === "column_1,column_2,column_3" && data.length === 3
+    && data[0].column_1 === "0.02" && data[0].column_3 === "R");
+  check("a headerless row of the wrong length is counted, on its own line number",
+    malformed?.count === 1 && malformed.sampleRows[0] === 3 && malformed.totalRows === 3);
+})();
 
 /* ══════════════════════════════════════════
    3. PATHOLOGICAL TARGETS — must not crash the report
