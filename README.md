@@ -78,6 +78,17 @@ changes the report only when you accept a suggestion.
   browser, keyed on the task and the exact bytes that were sent, so asking the same
   question about the same file again costs no request. Nothing is stored on a server, the
   panels say so, and a button clears the lot.
+- **Preparation plan and pipeline export** — a Preparation tab turns the report's decisions
+  into a training pipeline: split first (stratified, or grouped by an entity column the
+  advice names), every imputation, scale and category list fitted on the training rows only,
+  and each left-out column listed with its reason. It downloads as a runnable scikit-learn
+  script — prepared features, no model.
+- **Diagnostic baseline** — one fixed, untuned ridge model, cross-validated over five folds
+  through that same pipeline, answers whether the columns carry any signal (a corrected
+  paired t-test against a majority-class or mean baseline) and whether one column alone
+  nearly decides the target — including a curved relationship the correlations miss.
+- **Headerless files** — a first row that looks like data (decimal or negative numbers) is
+  offered back as data instead of silently becoming the column names.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
   behind each decision, the thresholds and estimators it uses, what it cannot decide, and
   how well the optional AI assistant scores on files its prompts were never tuned on
@@ -237,6 +248,11 @@ This runs nine files:
 - **`tests/ai-cleaning.test.mjs`** — cleaning candidates, rule application (never in place),
   rule verification and measurement, and the pandas export.
 - **`tests/ai-eval-score.test.mjs`** — the eval's scoring rules on hand-built answers.
+- **`tests/prep.test.mjs`** — the preparation pipeline: deterministic, stratified and grouped
+  folds, nothing learned from held-out rows, the plan's agreement with the report's advice,
+  and the exported script's decisions.
+- **`tests/diagnostic.test.mjs`** — the baseline model's solver against scikit-learn, and its
+  verdicts on data whose answer is known (no signal, clear signal, a hidden U-shaped leak).
 
 Run `npm test` after any change under `src/components/utils/core/`.
 
@@ -248,6 +264,9 @@ src/
                               /methodology (how the engine works)
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
+    csvIntake.js              upload rules: size/format, ragged rows, headerless files
+    prep/                     preparation plan, folds, train-only fitting, scikit-learn
+                              script export, and the cross-validated baseline model
     ai/                       AI client (requestAi) and its browser answer cache; per
                               feature a payload builder, a verifier
                               and a schema shared with the Worker (dossier, leakage,
@@ -268,7 +287,7 @@ src/
       TargetStep/              target-column picker
       ResultsDashboard/        tabbed report (Overview/Quality/Statistics/
                                 Visualizations/Target Signal/Relationships/
-                                Class Balance)
+                                Class Balance/Preparation)
     utils/core/                the analysis engine (pure functions, no side effects)
       roles.constants.js      ROLE enum — the single source of truth for role strings
       index.js                analyzeDataset() orchestrator
@@ -279,9 +298,7 @@ src/
       helpers.js              shared numeric utilities
 tests/                        engine regression suite, output-shape contract, Worker tests
 worker/index.js               Cloudflare Worker entry: POST /api/ai (OpenRouter proxy)
-worker/dossierPrompt.js       the column-dossier prompt
 worker/leakagePrompt.js       the leakage-review prompt
-worker/cleaningPrompt.js      the cleaning-proposal prompt
 worker/reviewPrompt.js        the column-review prompt (dossier + cleaning in one request)
 tools/ai-eval.mjs, ai-eval/   AI evals over the test corpus, known answers, scoring
 tools/blind-*.mjs             blind labelling sheet and agreement (checks the eval itself)
