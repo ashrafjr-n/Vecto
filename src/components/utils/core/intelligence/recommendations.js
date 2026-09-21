@@ -27,6 +27,42 @@ export function columnDecisions({ meta, quality, relationships }) {
   return { dropped, replaced, leaking, notKept };
 }
 
+/* How a column's missing values are filled — ONE rule, read by the advice text
+   below and by the preparation pipeline (src/lib/prep/), so the exported script
+   can never impute a column differently from what the report told the reader.
+   → "forward_fill" | "most_frequent" | "median" | "mean" */
+export function imputeStrategy(role, stat) {
+  if (role === ROLE.TEMPORAL) return "forward_fill";
+  if (role === ROLE.CATEGORICAL || role === ROLE.BINARY) return "most_frequent";
+  if (stat && Math.abs(stat.skewness) > 1) return "median";
+  return stat ? "mean" : "most_frequent";
+}
+
+/* Past this share of missing rows the imputed value is a real part of the column,
+   so the advice adds a "_was_missing" indicator beside it (and so does the pipeline). */
+export const IMPUTE_FLAG_PCT = 20;
+
+/* V is symmetric, dependency is not: for every pair of kept categoricals at
+   V ≥ 0.6 whose level counts differ ≥ 3×, the finer column determines the
+   coarser one. → Map fine → { levels, rows, coarse: [{col, levels, v}] }.
+   Exported for the pipeline, which must not train on a column the advice calls
+   too fine to learn from, and groups its split by it instead. */
+export const UNEVEN_LEVELS = 3;
+export const TOO_FINE_ROWS_PER_LEVEL = 5;
+export function columnDeterminations(associations, bothKept) {
+  const determines = new Map();
+  (associations ?? [])
+    .filter(a => a.cramersV >= 0.6 && bothKept(a.col1, a.col2))
+    .forEach(a => {
+      const [l1, l2] = a.levels;
+      if (Math.max(l1, l2) < UNEVEN_LEVELS * Math.min(l1, l2)) return;
+      const [fine, fineLevels, coarse, coarseLevels] = l1 > l2 ? [a.col1, l1, a.col2, l2] : [a.col2, l2, a.col1, l1];
+      if (!determines.has(fine)) determines.set(fine, { levels: fineLevels, rows: a.nPairs, coarse: [] });
+      determines.get(fine).coarse.push({ col: coarse, levels: coarseLevels, v: a.cramersV });
+    });
+  return determines;
+}
+
 export function getRecommendations({ meta, quality, statistics, relationships, classBalance, visualizations = [] }) {
   const recs = [];
 
@@ -81,7 +117,8 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
   const imputationFor = (col) => {
     const role = roleOf(col);
     const stat = statistics.find(s => s.col === col);
-    if (role === ROLE.TEMPORAL) {
+    const strategy = imputeStrategy(role, stat);
+    if (strategy === "forward_fill") {
       return { method: "forward-fill or interpolation",
                why: "this is a date column — a mean or a mode date is meaningless; carry the previous value forward or interpolate between neighbours" };
     }
@@ -89,11 +126,11 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
       return { method: 'the most frequent level, or an explicit "Unknown" category',
                why: 'this is a categorical column — averaging levels is undefined, and an explicit "Unknown" keeps missingness visible to the model' };
     }
-    if (stat && Math.abs(stat.skewness) > 1) {
+    if (strategy === "median") {
       return { method: "median",
                why: `the distribution is skewed (${stat.skewness}), so the mean is pulled toward the tail while the median is not` };
     }
-    if (stat) {
+    if (strategy === "mean") {
       return { method: "mean", why: "the distribution is roughly symmetric, so the mean is a fair centre" };
     }
     return { method: "the most frequent value",
@@ -158,7 +195,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
           rationale: `${pct}% missing is past the point where imputing the VALUE is defensible — ${method} would be invented for ${pct}% of rows. `
                    + presenceRationale(c.col),
         });
-      } else if (pct > 20) {
+      } else if (pct > IMPUTE_FLAG_PCT) {
         push({
           category:  "Data Cleaning",
           priority:  "high",
@@ -488,21 +525,14 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      embarked↔embark_town, all 1.00). Uneven pairs keep 0.6: their advice says the
      columns are NOT interchangeable, so it never costs a column, and the
      "too fine" case rests on it (openpowerlifting Name→Sex scores 0.80). */
-  const UNEVEN_LEVELS = 3;
   const INTERCHANGEABLE_V = 0.9;
   const fmtV = v => v.toFixed(2);
-  const determines = new Map();
+  const determines = columnDeterminations(relationships.categoricalAssociations, bothKept);
   (relationships.categoricalAssociations ?? [])
-    .filter(a => a.cramersV >= 0.6 && bothKept(a.col1, a.col2))
+    .filter(a => a.cramersV >= INTERCHANGEABLE_V && bothKept(a.col1, a.col2))
     .forEach(a => {
       const [l1, l2] = a.levels;
-      if (Math.max(l1, l2) >= UNEVEN_LEVELS * Math.min(l1, l2)) {
-        const [fine, fineLevels, coarse, coarseLevels] = l1 > l2 ? [a.col1, l1, a.col2, l2] : [a.col2, l2, a.col1, l1];
-        if (!determines.has(fine)) determines.set(fine, { levels: fineLevels, rows: a.nPairs, coarse: [] });
-        determines.get(fine).coarse.push({ col: coarse, levels: coarseLevels, v: a.cramersV });
-        return;
-      }
-      if (a.cramersV < INTERCHANGEABLE_V) return;
+      if (Math.max(l1, l2) >= UNEVEN_LEVELS * Math.min(l1, l2)) return;   // an uneven pair is in `determines`
       push({
         category:  "Feature Selection",
         priority:  "medium",
@@ -519,7 +549,6 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      from as the one to keep. Measured: the fine side of every legitimate grouping in
      the corpus has more than 5 rows per level (MeetTown 5.6, Society 7, Carpet Area
      34, team 68), and the two entity columns have under 3 (Name 2.8, MeetName 1.6). */
-  const TOO_FINE_ROWS_PER_LEVEL = 5;
   determines.forEach(({ levels, rows, coarse }, fine) => {
     const names = coarse.map(c => `"${c.col}"`).join(", ");
     const perLevel = rows / levels;
