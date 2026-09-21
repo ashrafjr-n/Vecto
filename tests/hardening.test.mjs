@@ -603,6 +603,14 @@ const syncRun = runAnalysisSync(wRows, ["a", "b", "y"], "y");
 check("the synchronous path returns a result and a null error",
   syncRun.error === null && Number.isFinite(syncRun.result?.healthScore?.score));
 
+const syncPhases = [];
+runAnalysisSync(wRows, ["a", "b", "y"], "y", p => syncPhases.push(p));
+check("the run ends with the diagnostic as its own counted phase, and carries its result",
+  syncRun.result.diagnostic?.status === "ok"
+  && syncPhases.length === ANALYSIS_PHASES.length + 1
+  && syncPhases.every((p, i) => p.index === i && p.total === ANALYSIS_PHASES.length + 1)
+  && syncPhases.at(-1).id === "diagnostic");
+
 check("the synchronous path RETURNS a failure instead of throwing",
   (() => { const r = runAnalysisSync(null, null, null);
            return r.result === null && typeof r.error === "string" && r.error.length > 0; })());
