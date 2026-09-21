@@ -73,3 +73,49 @@ export function inspectParseResult(results) {
     },
   };
 }
+
+/* A headerless CSV used to lose its first row silently: PapaParse turned it into
+   the column names, so sonar's 60 readings became columns called "0.0200",
+   "0.0371", … and one real row vanished from every statistic.
+
+   A header cell written as a FRACTIONAL or NEGATIVE number is data, not a name —
+   nobody titles a column "0.0371" or "-3". Whole numbers stay names on purpose:
+   "2019", "2020" (a wide table of years) and "0", "1", "2" (pandas' default
+   column labels) are real headers, and the values alone cannot tell them apart
+   from an integer data row.
+   ponytail: an all-integer headerless file is not caught — only a person can
+   tell that row apart from a header of years or indices. */
+const DATA_LIKE_HEADER = /^\s*(-\d+(\.\d+)?|[-+]?\d*\.\d+)([eE][-+]?\d+)?\s*$/;
+export const HEADERLESS_MIN_SHARE = 0.5;
+
+/* → { dataLike, total } when at least half the header cells look like data,
+   else null. Reads PapaParse's renamedHeaders so a duplicated number
+   ("0.0200" → "0.0200_1") is judged by what the file actually says. */
+export function headerlessVerdict(results) {
+  const fields  = results?.meta?.fields ?? [];
+  const renamed = results?.meta?.renamedHeaders ?? {};
+  const dataLike = fields.filter(f => DATA_LIKE_HEADER.test(renamed[f] ?? f)).length;
+  return fields.length > 0 && dataLike / fields.length >= HEADERLESS_MIN_SHARE
+    ? { dataLike, total: fields.length }
+    : null;
+}
+
+/* Rows from a `header: false` parse → the same { data, fields } shape a header
+   parse gives, keyed column_1 … column_N like a blank header (transformHeader).
+   Width is the first row's, as a header row would have set it; a row of any
+   other length is counted exactly as inspectParseResult counts one. */
+export function headerlessRows(rows) {
+  const width  = rows[0]?.length ?? 0;
+  const fields = Array.from({ length: width }, (_, i) => `column_${i + 1}`);
+  const badRows = [];
+  const data = rows.map((cells, r) => {
+    if (cells.length !== width) badRows.push(r + 1);   // +1: no header line
+    const row = {};
+    for (let i = 0; i < width && i < cells.length; i++) row[fields[i]] = cells[i];
+    return row;
+  });
+  const malformed = badRows.length === 0 ? null : {
+    count: badRows.length, sampleRows: badRows.slice(0, ROW_SAMPLE), totalRows: data.length,
+  };
+  return { data, fields, malformed };
+}
