@@ -24,6 +24,17 @@
    `b` alone that it encodes a town's racial composition, and failing to guess is not the
    same defect as inventing an attribute.
 
+   **One tension is recorded here BEFORE the run, not explained away after it.** The
+   prompt's rule for `sensitive` opens with "ask what one row is first", and its examples
+   are files whose rows are not people (a penguin, a diamond, a car). Files 01 and 02 are
+   AGGREGATE tables: one row is a count of people, not a person. These labels say
+   `الجنس` and `النوع` are sensitive there, because the column records that attribute of
+   the people being counted — a published table of deaths by sex is a table about people.
+   A model that follows the row-grain rule literally will answer null and lose RECALL,
+   which carries no bar; it cannot lose precision this way. Whichever way the answers
+   fall, the result is a finding about the rule's reach, and the labels were written
+   first so that finding cannot be manufactured afterwards.
+
    Labels are only the unambiguous cases, both ways. `null` is a real check — it fails
    when the model invents an attribute. Left UNSCORED where the closed list has no
    fitting value (marital status, occupation, a criminal record, a risk score) or where
