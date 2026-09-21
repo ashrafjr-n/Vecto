@@ -92,6 +92,9 @@ export function prepPlanToSklearn(plan, cleaningRules = []) {
     plan.task === "classification"
       ? "y = df[TARGET].map(level)"
       : 'y = pd.to_numeric(df[TARGET].str.strip(), errors="coerce")',
+    ...(plan.task === "regression"
+      ? ["X, y = X[y.notna()], y[y.notna()]   # a target value that is not a number cannot be predicted as one"]
+      : []),
     "",
     "# ── 5. Split FIRST, so nothing below learns from the test rows ──",
   );
@@ -99,7 +102,7 @@ export function prepPlanToSklearn(plan, cleaningRules = []) {
   if (plan.groupBy) {
     lines.push(
       `# Grouped by "${plan.groupBy}": every row of one value stays on one side. test_size counts groups, not rows.`,
-      `groups = df[${py(plan.groupBy)}].fillna(pd.Series("row " + df.index.astype(str), index=df.index))`,
+      `groups = df.loc[X.index, ${py(plan.groupBy)}].fillna(pd.Series("row " + X.index.astype(str), index=X.index))`,
       "train_idx, test_idx = next(GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42).split(X, y, groups))",
       "X_train, X_test, y_train, y_test = X.iloc[train_idx], X.iloc[test_idx], y.iloc[train_idx], y.iloc[test_idx]",
     );

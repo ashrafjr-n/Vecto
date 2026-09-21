@@ -134,7 +134,7 @@ check("the missing tokens are the engine's own", script.includes('MISSING = ["",
 const groupedScript = prepPlanToSklearn({ ...p, groupBy: "city", stratify: false });
 check("a grouped plan splits with GroupShuffleSplit on its column, and does not stratify",
   /GroupShuffleSplit\(n_splits=1, test_size=0\.2, random_state=42\)/.test(groupedScript)
-  && groupedScript.includes('groups = df["city"]') && !/stratify=y/.test(groupedScript));
+  && groupedScript.includes('groups = df.loc[X.index, "city"]') && !/stratify=y/.test(groupedScript));
 check("accepted cleaning rules come before anything is split",
   (() => { const s = prepPlanToSklearn(p, [{ column: "city", type: "merge_levels", affixes: [], values: [], merges: [{ from: "East", to: "east" }] }]);
            return s.includes("# merge_levels: city") && s.indexOf("# merge_levels: city") < s.indexOf("train_test_split("); })());
