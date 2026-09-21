@@ -118,6 +118,19 @@ export const PHASES = [
       { label: "Categories and priority", text: "Actions are tagged Data Cleaning, Feature Selection, Feature Engineering, Modeling or Data Integrity, prioritised high, medium or low, and every one carries its rationale." },
     ],
   },
+  {
+    title: "Preparation plan and baseline model",
+    lead: "The recommendations become a training pipeline, and one untuned model measures what that pipeline can support. Neither lives in the engine: both read its finished report, so they cannot make a decision the report did not.",
+    points: [
+      { label: "Split first", text: "80 / 20, stratified for a class target, or grouped by a column the advice calls too fine to learn from (under 5 rows per level), so one entity never sits on both sides. Rows with a missing target and duplicate rows are removed before the split." },
+      { label: "Fitted on train only", text: "Every median, mean, standard deviation and category list is learned from the training rows alone. Imputation follows the advice — median when |skewness| > 1, mean otherwise, most frequent level for categories — with a missing-value indicator past 20% missing, and a presence indicator alone past 50%. Categories keep their 19 most frequent levels plus one bucket for the rest." },
+      { label: "Left out, with a reason", text: "Identifiers, empty or constant columns, leakage suspects, dates and free text are excluded, and each exclusion is written into the plan and into the exported script." },
+      { label: "The script", text: "The plan exports as a scikit-learn script (pandas, ColumnTransformer, SimpleImputer, StandardScaler, OneHotEncoder, MissingIndicator) that splits, fits on the training rows and transforms both sides. It stops at prepared features: no model and no tuning." },
+      { label: "Baseline model", text: "Ridge regression with alpha 1 (one-vs-rest for a class target), cross-validated over 5 folds with the preparation refitted inside each fold, on an evenly spread sample of at most 5,000 rows. Scored in balanced accuracy or R², against a model that predicts the majority class or the training mean. The solver matches scikit-learn's Ridge and RidgeClassifier to 1e-11." },
+      { label: "Is there signal", text: "A paired t-test across the folds with the Nadeau–Bengio correction for folds that share training rows; signal needs t ≥ 2.78 (p < 0.05). No signal means the easy, linear signal is absent — not that none exists." },
+      { label: "One column too good", text: "Each column alone, numbers binned into 20 training quantiles so a curved relationship counts. A column scoring 0.95 or more — the engine's leakage bar — is flagged to check. A near-perfect score from all columns together is raised as a question, because a genuinely separable target looks the same." },
+    ],
+  },
 ];
 
 /* Why the numbers can be trusted — each one a property that can be checked, not
@@ -181,5 +194,7 @@ export const LIMITS = [
   { title: "Dates", text: "Detected from the first 100 non-missing values. Epoch timestamps, compact YYYYMMDD, week, quarter and time-only formats are not recognised." },
   { title: "Scale", text: "Files up to 40MB. Duplicate rows are counted up to 50,000 rows, the correlation matrix holds 40 numeric columns and categorical pairing 25 columns, and mutual information is estimated on a 20,000-row sample." },
   { title: "Spearman in the matrix", text: "Ranks are computed once per column, so where columns have different missing rows, ρ can differ slightly from a pairwise scipy.stats.spearmanr. Spearman against the target is computed exactly on each pair." },
+  { title: "Headerless files", text: "A first row where at least half the cells are decimal or negative numbers is offered as data rather than names. A headerless file of whole numbers is not caught: that row cannot be told apart from a header of years or indices." },
+  { title: "Baseline model", text: "Linear and untuned, so it is a floor. A column that restates the target only in part — a total that includes it — scores well below the 0.95 bar on its own; the leakage review's formula check is what catches that shape." },
   { title: "Multicollinearity", text: "Redundancy is pairwise correlation. A column that is a linear combination of three others will not be caught by it." },
 ];
