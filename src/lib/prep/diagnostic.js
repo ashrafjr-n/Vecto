@@ -32,7 +32,7 @@ const MIN_ROWS = 50;
 /* Quantile bins for the one-column check. A class boundary that falls inside a bin
    leaves that bin mixed, so resolution caps the score: a U-shaped rule scored 0.925
    with 10 bins and 0.977 with 20 (tests/diagnostic.test.mjs). */
-const BINS = 20;
+export const DIAG_BINS = 20;
 /* Two-sided 5% critical value of Student's t with DIAG_FOLDS − 1 = 4 degrees of freedom. */
 const T_CRITICAL = 2.776;
 
@@ -226,7 +226,7 @@ export function runDiagnostic(result, rows) {
 
   const features = [...plan.numeric.map(f => f.col), ...plan.categorical.map(f => f.col), ...plan.presence];
   const columns = features
-    .map(col => ({ col, cv: crossValidate(plan, rows, idx, folds, y, classes, [col], BINS) }))
+    .map(col => ({ col, cv: crossValidate(plan, rows, idx, folds, y, classes, [col], DIAG_BINS) }))
     .filter(c => c.cv)
     .map(c => ({ col: c.col, score: meanOf(c.cv.model) }))
     .sort((a, b) => b.score - a.score);
