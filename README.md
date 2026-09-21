@@ -59,6 +59,10 @@ changes the report only when you accept a suggestion.
   split an honest evaluation needs. Every proposed formula is evaluated on the rows, and a
   total that differs only by a few fixed amounts (an unrecorded surcharge) is recognised as
   such; group claims are measured; timing claims are shown as questions. Advisory only.
+  It also carries two **relevance** categories, which are the opposite question and are not
+  accusations: a column worth keeping despite a weak measured association, and a strong
+  association with no reason behind it. Both always render as open questions with the
+  engine's own number quoted — including where that number disagrees with the claim.
 - **AI cleaning proposals (optional)** — the engine scans the file for values that look
   dirty (numbers written with a unit or bound such as `42 Lac` or `125+`, one category
   spelled several ways, placeholders such as `-999`) and a language model proposes rules in
