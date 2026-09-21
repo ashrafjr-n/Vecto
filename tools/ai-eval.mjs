@@ -123,11 +123,16 @@ const TASK_DEFS = {
     line: (s) => `top target ${s.checks.find((c) => c.kind === "target@1")?.got ?? "n/a"} · withheld ${s.hygiene.withheld} · undescribed ${s.hygiene.undescribed} · rules ${s.hygiene.rules}`,
     measures: (all, ok) => {
       const isB = (c) => ["target@1", "target@3", "role", "subtype"].includes(c.kind);
+      /* `sensitive` (item 29) belongs to neither half. It arrived in the same answer as
+         B and D, but it is not a column profile and not a cleaning rule, and counting it
+         under D made the cleaning line read 100% → 94% on a run where every cleaning
+         check still passed. It has its own two lines below. */
+      const isD = (c) => !isB(c) && c.kind !== "sensitive";
       const withTarget = ok.filter((r) => r.score.engineTargetOk !== null);
       const engineRight = withTarget.filter((r) => r.score.engineTargetOk).length;
       return [
         ["B checks (day 1: 99%, 188/189)", pctOf(all.filter(isB))],
-        ["D checks (day 1: 100%, 19/19)", pctOf(all.filter((c) => !isB(c)))],
+        ["D checks (day 1: 100%, 19/19)", pctOf(all.filter(isD))],
         ["Target, top pick (AI)", pctOf(all.filter((c) => c.kind === "target@1"))],
         ["Target, top pick (engine's detectTarget)", withTarget.length ? `${Math.round((100 * engineRight) / withTarget.length)}% (${engineRight}/${withTarget.length})` : "n/a"],
         ["Target, any of top 3 (AI)", pctOf(all.filter((c) => c.kind === "target@3"))],
