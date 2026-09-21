@@ -6,6 +6,7 @@ import { findCleaningCandidates } from "../../../lib/ai/cleaning.js";
 import { requestAi } from "../../../lib/ai/requestAi.js";
 import { askDossier } from "../../../lib/ai/askDossier.js";
 import AiPanel  from "../shared/AiPanel.jsx";
+import { SENSITIVE_LABEL } from "../shared/sensitive.js";
 import AiPayloadPreview from "../shared/AiPayloadPreview.jsx";
 import RolePill from "../shared/RolePill.jsx";
 import CleaningRuleList from "../shared/CleaningRuleList.jsx";
@@ -263,23 +264,6 @@ function CleaningSection({ proposal, candidates, acceptedRules, onToggleRule }) 
     </section>
   );
 }
-
-/* A sensitive attribute is stated, never judged. The engine has no standing to say
-   whether a column may be used — that is law, consent and purpose, none of which are in
-   the file — so this reads as a label and stops. It is an AI claim like any other and
-   is not colour-coded: status colours stay reserved for measured findings. */
-const SENSITIVE_LABEL = {
-  sex_gender:         "sex or gender",
-  race_ethnicity:     "race or ethnicity",
-  religion:           "religion",
-  health:             "health",
-  sexual_orientation: "sexual orientation",
-  age:                "age",
-  nationality_origin: "nationality or origin",
-  disability:         "disability",
-  political_opinion:  "political opinion",
-  financial_hardship: "financial circumstances",
-};
 
 function ColumnRow({ col, accepted, onToggle }) {
   const facts = [

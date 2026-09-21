@@ -5,6 +5,8 @@ import { CircleX } from "lucide-react";
 import SectionCard from "../../shared/SectionCard.jsx";
 import StatusBadge  from "../../shared/StatusBadge.jsx";
 import { correlationFill, correlationText } from "../../shared/correlationColor.js";
+import AiBadge from "../../shared/AiBadge.jsx";
+import { SENSITIVE_LABEL, flaggedColumns, proxiesFor, unmeasuredCount, PROXY_MIN_V, PROXY_MIN_R } from "../../shared/sensitive.js";
 
 function LeakageWarnings({ suspects }) {
   if (!suspects?.length) return null;
@@ -168,6 +170,79 @@ function CategoricalAssociations({ associations, hasHeatmap }) {
   );
 }
 
+
+/* ── Columns that stand in for a flagged one (vecto-plan item 32) ──────────────
+   Dropping a sensitive column does not remove the attribute if another column
+   predicts it. The measurements here are the engine's own, already computed for
+   this report — nothing new is asked of a model, and the only AI part is WHICH
+   columns to look up.
+
+   It renders only when the review flagged something. There is deliberately no
+   "no sensitive columns found" state: the flags come from a model that was asked
+   about this file once, so their absence means nobody looked or nothing was
+   answered — never that the file holds no personal data. An all-clear here would
+   be the one sentence in the report that is not a measurement. */
+function SensitiveProxies({ relationships, dossier, roles }) {
+  const flagged = flaggedColumns(dossier);
+  if (!flagged.length) return null;
+
+  return (
+    <SectionCard
+      title="Columns that stand in for personal data"
+      action={<AiBadge>flagged by AI, measured by the engine</AiBadge>}
+    >
+      <p className="-mt-2 mb-3 text-[12px] leading-relaxed text-ink-faint">
+        The review read {flagged.length} column{flagged.length > 1 ? "s" : ""} as recording a
+        personal attribute. Removing one does not remove the attribute if another column
+        predicts it, so each is listed with the columns this report already measured it
+        against. The associations are the engine's; only the flag is the model's.
+      </p>
+      <div className="divide-y divide-line">
+        {flagged.map((col) => {
+          const proxies = proxiesFor(col.name, relationships);
+          const unmeasured = unmeasuredCount(col.name, roles);
+          return (
+            <div key={col.name} className="py-3 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="text-[13px] font-semibold text-ink">{col.name}</span>
+                <span className="text-[12px] text-ink-soft">read as {SENSITIVE_LABEL[col.sensitive]}</span>
+              </div>
+              {proxies.length > 0 ? (
+                <ul className="mt-1.5 space-y-1">
+                  {proxies.map((p) => (
+                    <li key={`${p.other}|${p.metric}`} className="flex items-center gap-3 text-[12.5px] text-ink-soft">
+                      <span className="min-w-0 flex-1 truncate">{p.other}</span>
+                      <span className="w-24 shrink-0 text-right font-mono text-[12px] text-ink">
+                        {p.metric} = {p.value.toFixed(2)}
+                      </span>
+                      <span className="w-28 shrink-0 text-right text-[11.5px] text-ink-faint">
+                        {p.n.toLocaleString()} rows
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1.5 text-[12px] text-ink-faint">
+                  No column reached the reporting bar against this one
+                  {" "}(V &ge; {PROXY_MIN_V}, |r| &ge; {PROXY_MIN_R}).
+                </p>
+              )}
+              {unmeasured > 0 && (
+                <p className="mt-1 text-[11.5px] text-ink-faint">
+                  {unmeasured} column{unmeasured > 1 ? "s were" : " was"} not compared with it at
+                  all: between features the engine measures numeric against numeric and
+                  categorical against categorical, never one against the other. Silence above
+                  is not evidence that nothing stands in for this column.
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
 /* Swatches are READ FROM the ramp at a representative r, not copied as hexes.
    They used to be five literals duplicating correlationColor.js, so the legend
    described the previous palette the moment the ramp changed — the legend is the
@@ -251,7 +326,7 @@ function CorrelationHeatmap({ relationships }) {
   );
 }
 
-function RelationshipsTab({ result }) {
+function RelationshipsTab({ result, ai }) {
   const { relationships } = result;
   const { cols } = relationships;
 
@@ -262,7 +337,10 @@ function RelationshipsTab({ result }) {
      V = 0.99: the engine found it and this early return threw it away. */
   const hasNonNumericFindings = (relationships.leakageSuspects?.length ?? 0) > 0
     || (relationships.categoricalAssociations?.length ?? 0) > 0
-    || (relationships.observations?.length ?? 0) > 0;
+    || (relationships.observations?.length ?? 0) > 0
+    /* A flagged column needs no numeric column to exist, and the early return below
+       would hide the proxy card exactly on the files most likely to carry one. */
+    || flaggedColumns(ai?.dossier).length > 0;
 
   if (!cols.length && !hasNonNumericFindings) {
     return (
@@ -277,6 +355,7 @@ function RelationshipsTab({ result }) {
       <LeakageWarnings suspects={relationships.leakageSuspects} />
       <Observations observations={relationships.observations} />
       <CategoricalAssociations associations={relationships.categoricalAssociations} hasHeatmap={cols.length > 0} />
+      <SensitiveProxies relationships={relationships} dossier={ai?.dossier} roles={result.meta.columnRoles} />
 
       {/* Numeric-only sections. Rendering them with no numeric column produced an
           empty heatmap and a "no strong correlations found (|r| > 0.4)" line, which

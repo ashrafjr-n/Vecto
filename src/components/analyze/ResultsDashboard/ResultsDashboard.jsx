@@ -169,7 +169,7 @@ function ResultsDashboard({ result, onReset, ai }) {
                 {activeTab === "statistics"     && <StatisticsTab     result={result} />}
                 {activeTab === "visualizations" && <VisualizationsTab result={result} />}
                 {activeTab === "targetsignal"   && <TargetSignalTab   result={result} ai={ai} />}
-                {activeTab === "relationships"  && <RelationshipsTab  result={result} />}
+                {activeTab === "relationships"  && <RelationshipsTab  result={result} ai={ai} />}
                 {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
               </motion.div>
             </AnimatePresence>
