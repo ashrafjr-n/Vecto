@@ -477,8 +477,19 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
      grouped under the column that determines the others; only pairs of similar
      grain keep the "one of the two" advice. Columns already settled (dropped,
      replaced by a presence indicator, or under leakage investigation) are left
-     out — "if you keep Society" beside "replace Society" was one more contradiction. */
+     out — "if you keep Society" beside "replace Society" was one more contradiction.
+
+     "Keep one of" costs the reader a column, so it needs the bar the numeric
+     advice uses (|r| ≥ 0.9), not the 0.6 that admits a pair to this block.
+     Measured over all 43 test files: at V 0.6–0.9 the similar-grain pairs carry
+     two facts each — penguins species↔island 0.66, taxis color↔pickup_borough
+     0.62, hotels reserved↔assigned room type 0.78, titanic Ticket↔Cabin 0.79 —
+     while at ≥ 0.9 they restate each other (pclass↔class, league↔country,
+     embarked↔embark_town, all 1.00). Uneven pairs keep 0.6: their advice says the
+     columns are NOT interchangeable, so it never costs a column, and the
+     "too fine" case rests on it (openpowerlifting Name→Sex scores 0.80). */
   const UNEVEN_LEVELS = 3;
+  const INTERCHANGEABLE_V = 0.9;
   const fmtV = v => v.toFixed(2);
   const determines = new Map();
   (relationships.categoricalAssociations ?? [])
@@ -491,6 +502,7 @@ export function getRecommendations({ meta, quality, statistics, relationships, c
         determines.get(fine).coarse.push({ col: coarse, levels: coarseLevels, v: a.cramersV });
         return;
       }
+      if (a.cramersV < INTERCHANGEABLE_V) return;
       push({
         category:  "Feature Selection",
         priority:  "medium",
