@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { Check, Copy, Download } from "lucide-react";
+import { Check, CircleX, Copy, Download, TriangleAlert } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
+import StatTile    from "../../shared/StatTile.jsx";
 import { buildPrepPlan } from "../../../../lib/prep/plan.js";
 import { prepPlanToSklearn } from "../../../../lib/prep/sklearn.js";
 import { MAX_CATEGORIES } from "../../../../lib/prep/encode.js";
+import { SUSPICIOUS_SCORE, DIAG_FOLDS, DIAG_BINS } from "../../../../lib/prep/diagnostic.js";
 
 const IMPUTE_TEXT = { mean: "mean", median: "median", most_frequent: "most frequent value" };
 
@@ -14,6 +16,115 @@ function splitText(plan) {
   if (plan.stratify) return "80 / 20, stratified: both sides keep the class shares.";
   if (plan.task === "classification") return "80 / 20, not stratified: a class has a single row, which cannot sit on both sides.";
   return "80 / 20, random.";
+}
+
+const METRIC = {
+  balanced_accuracy: { name: "balanced accuracy", explain: "the mean of each class's recall, so guessing the majority class scores 1 ÷ classes however imbalanced the target is" },
+  r2:                { name: "R²", explain: "the share of the target's variance the model explains, so predicting the training mean scores about 0" },
+};
+const COLUMNS_SHOWN = 10;
+const fmt = (x) => x.toFixed(3);
+
+/* One column alone, through the same model. Single series, value printed beside
+   every bar (the bars are a reading aid, the numbers are the data), the baseline
+   marked as a tick so "better than knowing nothing" is visible per row. */
+function ColumnScores({ diagnostic }) {
+  const { columns, baseline, metric } = diagnostic;
+  const shown = columns.slice(0, COLUMNS_SHOWN);
+  const pct = (x) => `${Math.round(Math.min(1, Math.max(0, x)) * 100)}%`;
+  return (
+    <div className="mt-5">
+      <h4 className="text-[11px] font-medium text-ink-faint">
+        Each column alone · {METRIC[metric].name}{columns.length > shown.length ? ` · best ${shown.length} of ${columns.length}` : ""}
+      </h4>
+      <ul className="mt-2 space-y-2">
+        {shown.map(({ col, score }) => {
+          const suspicious = score >= SUSPICIOUS_SCORE;
+          return (
+            <li key={col} className="flex items-center gap-3" title={`"${col}" alone: ${fmt(score)} ${METRIC[metric].name}, mean over ${diagnostic.folds} folds`}>
+              <span className="w-40 shrink-0 truncate font-mono text-[12px] text-ink-soft">{col}</span>
+              <div className="relative h-1.5 min-w-16 flex-1 rounded-full bg-paper">
+                <div className="h-full rounded-full bg-ink-faint" style={{ width: pct(score) }} />
+                <span className="absolute -top-1 h-3.5 w-px bg-ink-soft" style={{ left: pct(baseline.mean) }} />
+              </div>
+              <span className="w-12 shrink-0 text-right font-mono text-[12px] text-ink">{fmt(score)}</span>
+              <span className="w-24 shrink-0">
+                {suspicious && (
+                  <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-critical">
+                    <CircleX size={12} /> Check it
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2 text-[11.5px] text-ink-faint">The tick on each bar is the know-nothing baseline ({fmt(baseline.mean)}). Numbers are binned into {DIAG_BINS} quantile ranges here, so a curved relationship counts too.</p>
+    </div>
+  );
+}
+
+function DiagnosticCard({ diagnostic }) {
+  if (!diagnostic) return null;
+  if (diagnostic.status !== "ok") {
+    return (
+      <SectionCard title="Diagnostic baseline">
+        <p className="text-[13px] text-ink-soft">No baseline was measured. {diagnostic.reason}</p>
+      </SectionCard>
+    );
+  }
+  const { model, baseline, metric, t, signal, suspicious, nearPerfect } = diagnostic;
+  const tText = Number.isFinite(t) ? t.toFixed(1) : "∞";
+  return (
+    <SectionCard title="Diagnostic baseline">
+      <p className="text-[13px] leading-relaxed text-ink-soft">
+        One fixed, untuned model — ridge regression{diagnostic.task === "classification" ? " as a one-vs-rest classifier" : ""}, alpha 1 —
+        trained on the plan below and cross-validated over {diagnostic.folds} folds ({diagnostic.split}), with the preparation re-fitted
+        inside every fold. It is a measurement, not a model to use: the score is a floor for what these columns support.
+        {" "}{diagnostic.sampled ? `Measured on an evenly spread sample of ${diagnostic.rows.toLocaleString()} rows.` : `${diagnostic.rows.toLocaleString()} rows.`}
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <StatTile label="Model" value={fmt(model.mean)} suffix={` ±${fmt(model.sd)}`} />
+        <StatTile label="Knows nothing" value={fmt(baseline.mean)} />
+        <StatTile label="Corrected t" value={tText} tone={signal ? "success" : "warning"} />
+      </div>
+      <p className="mt-4 text-[13px] leading-relaxed text-ink">
+        {signal
+          ? `The columns carry signal: the model beats the know-nothing baseline by ${fmt(model.mean - baseline.mean)} in ${METRIC[metric].name}, and the gap holds across the folds.`
+          : `No reliable signal: the model does not beat the know-nothing baseline consistently across the folds.`}
+      </p>
+      <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
+        Score: {METRIC[metric].name}, {METRIC[metric].explain}. The verdict is a paired t-test across the {DIAG_FOLDS} folds with the
+        Nadeau–Bengio correction for folds that share training rows; it needs t ≥ 2.78 (p &lt; 0.05).
+        {!signal && " An untuned linear model can miss structure a flexible one would find — this says the easy signal is absent, not that none exists."}
+      </p>
+
+      {suspicious.length > 0 && (
+        <div className="mt-4 flex items-start gap-3 rounded-lg border border-critical/20 bg-critical-tint px-4 py-3">
+          <CircleX size={15} className="mt-0.5 shrink-0 text-critical" />
+          <div className="text-[12.5px] text-ink-soft">
+            <div className="font-semibold text-critical">
+              {suspicious.length === 1 ? "One column" : `${suspicious.length} columns`} alone nearly decide{suspicious.length === 1 ? "s" : ""} the target
+            </div>
+            {suspicious.map(c => `"${c}"`).join(", ")} score{suspicious.length === 1 ? "s" : ""} {SUSPICIOUS_SCORE} or more by {suspicious.length === 1 ? "itself" : "themselves"} —
+            the same bar the engine uses for leakage. That is how leakage looks: check that each is known before the outcome is.
+          </div>
+        </div>
+      )}
+      {nearPerfect && (
+        <div className="mt-4 flex items-start gap-3 rounded-lg border border-warning/25 bg-warning-tint px-4 py-3">
+          <TriangleAlert size={15} className="mt-0.5 shrink-0 text-warning" />
+          <div className="text-[12.5px] text-ink-soft">
+            <div className="font-semibold text-warning">Near-perfect for an untuned linear model</div>
+            Either the target is genuinely easy to separate, or several columns together restate it. The ranking below shows which
+            columns carry the score; confirm those are available before the outcome.
+          </div>
+        </div>
+      )}
+      <ColumnScores diagnostic={diagnostic} />
+      <p className="mt-4 text-[11.5px] text-ink-faint">Columns the report already flags as leakage are left out of the plan, so they are not measured again here.</p>
+    </SectionCard>
+  );
 }
 
 function Group({ title, rows }) {
@@ -128,6 +239,7 @@ function PreparationTab({ result, ai }) {
   }
   return (
     <div className="space-y-5">
+      <DiagnosticCard diagnostic={result.diagnostic} />
       <PlanCard plan={plan} />
       <ScriptCard plan={plan} cleaningRules={cleaningRules} />
     </div>
