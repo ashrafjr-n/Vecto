@@ -1163,6 +1163,18 @@ check("an uneven categorical dependency names its direction instead of 'keep one
   dirRecs.some(r => r.column === "fine" && /largely determines/.test(r.issue))
   && !dirRecs.some(r => /Keep one of/.test(r.action)));
 
+/* Similar grain: "keep one of" only when the pair restates itself (V ≥ 0.9, the
+   numeric rule's bar). A pair that agrees on 2 rows in 3 carries two facts. */
+const twin = (agree) => Array.from({ length: 1200 }, (_, i) => {
+  const a = ["n", "e", "s", "w"][i % 4];
+  return { a, b: (i * 7919) % 3 < agree ? a.toUpperCase() : ["N", "E", "S", "W"][(i * 31) % 4], y: String((i * 13) % 5) };
+});
+const keepOne = (rows) => analyzeDataset(rows, ["a", "b", "y"], "y").recommendations.some(r => /Keep one of "a" or "b"/.test(r.action));
+const partial = analyzeDataset(twin(2), ["a", "b", "y"], "y").relationships.categoricalAssociations[0];
+check("similar-grain pair at V 0.6–0.9 is not told to drop a column",
+  partial.cramersV >= 0.6 && partial.cramersV < 0.9 && !keepOne(twin(2)));
+check("similar-grain pair that restates itself still gets 'keep one of'", keepOne(twin(3)));
+
 /* Three columns with a few missing cells each: one item, not three. */
 const lightRows = Array.from({ length: 400 }, (_, i) => ({
   a: i % 50 === 0 ? "" : String(i % 11), b: i % 40 === 0 ? "" : String(i % 13),
