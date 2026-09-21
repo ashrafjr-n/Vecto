@@ -10,7 +10,9 @@ import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
 import { setPendingDataset } from "../lib/datasetHandoff.js";
-import { validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader } from "../lib/csvIntake.js";
+import {
+  validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader, headerlessVerdict, headerlessRows,
+} from "../lib/csvIntake.js";
 
 /* Radius pair that makes the hero and the content panel read as one continuous
    surface interrupted by the dotted canvas, rather than two stacked cards.
@@ -125,6 +127,47 @@ function Home() {
   /* Set when the CSV parsed but some rows were ragged — a warning, not a
      rejection: the readable rows are already handed off and analysable. */
   const [malformed,  setMalformed]  = useState(null);
+  /* Set when the first row looks like data, not names — held for a choice,
+     because the rule reads values and cannot be certain. Carries the File so
+     "read it as data" can re-parse, and the header parse's own malformed
+     verdict for the "keep as names" path. */
+  const [headerless, setHeaderless] = useState(null);
+
+  /* The one exit after a successful parse: a ragged-row warning holds the
+     navigation so it is read; otherwise go straight to the analysis. */
+  const proceed = useCallback((malformedRows) => {
+    if (malformedRows) {
+      setIsParsing(false);
+      setMalformed(malformedRows);
+      return;
+    }
+    navigate("/analyze");
+  }, [navigate]);
+
+  const readFirstRowAsData = () => {
+    const { file } = headerless;
+    setHeaderless(null);
+    setIsParsing(true);
+    Papa.parse(file, {
+      header:         false,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const { data, fields, malformed: ragged } = headerlessRows(results.data);
+        setPendingDataset(data, fields);
+        proceed(ragged);
+      },
+      error: () => {
+        setIsParsing(false);
+        setError("parse");
+      },
+    });
+  };
+
+  const keepFirstRowAsNames = () => {
+    const { malformed: ragged } = headerless;
+    setHeaderless(null);
+    proceed(ragged);
+  };
 
   const handleFile = useCallback((file) => {
     if (!file) return;
@@ -133,6 +176,7 @@ function Home() {
 
     setError(null);
     setMalformed(null);
+    setHeaderless(null);
     setIsParsing(true);
 
     Papa.parse(file, {
@@ -149,24 +193,29 @@ function Home() {
 
         setPendingDataset(results.data, results.meta.fields);
 
+        /* A headerless file used to lose its first row into the column names
+           without a word. Ask before anything else: which row is the header
+           decides which rows count as ragged. */
+        const firstRowIsData = headerlessVerdict(results);
+        if (firstRowIsData) {
+          setIsParsing(false);
+          setHeaderless({ ...firstRowIsData, file, malformed });
+          return;
+        }
+
         /* Rows PapaParse could not read cleanly. They were previously ignored
            outright — the file analyzed silently and every statistic downstream
            was computed over partly-garbage rows the user never saw. Hold the
            navigation so the warning is actually read; the data is already
            handed off, so continuing is one click. */
-        if (malformed) {
-          setIsParsing(false);
-          setMalformed(malformed);
-          return;
-        }
-        navigate("/analyze");
+        proceed(malformed);
       },
       error: () => {
         setIsParsing(false);
         setError("parse");
       },
     });
-  }, [navigate]);
+  }, [proceed]);
 
   const onDragOver  = (e) => { e.preventDefault(); setIsDragOver(true); };
   const onDragLeave = ()  => setIsDragOver(false);
@@ -266,6 +315,41 @@ function Home() {
             <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint">
               CSV only · Up to {MAX_SIZE_MB}MB · Processed locally, never uploaded
             </p>
+
+            {headerless && (
+              <div className="mt-6 rounded-2xl border border-warning/25 bg-warning-tint px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <FileWarning size={16} className="mt-0.5 shrink-0 text-warning" />
+                  <div>
+                    <div className="text-[13px] font-semibold text-warning">
+                      The first row looks like data, not column names.
+                    </div>
+                    <div className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                      {headerless.dataLike} of its {headerless.total} cells are decimal or
+                      negative numbers, which a column name almost never is. Read as names, that
+                      row would be left out of every statistic. Read as data, the columns are
+                      named column_1 to column_{headerless.total}.
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={readFirstRowAsData}
+                    className="rounded-xl bg-ink px-4 py-2.5 text-[13px] font-semibold text-paper-sunken transition-opacity hover:opacity-90"
+                  >
+                    Read the first row as data
+                  </button>
+                  <button
+                    type="button"
+                    onClick={keepFirstRowAsNames}
+                    className="rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:border-ink-faint"
+                  >
+                    Keep it as column names
+                  </button>
+                </div>
+              </div>
+            )}
 
             {malformed && (
               <div className="mt-6 rounded-2xl border border-warning/25 bg-warning-tint px-5 py-4">
