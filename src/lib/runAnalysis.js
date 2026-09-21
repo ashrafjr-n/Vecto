@@ -13,14 +13,14 @@
    detectColumnRoles on them to draw the target picker, so the clone is a copy,
    not a handover. */
 
-import { analyzeDataset } from "../components/utils/core/index.js";
+import { analyzeWithDiagnostic } from "./prep/diagnostic.js";
 
 /* Direct call, errors returned rather than thrown. The results-step call site is
    asynchronous and ErrorBoundary only catches errors thrown during render, so a
    throw escaping here leaves a spinner turning forever with no message. */
 export function runAnalysisSync(data, columns, target, onPhase, roleOverrides) {
   try {
-    return { result: analyzeDataset(data, columns, target, onPhase, roleOverrides), error: null };
+    return { result: analyzeWithDiagnostic(data, columns, target, onPhase, roleOverrides), error: null };
   } catch (err) {
     console.error("analyzeDataset() failed:", err);
     return { result: null, error: err?.message ?? "Unknown error" };
