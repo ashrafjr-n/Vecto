@@ -832,6 +832,16 @@ check("a categorical column that determines the target is flagged as leakage",
 check("an unrelated categorical column is not flagged",
   !detLeak.some(l => l.col === "noise"));
 
+/* Ask a Manager salaries: ONE row (salary 870,000,000, other pay 120,000,000) put
+   r at 1.00 while ρ was 0.45, and a legitimate column was flagged as leakage. A true
+   numeric leak ranks the same way it correlates — every documented one has ρ ≥ 0.94. */
+const outlierRows = Array.from({ length: 2000 }, (_, i) => ({ other: String((i * 7919) % 1000), pay: String(50000 + ((i * 104729) % 1000) * 60), sum: "" }));
+outlierRows.push({ other: "120000000", pay: "870000000" });
+for (const r of outlierRows) { r.sum = String(Number(r.pay) + Number(r.other)); }
+const outlierLeak = analyzeDataset(outlierRows, ["other", "sum", "pay"], "pay").relationships.leakageSuspects;
+check("one extreme row does not make a column a leak; a real sum of the target still is",
+  !outlierLeak.some(l => l.col === "other") && outlierLeak.some(l => l.col === "sum"));
+
 /* Missingness that restates the label: present for one class, empty for the
    other. These columns have no targetCorrelations entry at all, so the loop over
    it can never reach them. */

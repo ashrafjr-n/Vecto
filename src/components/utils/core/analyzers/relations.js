@@ -526,10 +526,17 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
      Both thresholds are 0.95 on purpose — after the corrections above the two
      metrics mean the same thing at the top of their range: near-determinism. */
   const LEAKAGE_MIN = 0.95;
+  /* A Pearson flag must also hold on ranks. One row can carry r alone: Ask a Manager's
+     870,000,000 salary beside 120,000,000 of other pay put r at 1.00 with ρ 0.45, and a
+     legitimate column was called a leak. Every documented numeric leak in the test sets
+     ranks as it correlates (ρ ≥ 0.94, bike-sharing `registered` the lowest), so 0.9 —
+     the numeric redundancy bar — keeps them all. */
+  const LEAKAGE_RANK_MIN = 0.9;
 
   const leakageSuspects = Object.entries(targetCorrelations)
     .filter(([, e]) => (e?.metric === "pearson" || e?.metric === "cramers_v")
-                    && (e?.absValue ?? 0) >= LEAKAGE_MIN)
+                    && (e?.absValue ?? 0) >= LEAKAGE_MIN
+                    && (e.metric !== "pearson" || Math.abs(e.spearman ?? 0) >= LEAKAGE_RANK_MIN))
     .map(([col, entry]) => ({
       col,
       correlation: entry.value,
