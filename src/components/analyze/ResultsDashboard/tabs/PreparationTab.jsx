@@ -34,7 +34,7 @@ function ColumnScores({ diagnostic }) {
   const pct = (x) => `${Math.round(Math.min(1, Math.max(0, x)) * 100)}%`;
   return (
     <div className="mt-5">
-      <h4 className="text-[11px] font-medium text-ink-faint">
+      <h4 className="text-[12px] font-medium text-ink-faint">
         Each column alone · {METRIC[metric].name}{columns.length > shown.length ? ` · best ${shown.length} of ${columns.length}` : ""}
       </h4>
       <ul className="mt-2 space-y-2">
@@ -42,13 +42,13 @@ function ColumnScores({ diagnostic }) {
           const suspicious = score >= SUSPICIOUS_SCORE;
           return (
             <li key={col} className="flex items-center gap-3" title={`"${col}" alone: ${fmt(score)} ${METRIC[metric].name}, mean over ${diagnostic.folds} folds`}>
-              <span className="w-40 shrink-0 truncate font-mono text-[12px] text-ink-soft">{col}</span>
+              <span className="w-24 shrink-0 truncate font-mono text-[12px] text-ink-soft sm:w-40">{col}</span>
               <div className="relative h-1.5 min-w-16 flex-1 rounded-full bg-paper">
                 <div className="h-full rounded-full bg-ink-faint" style={{ width: pct(score) }} />
                 <span className="absolute -top-1 h-3.5 w-px bg-ink-soft" style={{ left: pct(baseline.mean) }} />
               </div>
               <span className="w-12 shrink-0 text-right font-mono text-[12px] text-ink">{fmt(score)}</span>
-              <span className="w-24 shrink-0">
+              <span className="shrink-0 sm:w-24">
                 {suspicious && (
                   <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-critical">
                     <CircleX size={12} /> Check it
@@ -79,26 +79,34 @@ function DiagnosticCard({ diagnostic, target }) {
   return (
     <SectionCard title="Diagnostic baseline">
       <p className="text-[13px] leading-relaxed text-ink-soft">
-        One fixed, untuned model — ridge regression{diagnostic.task === "classification" ? " as a one-vs-rest classifier" : ""}, alpha 1 —
-        trained on the plan below and cross-validated over {diagnostic.folds} folds ({diagnostic.split}), with the preparation re-fitted
-        inside every fold. It is a measurement, not a model to use: the score is a floor for what these columns support.
+        One simple, untuned model trained on the plan below and tested on rows it has not seen.
+        It is a measurement, not a model to use: its score is a floor for what these columns support.
         {" "}{diagnostic.sampled ? `Measured on an evenly spread sample of ${diagnostic.rows.toLocaleString()} rows.` : `${diagnostic.rows.toLocaleString()} rows.`}
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile label="Model" value={fmt(model.mean)} suffix={` ±${fmt(model.sd)}`} />
         <StatTile label="Knows nothing" value={fmt(baseline.mean)} />
-        <StatTile label="Corrected t" value={tText} tone={signal ? "success" : "warning"} />
+        <StatTile label="Consistency (t)" value={tText} tone={signal ? "success" : "warning"} />
       </div>
       <p className="mt-4 text-[13px] leading-relaxed text-ink">
         {signal
           ? `The columns carry signal: the model beats the know-nothing baseline by ${fmt(model.mean - baseline.mean)} in ${METRIC[metric].name}, and the gap holds across the folds.`
           : `No reliable signal: the model does not beat the know-nothing baseline consistently across the folds.`}
       </p>
-      <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
-        Score: {METRIC[metric].name}, {METRIC[metric].explain}. The verdict is a paired t-test across the {DIAG_FOLDS} folds with the
-        Nadeau–Bengio correction for folds that share training rows; it needs t ≥ 2.78 (p &lt; 0.05).
-        {!signal && " An untuned linear model can miss structure a flexible one would find — this says the easy signal is absent, not that none exists."}
-      </p>
+      {!signal && (
+        <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
+          An untuned linear model can miss structure a flexible one would find — this says the easy signal is absent, not that none exists.
+        </p>
+      )}
+      <details className="mt-3 text-[12px] text-ink-faint">
+        <summary className="cursor-pointer font-medium text-ink-soft hover:text-ink">How this is measured</summary>
+        <p className="mt-2 leading-relaxed">
+          Ridge regression{diagnostic.task === "classification" ? " as a one-vs-rest classifier" : ""}, alpha 1, cross-validated over{" "}
+          {diagnostic.folds} folds ({diagnostic.split}) with the preparation re-fitted inside every fold. Score: {METRIC[metric].name},{" "}
+          {METRIC[metric].explain}. The verdict is a paired t-test across the {DIAG_FOLDS} folds with the Nadeau–Bengio correction
+          for folds that share training rows; it needs t ≥ 2.78 (p &lt; 0.05).
+        </p>
+      </details>
 
       {suspicious.length > 0 && (
         <div className="mt-4 flex items-start gap-3 rounded-lg border border-critical/20 bg-critical-tint px-4 py-3">
@@ -147,16 +155,28 @@ function UnstableDiagnostic({ diagnostic, target }) {
   );
 }
 
+/* Columns that get the same treatment share one line: eight categorical columns
+   used to print the same sentence eight times. */
+function byTreatment(rows) {
+  const groups = new Map();
+  rows.forEach(({ col, text }) => groups.set(text, [...(groups.get(text) ?? []), col]));
+  return [...groups].map(([text, cols]) => ({ text, cols }));
+}
+
 function Group({ title, rows }) {
   if (rows.length === 0) return null;
   return (
     <div>
-      <h4 className="text-[11px] font-medium text-ink-faint">{title} · {rows.length}</h4>
+      <h4 className="text-[12px] font-medium text-ink-faint">{title} · {rows.length}</h4>
       <ul className="mt-2 divide-y divide-line">
-        {rows.map(({ col, text }) => (
-          <li key={col} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 first:pt-0 last:pb-0">
-            <span className="font-mono text-[12px] text-ink">{col}</span>
-            <span className="text-[12.5px] text-ink-soft">{text}</span>
+        {byTreatment(rows).map(({ text, cols }) => (
+          <li key={text} className="py-2.5 first:pt-0 last:pb-0">
+            <div className="flex flex-wrap gap-1.5">
+              {cols.map((col) => (
+                <span key={col} className="rounded-md border border-line bg-paper px-2 py-0.5 font-mono text-[11.5px] text-ink">{col}</span>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-soft">{text}</p>
           </li>
         ))}
       </ul>
