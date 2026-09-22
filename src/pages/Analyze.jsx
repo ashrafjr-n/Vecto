@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { LoaderCircle, TriangleAlert, X } from "lucide-react";
 
 import Header         from "../components/layout/Header.jsx";
+import Footer         from "../components/layout/Footer.jsx";
 import TargetStep     from "../components/analyze/TargetStep/TargetStep.jsx";
 /* Only reached at the results step — kept out of the target/processing path's chunk. */
 const ResultsDashboard = lazy(() =>
@@ -324,6 +325,7 @@ function Analyze() {
 
         </AnimatePresence>
       </main>
+      <Footer />
     </div>
   );
 }
