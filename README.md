@@ -292,17 +292,21 @@ src/
   content/
     methodology.js            copy for /methodology — thresholds quoted from the engine,
                               AI figures quoted from held-out eval runs
-    pages.js                  copy for /about, /privacy and /terms
+    pages.js                  copy for /about (its own shape) and for /privacy, /terms
   pages/
     Home.jsx                  intro + the functional CSV dropzone
     Analyze.jsx                3-step machine: Target → Processing → Results
-    Methodology.jsx           engine stages, trust principles, measured AI accuracy, limits
-    TextPage.jsx              About, Privacy and Terms, over content/pages.js
+    Methodology.jsx           engine stages as a spec sheet: contents, sticky stage
+                              headers, rules, measured AI accuracy, limits
+    About.jsx                 what the tool does, set against what it is not
+    TextPage.jsx              Privacy and Terms, over content/pages.js
     NotFound.jsx              any unknown path
   components/
     layout/Header.jsx         fixed, full-width, shared by every page
     layout/Footer.jsx         page links and the repository
-    layout/DocPage.jsx        the reading-page frame: title, lead, sticky "On this page"
+    layout/DocPage.jsx        the legal-page frame: title, lead, sticky "On this page"
+    layout/ReferencePage.jsx  the frame for /methodology and /about: masthead, colophon
+    common/SpecRows.jsx       the label/definition ledger both reference pages use
     common/                   shared primitives (ErrorBoundary, SectionLabel)
     analyze/
       shared/                 primitives used across steps/tabs (RolePill, StatTile,
