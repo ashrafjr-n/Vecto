@@ -3,6 +3,16 @@
    src/components/utils/core/. If a rule there changes, this copy is wrong until
    it is changed too; nothing links the two automatically. */
 
+/* The colophon beside the headline. Each line is a fact stated elsewhere in this
+   file or in CLAUDE.md — a figure here that nothing backs up is worse than a
+   blank column. `Stages` is not written down: the page counts PHASES. */
+export const METHODOLOGY_FACTS = [
+  { label: "Runs in",            value: "Your browser tab" },
+  { label: "Network requests",   value: "0" },
+  { label: "Statistics checked", value: "pandas · scipy" },
+  { label: "Datasets tested on", value: "40+" },
+];
+
 export const METHODOLOGY_INTRO = {
   headline: "How Vecto reads a dataset.",
   lead: [
@@ -171,19 +181,19 @@ export const PRINCIPLES = [
    only from a recorded run; a rounder number here is a worse number. */
 export const AI_MEASURED = [
   {
-    title: "Choosing the target",
+    label: "Choosing the target",
     text: "On 19 files never used to write the prompt — new domains, each with a published data dictionary, run once in two test sets of 10 and 9 — the assistant's first suggestion matched the documented target 19 times out of 19. The engine's own name-and-shape guess matched 8 (5 of 10, then 3 of 9).",
   },
   {
-    title: "Describing columns",
+    label: "Describing columns",
     text: "On the 10-file test, 213 of 214 checks passed: roles 118 of 118, subtypes 75 of 76. Cleaning rules were the weaker half at 9 of 11, both misses on one file that writes decimals with commas — the cause was a bug in the engine's own scan, since fixed. On the final 9-file test, 275 of 280 checks passed.",
   },
   {
-    title: "A person labelled the same columns blind",
+    label: "A person labelled the same columns blind",
     text: "60 columns from 17 files, shown only what the model is shown — the name and a profile, no dictionary, no engine role. The labeller answered \u201cnot sure\u201d for 55% of them. Where they did decide (n = 36), their role agreed with the model at \u03ba 0.86 and with the written expectations at \u03ba 0.93. Half of these columns are undecidable from what the model sees, so the scores above rest on files that arrived with documentation.",
   },
   {
-    title: "Leakage is the weaker task",
+    label: "Leakage is the weaker task",
     text: "On the final 9-file test it raised 5 of 6 documented leaks and accused none of the 45 legitimate columns. On the earlier 10-file test, under an older model setting, it raised only 4 of 12. It can still question a column that turns out to be legitimate \u2014 which is why a claim the engine cannot measure is shown as a question, never as a verdict.",
   },
 ];
@@ -191,12 +201,12 @@ export const AI_MEASURED = [
 /* What the engine does not decide. Stated for the reader who will otherwise find
    each one the hard way. */
 export const LIMITS = [
-  { title: "Meaning", text: "The engine sees values, not semantics. It cannot know that a column is a post-outcome field, or that an outlier is a data-entry error rather than a real event." },
-  { title: "Codes versus counts", text: "Integer columns with 5 to 25 levels stay numeric and are flagged; only you know whether they are codes." },
-  { title: "Dates", text: "Detected from the first 100 non-missing values. Epoch timestamps, compact YYYYMMDD, week, quarter and time-only formats are not recognised." },
-  { title: "Scale", text: "Files up to 40MB. Duplicate rows are counted up to 50,000 rows, the correlation matrix holds 40 numeric columns and categorical pairing 25 columns, and mutual information is estimated on a 20,000-row sample." },
-  { title: "Spearman in the matrix", text: "Ranks are computed once per column, so where columns have different missing rows, ρ can differ slightly from a pairwise scipy.stats.spearmanr. Spearman against the target is computed exactly on each pair." },
-  { title: "Headerless files", text: "A first row where at least half the cells are decimal or negative numbers is offered as data rather than names. A headerless file of whole numbers is not caught: that row cannot be told apart from a header of years or indices." },
-  { title: "Baseline model", text: "Linear and untuned, so it is a floor. A column that restates the target only in part — a total that includes it — scores well below the 0.95 bar on its own; the leakage review's formula check is what catches that shape." },
-  { title: "Multicollinearity", text: "Redundancy is pairwise correlation. A column that is a linear combination of three others will not be caught by it." },
+  { label: "Meaning", text: "The engine sees values, not semantics. It cannot know that a column is a post-outcome field, or that an outlier is a data-entry error rather than a real event." },
+  { label: "Codes versus counts", text: "Integer columns with 5 to 25 levels stay numeric and are flagged; only you know whether they are codes." },
+  { label: "Dates", text: "Detected from the first 100 non-missing values. Epoch timestamps, compact YYYYMMDD, week, quarter and time-only formats are not recognised." },
+  { label: "Scale", text: "Files up to 40MB. Duplicate rows are counted up to 50,000 rows, the correlation matrix holds 40 numeric columns and categorical pairing 25 columns, and mutual information is estimated on a 20,000-row sample." },
+  { label: "Spearman in the matrix", text: "Ranks are computed once per column, so where columns have different missing rows, ρ can differ slightly from a pairwise scipy.stats.spearmanr. Spearman against the target is computed exactly on each pair." },
+  { label: "Headerless files", text: "A first row where at least half the cells are decimal or negative numbers is offered as data rather than names. A headerless file of whole numbers is not caught: that row cannot be told apart from a header of years or indices." },
+  { label: "Baseline model", text: "Linear and untuned, so it is a floor. A column that restates the target only in part — a total that includes it — scores well below the 0.95 bar on its own; the leakage review's formula check is what catches that shape." },
+  { label: "Multicollinearity", text: "Redundancy is pairwise correlation. A column that is a linear combination of three others will not be caught by it." },
 ];
