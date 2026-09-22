@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Papa from "papaparse";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import {
   UploadCloud, LoaderCircle, TriangleAlert, ArrowRight, FileWarning,
 } from "lucide-react";
@@ -110,16 +110,34 @@ const REVEAL = {
 function Home() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
-  /* The hero eases out — fading and drifting up slightly — as it scrolls
-     past, instead of cutting off hard at the viewport edge. Purely visual;
+  /* The page opens as three LAYERS, not three stacked blocks. The dotted canvas
+     carrying the dropzone is pinned to the viewport (sticky, z-0); the hero sits
+     on top of it (negative margin, z-10) and lifts away on scroll, uncovering a
+     layer that was behind it the whole time; the content panel below (z-20) then
+     rides up over that same pinned canvas. Two things fall out of it for free:
+     every rounded panel corner now cuts through to the dots instead of to flat
+     background, and the dots hold still while the panels move, which is what
+     makes the depth read. All of it is scroll POSITION — nothing is timed, and
      scroll stays entirely in the user's hands. */
   const heroRef = useRef(null);
-  const { scrollYProgress: heroProgress } = useScroll({
+  const reduceMotion = useReducedMotion();
+  const { scrollYProgress: heroExit } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"],
   });
-  const heroOpacity = useTransform(heroProgress, [0, 1], [1, 0.5]);
-  const heroY = useTransform(heroProgress, [0, 1], [0, -32]);
+  /* Transforms only, no scroll-linked opacity: framer-motion 12 updates a
+     transform on every scroll frame but leaves a motion-value opacity frozen at
+     the value it mounted with (measured here, both on the hero and on the
+     dropzone). The reveal reads better for it — the hero stays a solid sheet
+     rather than dissolving over the layer it is uncovering. */
+  const heroY     = useTransform(heroExit, [0, 1], [0, -70]);
+  const heroScale = useTransform(heroExit, [0, 1], [1, 0.97]);
+  /* The dropzone doesn't merely become visible — it settles into place as the
+     hero clears it, so the eye reads one layer being uncovered, not two cuts. */
+  const dropY     = useTransform(heroExit, [0.15, 0.95], [64, 0]);
+  const dropScale = useTransform(heroExit, [0.15, 0.95], [0.9, 1]);
+  const heroMotion = reduceMotion ? undefined : { y: heroY, scale: heroScale };
+  const dropMotion = reduceMotion ? undefined : { y: dropY, scale: dropScale };
   const [isDragOver, setIsDragOver] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
   const [error,      setError]      = useState(null);
@@ -230,59 +248,22 @@ function Home() {
     <div className="night min-h-screen bg-paper text-ink">
       <Header />
 
-      <main>
+      <main className="relative">
 
-        {/* ── HERO PANEL — normal scroll throughout. It fades and eases up
-            slightly as it scrolls past instead of cutting off hard, the one
-            piece of motion tied directly to scroll position. ────────────── */}
-        <motion.section
-          ref={heroRef}
-          style={{ opacity: heroOpacity, y: heroY }}
-          className={`bg-paper-sunken px-6 pt-20 pb-10 sm:px-10 sm:pt-24 sm:pb-12 ${PANEL_RADIUS_BOTTOM}`}
-        >
-          <div className="mx-auto max-w-[1400px]">
-
-            <SectionLabel>Dataset analysis in the browser</SectionLabel>
-
-            <h1 className="mt-12 max-w-[19ch] text-[2.5rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-6xl lg:text-[5.25rem]">
-              A structural audit of your dataset, in the browser.
-            </h1>
-
-            <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                Drop a CSV and choose the column you want to predict. Vecto reads each
-                column&apos;s role, measures quality, relationships and leakage, and tells you
-                what to fix before training.
-              </p>
-              <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                The analysis runs in this tab and your file is never uploaded. An optional
-                AI review sends column summaries — never rows — and only when you ask.
-              </p>
-            </div>
-
-            <div className="mt-12 grid grid-cols-3 border-t border-line sm:mt-16">
-              {DIAGNOSTICS.map((d) => (
-                <div key={d.label} className="py-6 pr-4 sm:py-8 sm:pr-8">
-                  <div className="whitespace-nowrap font-mono text-2xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
-                  <div className="mt-2 text-[13px] text-ink-faint">{d.label}</div>
-                </div>
-              ))}
-            </div>
-
-          </div>
-        </motion.section>
-
-        {/* ── DOTTED CANVAS — the negative space between the two panels, and
-            where the actual interaction lives ──────────────────────────── */}
-        <section className="dot-grid px-6 py-24 sm:px-10 sm:py-36">
-          <motion.div {...REVEAL} className="mx-auto max-w-2xl">
+        {/* ── LAYER 0 — the dotted canvas, pinned to the viewport for the whole
+            page. It is uncovered by the hero above it and then covered again by
+            the content panel below, so it is also what shows through every
+            rounded corner on the page. ─────────────────────────────────── */}
+        <section className="sticky top-0 z-0 flex h-[100svh] items-center justify-center overflow-hidden px-6 pt-16 sm:px-10">
+          <div aria-hidden className="dot-grid pointer-events-none absolute inset-0" />
+          <motion.div style={dropMotion} className="relative w-full max-w-2xl">
 
             <div
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
               onDrop={onDrop}
               onClick={() => !isParsing && inputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-20 text-center transition-colors sm:py-24 ${
+              className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-14 text-center transition-colors sm:py-20 ${
                 isDragOver
                   ? "border-accent bg-accent-tint"
                   : "border-line-strong bg-paper-sunken hover:border-ink-faint"
@@ -394,8 +375,53 @@ function Home() {
           </motion.div>
         </section>
 
-        {/* ── CONTENT PANEL — mirrored radii, interlocking with the hero ── */}
-        <section className={`bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
+        {/* ── LAYER 1 — HERO PANEL, lying over the pinned canvas and lifting off
+            it on scroll. Its bottom radius cuts through to the dots. ────── */}
+        <motion.section
+          ref={heroRef}
+          style={heroMotion}
+          className={`relative z-10 -mt-[100svh] flex min-h-[100svh] origin-top flex-col justify-center bg-paper-sunken px-6 pt-24 pb-14 sm:px-10 sm:pt-28 sm:pb-16 ${PANEL_RADIUS_BOTTOM}`}
+        >
+          <div className="mx-auto max-w-[1400px]">
+
+            <SectionLabel>Dataset analysis in the browser</SectionLabel>
+
+            <h1 className="mt-12 max-w-[19ch] text-[2.5rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-6xl lg:text-[5.25rem]">
+              A structural audit of your dataset, in the browser.
+            </h1>
+
+            <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
+                Drop a CSV and choose the column you want to predict. Vecto reads each
+                column&apos;s role, measures quality, relationships and leakage, and tells you
+                what to fix before training.
+              </p>
+              <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
+                The analysis runs in this tab and your file is never uploaded. An optional
+                AI review sends column summaries — never rows — and only when you ask.
+              </p>
+            </div>
+
+            <div className="mt-12 grid grid-cols-3 border-t border-line sm:mt-16">
+              {DIAGNOSTICS.map((d) => (
+                <div key={d.label} className="py-6 pr-4 sm:py-8 sm:pr-8">
+                  <div className="whitespace-nowrap font-mono text-2xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
+                  <div className="mt-2 text-[13px] text-ink-faint">{d.label}</div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </motion.section>
+
+        {/* ── THE REVEAL WINDOW — no content of its own: this is the stretch of
+            scroll where the pinned canvas above is the only thing on screen and
+            the dropzone is there to be used. ───────────────────────────── */}
+        <div aria-hidden className="h-[145svh]" />
+
+        {/* ── LAYER 2 — CONTENT PANEL, riding up over the pinned canvas. Mirrored
+            radii, so its top corners cut through to the same dots. ─────── */}
+        <section className={`relative z-20 bg-paper-sunken px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32 ${PANEL_RADIUS_TOP}`}>
           <div className="mx-auto max-w-[1400px]">
 
             <motion.div {...REVEAL}>
