@@ -7,7 +7,8 @@
               relationships.unscoredColumns — nothing leaves the scan without a trace
      signal   the diagnostic's "any signal" verdict matches the documentation (null: reported only)
 
-   Parsing matches tools/ai-eval.mjs. Writes reports/engine-check-<set>/summary.md.
+   Parsing and decoding match Home.jsx (decodeCsv), like tools/report.mjs.
+   Writes reports/engine-check-<set>/summary.md.
 
    Usage: node --max-old-space-size=8192 tools/engine-check.mjs --set=final */
 
@@ -15,7 +16,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import Papa from "papaparse";
 
-import { transformHeader } from "../src/lib/csvIntake.js";
+import { transformHeader, decodeCsv } from "../src/lib/csvIntake.js";
 import { analyzeWithDiagnostic } from "../src/lib/prep/diagnostic.js";
 import { buildPrepPlan } from "../src/lib/prep/plan.js";
 
@@ -29,11 +30,10 @@ const fmt = (x) => (typeof x === "number" ? x.toFixed(3) : String(x));
 const rows = [];
 
 for (const e of ENGINE_EXPECTATIONS) {
-  const parsed = Papa.parse(readFileSync(join("forTesting", e.file), "utf8"), { header: true, skipEmptyLines: true, transformHeader });
+  const parsed = Papa.parse(decodeCsv(readFileSync(join("forTesting", e.file))).text, { header: true, skipEmptyLines: true, transformHeader });
   const columns = parsed.meta.fields;
   const checks = [];
   let result = null;
-  let ms = null;
 
   const t0 = performance.now();
   try {
@@ -41,7 +41,7 @@ for (const e of ENGINE_EXPECTATIONS) {
   } catch (err) {
     checks.push({ kind: "crash", ok: false, note: err?.message ?? String(err) });
   }
-  ms = Math.round(performance.now() - t0);
+  const ms = Math.round(performance.now() - t0);
 
   if (result) {
     checks.push({ kind: "crash", ok: true });

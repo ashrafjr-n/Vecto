@@ -16,7 +16,7 @@ import Papa from "papaparse";
 
 import { analyzeDataset, detectTarget } from "../src/components/utils/core/index.js";
 import {
-  inspectParseResult, transformHeader, headerlessVerdict, headerlessRows, MAX_SIZE_MB, MAX_SIZE_B,
+  inspectParseResult, transformHeader, headerlessVerdict, headerlessRows, decodeCsv, MAX_SIZE_MB, MAX_SIZE_B,
 } from "../src/lib/csvIntake.js";
 
 const args    = process.argv.slice(2);
@@ -35,7 +35,7 @@ mkdirSync(outDir, { recursive: true });
 for (const file of files) {
   const name   = basename(file, extname(file));
   const bytes  = statSync(file).size;
-  const text   = readFileSync(file, "utf8");
+  const { text, encoding } = decodeCsv(readFileSync(file));
   let parsed   = Papa.parse(text, { header: true, skipEmptyLines: true, transformHeader });
   let intake   = inspectParseResult(parsed);
   /* A first row of data is read as data — the answer the app pre-selects. The
@@ -55,6 +55,7 @@ for (const file of files) {
     overSizeCap: bytes > MAX_SIZE_B ? `${MAX_SIZE_MB}MB cap exceeded` : null,
     intake,
     headerless,
+    encoding,
     rows: parsed.data.length,
     columns: parsed.meta.fields ?? [],
     target: null,
