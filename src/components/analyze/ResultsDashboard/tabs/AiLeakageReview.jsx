@@ -204,6 +204,25 @@ function ReviewResult({ review, target, onAskAgain }) {
         </section>
       )}
 
+      {/* Measured by the engine before the request (prep/sameTarget.js): evidence, not a
+          verdict — an entity, a value known only afterwards, or harmless. The model had
+          the numbers and did not raise these; the reader decides. */}
+      {review.sameTargetNotRaised?.length > 0 && (
+        <section className="text-[12.5px] leading-relaxed text-ink-soft">
+          <h3 className="text-[11px] font-medium text-ink-faint">Rows sharing a value share the target — measured, not raised by the model</h3>
+          <ul className="mt-1.5 space-y-1">
+            {review.sameTargetNotRaised.map((s) => (
+              <li key={s.column}>
+                <span className="font-mono text-ink">{s.column}</span> — {s.repeatedRows.toLocaleString()} rows repeat one of its{" "}
+                {s.values.toLocaleString()} values, and within those the target is the same {Math.round(s.sameTargetShare * 100)}% of the time
+                (the most common target value alone: {Math.round(s.overallShare * 100)}%). If it identifies an entity, split by it; if it is only
+                known after the outcome, leave it out.
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {review.withheld.length > 0 && (
         <details className="text-[12.5px] text-ink-soft">
           <summary className="cursor-pointer hover:text-ink">
