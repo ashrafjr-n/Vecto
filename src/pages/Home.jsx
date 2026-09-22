@@ -36,12 +36,11 @@ const ERRORS = {
   },
 };
 
-/* Small stat row for dashboard-adjacent texture only — not live data. See
-   frontend.md "Home" spec: atmosphere, never a fake dashboard. */
+/* Three facts about the product, not live data — each one checkable. */
 const DIAGNOSTICS = [
-  { value: "10+", label: "Diagnostics computed" },
-  { value: "6",   label: "Report sections" },
-  { value: "0",   label: "Rows uploaded" },
+  { value: "8",                   label: "Report sections" },
+  { value: "0",                   label: "Rows uploaded" },
+  { value: `${MAX_SIZE_MB} MB`,   label: "Largest file" },
 ];
 
 /* Grounded, checkable claims — not marketing adjectives. Every one of these is
@@ -56,46 +55,46 @@ const TALKING_POINTS = [
     text: "Numeric, categorical, identifier, and temporal roles are inferred from the values themselves — cardinality, uniqueness, date-family matching — with explicit guards against false positives like a 4-digit year read as a date.",
   },
   {
-    title: "Nothing leaves the browser",
-    text: "Parsing and every computation run in this tab. There is no upload endpoint to misconfigure, because there is no upload.",
+    title: "Your file stays in the browser",
+    text: "Parsing and every computation run in this tab, and the file is never uploaded. The optional AI review sends column summaries only, and only when you ask for it.",
   },
   {
-    title: "Built for people who read a correlation matrix",
-    text: "No dumbed-down thresholds, no hand-holding copy. If you know what target leakage or multicollinearity means, this tool assumes you do.",
+    title: "Every number comes with its reason",
+    text: "A coefficient carries its p-value and sample size, a capped score says what capped it, and a column the engine could not measure is named as unmeasured — never shown as clean.",
   },
 ];
 
 const PROCESS_FLOW = [
-  { title: "Upload CSV", desc: "Drop your CSV directly in the browser." },
-  { title: "Detect",     desc: "Automatically identify targets, numeric, categorical & ID columns." },
-  { title: "Analyze",    desc: "Check quality, relationships, class balance and more." },
-  { title: "Understand", desc: "Get actionable insights and recommendations." },
-  { title: "Improve",    desc: "Apply the recommendations to raise the health score." },
+  { title: "Drop a CSV",         desc: "It is parsed in this tab. Nothing is uploaded." },
+  { title: "Choose the target",  desc: "Or none. Column roles are read from the values, not the names." },
+  { title: "Read the report",    desc: "Eight sections, each figure stated with the reasoning behind it." },
+  { title: "Take the pipeline",  desc: "A scikit-learn script that repeats the preparation the report recommends." },
 ];
 
 const DIAGNOSTIC_LAYERS = [
-  { title: "Quality",         text: "Missing values, duplicate rows, and a weighted quality score." },
-  { title: "Statistics",      text: "Per-column mean, std, skewness, kurtosis and distribution shape." },
-  { title: "Visualizations",  text: "Histograms and distribution charts for every column." },
-  { title: "Relationships",   text: "A full correlation matrix with multicollinearity and leakage checks." },
-  { title: "Class Balance",   text: "Majority-to-minority ratio and minority-class row counts." },
-  { title: "Recommendations", text: "Prioritized, actionable fixes tied to what was actually found." },
+  { title: "Overview",        text: "Health score, column roles, key findings and prioritised recommendations." },
+  { title: "Quality",         text: "Missing values, duplicates, mixed types and a quality score built from its deductions." },
+  { title: "Statistics",      text: "Mean, median, spread, skewness, kurtosis and skew-adjusted outliers per column." },
+  { title: "Visualizations",  text: "Histograms, box plots and level counts for every column." },
+  { title: "Target signal",   text: "Each column against the target, with the metric that fits its type, and leakage checks." },
+  { title: "Relationships",   text: "Correlation heatmap, redundant pairs and associations between categories." },
+  { title: "Class balance",   text: "Class shares and imbalance, for a target with classes." },
+  { title: "Preparation",     text: "A per-column plan, a baseline model as a measurement, and the script to run it." },
 ];
 
-/* The raw-CSV-to-report illustration. Same facts as before, now as rows. */
+/* A real report, not a mock: seaborn's titanic.csv with `survived` as the target,
+   as the engine reports it. Update from a real run if an engine change moves it. */
 const SPECIMEN_INPUT = [
-  { label: "Column roles",  value: "Unknown" },
-  { label: "Target",        value: "Not chosen" },
-  { label: "Data quality",  value: "Unmeasured" },
+  { label: "Rows",     value: "891" },
+  { label: "Columns",  value: "15" },
+  { label: "Target",   value: "survived" },
 ];
 
 const SPECIMEN_REPORT = [
-  { label: "Top predictor",  value: "eat-well?" },
-  { label: "Missing values", value: "None" },
-  { label: "Recommendation", value: "Drop ID before training" },
+  { label: "Leakage",        value: "alive restates the target (r = 1.00)" },
+  { label: "Missing values", value: "deck is 77% empty — keep it as a present / absent flag" },
+  { label: "Duplicates",     value: "107 rows — drop before training" },
 ];
-
-const index2 = (i) => String(i + 1).padStart(2, "0");
 
 /* Shared, restrained reveal for section groups further down the page: fade
    and ease up a short distance, once, the first time each group is scrolled
@@ -243,7 +242,7 @@ function Home() {
         >
           <div className="mx-auto max-w-[1400px]">
 
-            <SectionLabel mark="01">Client-side dataset audit</SectionLabel>
+            <SectionLabel>Dataset analysis in the browser</SectionLabel>
 
             <h1 className="mt-12 max-w-[19ch] text-[2.5rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-6xl lg:text-[5.25rem]">
               A structural audit of your dataset, in the browser.
@@ -251,14 +250,13 @@ function Home() {
 
             <div className="mt-16 grid gap-x-16 gap-y-10 border-t border-line pt-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                Upload a CSV and pick a target column. Vecto checks column roles, data
-                quality, correlations and leakage, then returns a weighted health score.
+                Drop a CSV and choose the column you want to predict. Vecto reads each
+                column&apos;s role, measures quality, relationships and leakage, and tells you
+                what to fix before training.
               </p>
               <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
-                Nothing is uploaded — parsing and analysis run locally, in this tab. An
-                optional AI assistant can send a column summary, never row data, and only
-                once you have asked for it. Every number in the report carries its
-                reasoning, and every score held back says why.
+                The analysis runs in this tab and your file is never uploaded. An optional
+                AI review sends column summaries — never rows — and only when you ask.
               </p>
             </div>
 
@@ -266,7 +264,7 @@ function Home() {
               {DIAGNOSTICS.map((d) => (
                 <div key={d.label} className="border-b border-line py-8 pr-8 sm:border-b-0">
                   <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
-                  <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">{d.label}</div>
+                  <div className="mt-2 text-[13px] text-ink-faint">{d.label}</div>
                 </div>
               ))}
             </div>
@@ -314,8 +312,11 @@ function Home() {
               )}
             </div>
 
-            <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-ink-faint">
-              CSV only · Up to {MAX_SIZE_MB}MB · Processed locally, never uploaded
+            <p className="mt-6 text-center text-[13px] text-ink-faint">
+              CSV up to {MAX_SIZE_MB} MB · processed in your browser ·{" "}
+              <Link to="/analyze?sample=1" onClick={() => window.scrollTo(0, 0)} className="font-medium text-ink-soft underline decoration-line-strong underline-offset-4 hover:text-ink">
+                or open a sample report
+              </Link>
             </p>
 
             {headerless && (
@@ -398,12 +399,11 @@ function Home() {
           <div className="mx-auto max-w-[1400px]">
 
             <motion.div {...REVEAL}>
-              <SectionLabel mark="02">Why it's built this way</SectionLabel>
+              <SectionLabel>Why it can be trusted</SectionLabel>
               <div className="mt-10 grid gap-x-14 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-                {TALKING_POINTS.map((p, i) => (
+                {TALKING_POINTS.map((p) => (
                   <div key={p.title}>
-                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
-                    <h3 className="mt-4 text-[17px] font-medium leading-snug tracking-tight text-ink">{p.title}</h3>
+                    <h3 className="text-[17px] font-medium leading-snug tracking-tight text-ink">{p.title}</h3>
                     <p className="mt-3 text-[13.5px] leading-[1.75] text-ink-soft">{p.text}</p>
                   </div>
                 ))}
@@ -411,16 +411,16 @@ function Home() {
             </motion.div>
 
             <motion.div {...REVEAL} className="mt-24 sm:mt-32">
-              <SectionLabel mark="03">What happens to your dataset</SectionLabel>
-              <div className="mt-10 grid grid-cols-1 border-t border-line sm:grid-cols-2 lg:grid-cols-5">
+              <SectionLabel>How it works</SectionLabel>
+              <ol className="mt-10 grid grid-cols-1 border-t border-line sm:grid-cols-2 lg:grid-cols-4">
                 {PROCESS_FLOW.map((step, i) => (
-                  <div key={step.title} className="border-b border-line py-7 pr-8 lg:border-b-0">
-                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
-                    <div className="mt-4 text-[17px] font-medium tracking-tight text-ink">{step.title}</div>
+                  <li key={step.title} className="border-b border-line py-7 pr-8 lg:border-b-0">
+                    <div className="text-[13px] text-ink-faint">Step {i + 1}</div>
+                    <div className="mt-2 text-[17px] font-medium tracking-tight text-ink">{step.title}</div>
                     <div className="mt-2 text-[13.5px] leading-[1.7] text-ink-soft">{step.desc}</div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ol>
 
               {/* The detail that used to be an accordion here lives on /methodology. */}
               <Link
@@ -437,21 +437,20 @@ function Home() {
                 layers sit below as an even 3 × 2 grid, each cell opened by its own
                 hairline — the stats row's grammar, not a list crowded into one column. */}
             <motion.div {...REVEAL} className="mt-24 sm:mt-32">
-              <SectionLabel mark="04">Six diagnostic layers</SectionLabel>
+              <SectionLabel>The report</SectionLabel>
               <div className="mt-10 grid gap-x-16 gap-y-6 lg:grid-cols-2 lg:items-end">
-                <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
-                  One dataset, read six ways.
+                <h2 className="max-w-[18ch] text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
+                  Eight sections, one reading of the file.
                 </h2>
                 <p className="max-w-xl text-[15px] leading-[1.7] text-ink-soft">
-                  Each layer is a section of the report, computed from the same parse of the
-                  file — so a column flagged in one layer is the same column everywhere else.
+                  Every section is computed from the same parse, so a column flagged in one is
+                  the same column everywhere else — and the advice never contradicts itself.
                 </p>
               </div>
-              <div className="mt-14 grid gap-x-12 sm:grid-cols-2 lg:grid-cols-3">
-                {DIAGNOSTIC_LAYERS.map((layer, i) => (
+              <div className="mt-14 grid gap-x-12 sm:grid-cols-2 lg:grid-cols-4">
+                {DIAGNOSTIC_LAYERS.map((layer) => (
                   <div key={layer.title} className="border-t border-line pt-6 pb-10">
-                    <div className="font-mono text-[11px] text-ink-faint">{index2(i)}</div>
-                    <div className="mt-4 text-[17px] font-medium tracking-tight text-ink">{layer.title}</div>
+                    <div className="text-[17px] font-medium tracking-tight text-ink">{layer.title}</div>
                     <p className="mt-2 max-w-sm text-[13.5px] leading-[1.7] text-ink-soft">{layer.text}</p>
                   </div>
                 ))}
@@ -459,36 +458,35 @@ function Home() {
             </motion.div>
 
             <motion.div {...REVEAL} className="mt-24 sm:mt-32">
-              <SectionLabel mark="05">From raw CSV to clear decisions</SectionLabel>
-              {/* Before / after as one recessed specimen. Hairline rows and a large mono
-                  figure — the hero's stat grammar — instead of icon badges in a card
-                  nested inside a card. Static illustration, not live data. */}
+              <SectionLabel>An example</SectionLabel>
+              {/* A real run, as one recessed specimen: hairline rows and a large mono
+                  figure — the hero's stat grammar. See SPECIMEN_* for where it comes from. */}
               <div className="mt-12 grid divide-y divide-line overflow-hidden rounded-[2rem] border border-line bg-paper lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:divide-x lg:divide-y-0">
 
                 <div className="p-8 sm:p-10">
-                  <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">Input</div>
-                  <div className="mt-8 font-mono text-3xl font-medium tracking-tight text-ink sm:text-4xl">messy.csv</div>
+                  <div className="text-[13px] text-ink-faint">Input</div>
+                  <div className="mt-6 break-all font-mono text-3xl font-medium tracking-tight text-ink sm:text-4xl">titanic.csv</div>
                   <dl className="mt-10 border-t border-line">
                     {SPECIMEN_INPUT.map((row) => (
                       <div key={row.label} className="flex items-baseline justify-between gap-6 border-b border-line py-4">
                         <dt className="text-[13.5px] text-ink-soft">{row.label}</dt>
-                        <dd className="font-mono text-[13px] text-ink-faint">{row.value}</dd>
+                        <dd className="font-mono text-[13px] text-ink">{row.value}</dd>
                       </div>
                     ))}
                   </dl>
                 </div>
 
                 <div className="p-8 sm:p-10">
-                  <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">Report</div>
-                  <div className="mt-8 flex items-baseline gap-3">
-                    <span className="font-mono text-5xl font-medium tracking-tight text-success sm:text-6xl">92</span>
-                    <span className="font-mono text-[13px] text-ink-faint">/100 · Health score · Excellent</span>
+                  <div className="text-[13px] text-ink-faint">Report</div>
+                  <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="font-mono text-5xl font-medium tracking-tight text-warning sm:text-6xl">69</span>
+                    <span className="text-[13px] text-ink-faint">/100 health score · Fair, held down by the 77%-empty column</span>
                   </div>
                   <dl className="mt-10 border-t border-line">
                     {SPECIMEN_REPORT.map((row) => (
-                      <div key={row.label} className="flex items-baseline justify-between gap-6 border-b border-line py-4">
-                        <dt className="text-[13.5px] text-ink-soft">{row.label}</dt>
-                        <dd className="text-right font-mono text-[13px] text-ink">{row.value}</dd>
+                      <div key={row.label} className="flex flex-col gap-1 border-b border-line py-4 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+                        <dt className="shrink-0 text-[13.5px] text-ink-soft">{row.label}</dt>
+                        <dd className="text-[13px] text-ink sm:text-right">{row.value}</dd>
                       </div>
                     ))}
                   </dl>
@@ -496,9 +494,19 @@ function Home() {
 
               </div>
 
-              <p className="mt-16 max-w-[20ch] text-[2rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-5xl">
-                Stop staring at columns. Start understanding your dataset.
-              </p>
+              <div className="mt-16 flex flex-col gap-6 border-t border-line pt-12 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[15px] leading-relaxed text-ink-soft">
+                  See the full report on a sample file, or read how every number is computed.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link to="/analyze?sample=1" onClick={() => window.scrollTo(0, 0)} className="rounded-xl bg-ink px-5 py-2.5 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90">
+                    Open the sample report
+                  </Link>
+                  <Link to="/methodology" onClick={() => window.scrollTo(0, 0)} className="rounded-xl border border-line-strong px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:border-ink-faint">
+                    Methodology
+                  </Link>
+                </div>
+              </div>
             </motion.div>
 
           </div>
