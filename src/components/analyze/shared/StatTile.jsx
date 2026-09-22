@@ -11,7 +11,7 @@ function StatTile({ label, value, suffix, tone = "ink" }) {
   }[tone] ?? "text-ink";
 
   return (
-    <div className="rounded-[1.25rem] border border-line bg-paper-sunken px-5 py-4">
+    <div className="rounded-xl border border-line bg-paper px-4 py-3.5">
       <div className="text-[12px] text-ink-faint">{label}</div>
       <div className={`mt-2 font-mono text-2xl font-medium tracking-tight ${toneCls}`}>
         {value}
