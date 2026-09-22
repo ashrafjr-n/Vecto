@@ -19,7 +19,7 @@ import { getHealthScore } from "../src/components/utils/core/scoring/health.js";
 import { analyzeDataset, ANALYSIS_PHASES, detectTarget } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
-import { validateFile, inspectParseResult, transformHeader, headerlessVerdict, headerlessRows, MAX_SIZE_B } from "../src/lib/csvIntake.js";
+import { validateFile, inspectParseResult, transformHeader, headerlessVerdict, headerlessRows, decodeCsv, MAX_SIZE_B } from "../src/lib/csvIntake.js";
 import Papa from "papaparse";
 import { runAnalysis, runAnalysisSync } from "../src/lib/runAnalysis.js";
 import { normalizeValue, valueFrequencies, cramersV, mutualInformation, toNumber, quantile, median,
@@ -149,6 +149,12 @@ check("whole-number headers (years, pandas indices) stay names",
   && headerlessVerdict(headerParse("0,1,2\n0.5,1.5,2.5\n")) === null);
 check("an ordinary header is not flagged",
   headerlessVerdict(headerParse("age,fare,survived\n22,7.25,0\n")) === null);
+
+/* UCI Seoul Bike is Latin-1: "°" is the single byte 0xB0, which is not UTF-8. */
+check("a Latin-1 file is read as windows-1252, not as replacement characters",
+  decodeCsv(Uint8Array.from([0x54, 0x28, 0xb0, 0x43, 0x29])).text === "T(°C)");
+check("a UTF-8 file (BOM included) is read as UTF-8 and never re-decoded",
+  (({ text, encoding }) => text === "é,ü" && encoding === "utf-8")(decodeCsv(new TextEncoder().encode("﻿é,ü"))));
 (() => {
   const { data, fields, malformed } = headerlessRows(
     Papa.parse("0.02,0.03,R\n0.4,0.5,M\n0.6,M\n", { skipEmptyLines: true }).data);

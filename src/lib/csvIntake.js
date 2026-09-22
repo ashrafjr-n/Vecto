@@ -28,6 +28,19 @@ export function transformHeader(header, index) {
   return String(header ?? "").trim() === "" ? `column_${index + 1}` : header;
 }
 
+/* Bytes → text. UTF-8 first, strictly: a fatal decoder throws exactly when the bytes
+   are not UTF-8, so a real UTF-8 file is never re-read. Only then windows-1252, the
+   web's fallback for legacy files. UCI's Seoul Bike file is Latin-1: read as UTF-8,
+   "Temperature(°C)" became "Temperature(�C)" in every card of the report, and the
+   AI review could not name the column back. A leading BOM is dropped either way. */
+export function decodeCsv(bytes) {
+  try {
+    return { text: new TextDecoder("utf-8", { fatal: true }).decode(bytes), encoding: "utf-8" };
+  } catch {
+    return { text: new TextDecoder("windows-1252").decode(bytes), encoding: "windows-1252" };
+  }
+}
+
 /* → "format" | "size" | null  (null = accepted) */
 export function validateFile(file) {
   if (!file) return "format";
