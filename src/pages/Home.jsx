@@ -11,7 +11,7 @@ import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
 import { setPendingDataset } from "../lib/datasetHandoff.js";
 import {
-  validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader, headerlessVerdict, headerlessRows,
+  validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader, headerlessVerdict, headerlessRows, decodeCsv,
 } from "../lib/csvIntake.js";
 
 /* Radius pair that makes the hero and the content panel read as one continuous
@@ -128,8 +128,8 @@ function Home() {
      rejection: the readable rows are already handed off and analysable. */
   const [malformed,  setMalformed]  = useState(null);
   /* Set when the first row looks like data, not names — held for a choice,
-     because the rule reads values and cannot be certain. Carries the File so
-     "read it as data" can re-parse, and the header parse's own malformed
+     because the rule reads values and cannot be certain. Carries the decoded text
+     so "read it as data" can re-parse, and the header parse's own malformed
      verdict for the "keep as names" path. */
   const [headerless, setHeaderless] = useState(null);
 
@@ -145,20 +145,16 @@ function Home() {
   }, [navigate]);
 
   const readFirstRowAsData = () => {
-    const { file } = headerless;
+    const { text } = headerless;
     setHeaderless(null);
     setIsParsing(true);
-    Papa.parse(file, {
+    Papa.parse(text, {
       header:         false,
       skipEmptyLines: true,
       complete: (results) => {
         const { data, fields, malformed: ragged } = headerlessRows(results.data);
         setPendingDataset(data, fields);
         proceed(ragged);
-      },
-      error: () => {
-        setIsParsing(false);
-        setError("parse");
       },
     });
   };
@@ -179,42 +175,48 @@ function Home() {
     setHeaderless(null);
     setIsParsing(true);
 
-    Papa.parse(file, {
-      header:         true,
-      skipEmptyLines: true,
-      transformHeader,
-      complete: (results) => {
-        const { error: verdict, malformed } = inspectParseResult(results);
-        if (verdict) {
-          setIsParsing(false);
-          setError(verdict);
-          return;
-        }
+    const readFailed = () => {
+      setIsParsing(false);
+      setError("parse");
+    };
 
-        setPendingDataset(results.data, results.meta.fields);
+    /* Decoded here, not by PapaParse: a Latin-1 file read as UTF-8 turns every
+       accented header into replacement characters (decodeCsv in csvIntake.js). */
+    file.arrayBuffer().then((bytes) => {
+      const { text } = decodeCsv(bytes);
+      Papa.parse(text, {
+        header:         true,
+        skipEmptyLines: true,
+        transformHeader,
+        complete: (results) => {
+          const { error: verdict, malformed } = inspectParseResult(results);
+          if (verdict) {
+            setIsParsing(false);
+            setError(verdict);
+            return;
+          }
 
-        /* A headerless file used to lose its first row into the column names
-           without a word. Ask before anything else: which row is the header
-           decides which rows count as ragged. */
-        const firstRowIsData = headerlessVerdict(results);
-        if (firstRowIsData) {
-          setIsParsing(false);
-          setHeaderless({ ...firstRowIsData, file, malformed });
-          return;
-        }
+          setPendingDataset(results.data, results.meta.fields);
 
-        /* Rows PapaParse could not read cleanly. They were previously ignored
-           outright — the file analyzed silently and every statistic downstream
-           was computed over partly-garbage rows the user never saw. Hold the
-           navigation so the warning is actually read; the data is already
-           handed off, so continuing is one click. */
-        proceed(malformed);
-      },
-      error: () => {
-        setIsParsing(false);
-        setError("parse");
-      },
-    });
+          /* A headerless file used to lose its first row into the column names
+             without a word. Ask before anything else: which row is the header
+             decides which rows count as ragged. */
+          const firstRowIsData = headerlessVerdict(results);
+          if (firstRowIsData) {
+            setIsParsing(false);
+            setHeaderless({ ...firstRowIsData, text, malformed });
+            return;
+          }
+
+          /* Rows PapaParse could not read cleanly. They were previously ignored
+             outright — the file analyzed silently and every statistic downstream
+             was computed over partly-garbage rows the user never saw. Hold the
+             navigation so the warning is actually read; the data is already
+             handed off, so continuing is one click. */
+          proceed(malformed);
+        },
+      });
+    }, readFailed);
   }, [proceed]);
 
   const onDragOver  = (e) => { e.preventDefault(); setIsDragOver(true); };
