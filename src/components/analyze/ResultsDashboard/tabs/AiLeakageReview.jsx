@@ -1,4 +1,5 @@
-import { RotateCcw, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { RotateCcw } from "lucide-react";
 
 import { buildLeakagePayload } from "../../../../lib/ai/leakage.js";
 import AiPanel          from "../../shared/AiPanel.jsx";
@@ -64,33 +65,28 @@ function AiLeakageReview({ result, dossier, review, status, failure, onAsk, onCa
 
   return (
     <AiPanel
-      title="AI leakage review"
-      size="report"
+      title="Leakage review"
       status={status}
       failure={failure}
       onCancel={onCancel}
-      loadingText="Reviewing the report for leakage — free models can take a minute. Nothing else waits for it."
+      loadingText="Reviewing for leakage — usually under a minute. Nothing else waits for it."
     >
       {!review && (
         <>
-          <p className="mt-5 text-[13px] leading-[1.7] text-ink-soft">
-            Ask a language model which columns a model could not use when making a real
-            prediction: computed from the target, known only after the outcome, the label
-            under another name, or an entity repeated across rows. Every formula it proposes
-            is evaluated on your rows, and every group claim is measured, before it is shown.
+          <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+            Looks for columns that would not exist when a real prediction is made: computed
+            from the target, recorded after the outcome, or repeating one entity across rows.
+            Formulas and group claims are measured on your rows before they are shown.
           </p>
-          <p className="mt-3 text-[12px] leading-[1.7] text-ink-faint">
-            Sent to OpenRouter&apos;s free models, which may log or train on requests: column names
-            and roles, the engine&apos;s measured associations and column means
-            {dossier ? ", and the column meanings from the AI dossier" : ""}. No cell values.
-          </p>
-          <AiPayloadPreview build={payload} />
+          <AiPayloadPreview
+            build={payload}
+            sent={<>Sends column names, roles and the engine&apos;s measurements{dossier ? ", plus the column meanings from the review" : ""}, never cell values, to OpenRouter&apos;s free models, which may log requests. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
+          />
           <button
             type="button"
             onClick={onAsk}
-            className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line-strong px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
+            className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
           >
-            <Sparkles size={14} />
             {status === "error" ? "Try again" : "Review for leakage"}
           </button>
         </>
@@ -167,9 +163,8 @@ function ReviewResult({ review, target, onAskAgain }) {
             {questions.length} question{questions.length > 1 ? "s" : ""} the data cannot answer
           </h3>
           <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
-            These rest on what the columns are taken to mean — when they were recorded, whether a
-            value repeats an entity rather than a category, whether one number is built from
-            another. Nothing here was measured, and none of it is evidence against a column.
+            These depend on what a column means — when it was recorded, or whether it names an
+            entity — which the data cannot show. None of it is evidence against a column.
           </p>
           <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-paper">
             {questions.map((f) => <FindingRow key={`${f.column}|${f.category}`} f={f} />)}
@@ -183,11 +178,8 @@ function ReviewResult({ review, target, onAskAgain }) {
             {remarks.length} remark{remarks.length > 1 ? "s" : ""} on whether the numbers fit the columns
           </h3>
           <p className="mt-1 text-[12px] leading-relaxed text-ink-faint">
-            These are not leakage and not accusations. Each one asks whether a measured
-            association matches what the column means — a column worth keeping despite a weak
-            number, or a strong number with no reason behind it. The engine's own measurement
-            is quoted in each, including where it disagrees with the claim; the judgement is
-            yours either way.
+            Not leakage: each asks whether a measured association fits what the column means.
+            The engine&apos;s number is quoted in each, including where it disagrees.
           </p>
           <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-paper">
             {remarks.map((f) => <FindingRow key={`${f.column}|${f.category}`} f={f} />)}
