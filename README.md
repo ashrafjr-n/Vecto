@@ -58,7 +58,10 @@ changes the report only when you accept a suggestion.
   the outcome, the label under another name, or an entity repeated across rows — plus the
   split an honest evaluation needs. Every proposed formula is evaluated on the rows, and a
   total that differs only by a few fixed amounts (an unrecorded surcharge) is recognised as
-  such; group claims are measured; timing claims are shown as questions. Advisory only.
+  such; group claims are measured; timing claims are shown as questions. Before asking, the
+  engine measures columns whose repeated values almost always share the target (an entity
+  a random split would memorise, or a value known only afterwards) and hands them over as
+  evidence; any the model leaves out are listed for the reader as a question. Advisory only.
   It also carries two **relevance** categories, which are the opposite question and are not
   accusations: a column worth keeping despite a weak measured association, and a strong
   association with no reason behind it. Both always render as open questions with the
@@ -86,7 +89,11 @@ changes the report only when you accept a suggestion.
 - **Diagnostic baseline** — one fixed, untuned ridge model, cross-validated over five folds
   through that same pipeline, answers whether the columns carry any signal (a corrected
   paired t-test against a majority-class or mean baseline) and whether one column alone
-  nearly decides the target — including a curved relationship the correlations miss.
+  nearly decides the target — including a curved relationship the correlations miss. When a
+  few extreme target values put the folds on different scales, it says R² is not
+  meaningful instead of printing a score.
+- **Legacy encodings** — a file that is not UTF-8 is read as Windows-1252, and the target
+  step says so in one line.
 - **Headerless files** — a first row that looks like data (decimal or negative numbers) is
   offered back as data instead of silently becoming the column names.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
@@ -149,7 +156,8 @@ Workers.
 ### AI endpoint
 
 `POST /api/ai` with `{ "task": "<name>", "payload": { ... } }` forwards a server-defined
-prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }`. The
+prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }` (plus
+`retried: true` when a provider failure inside a 200 was retried once). The
 client only names a task; prompts, JSON schemas and token limits live in the Worker. Tasks:
 `ping` (deployment check), `review` (the column dossier and cleaning rules in one request,
 from the target picker or the Quality tab) and `leakage` (Target Signal tab). The analysis
