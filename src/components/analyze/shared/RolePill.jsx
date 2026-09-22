@@ -20,7 +20,7 @@ const FALLBACK_PILL = PILL_STYLE[ROLE.CATEGORICAL];
 
 function RolePill({ role }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide ${PILL_STYLE[role] ?? FALLBACK_PILL}`}>
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${PILL_STYLE[role] ?? FALLBACK_PILL}`}>
       {role}
     </span>
   );

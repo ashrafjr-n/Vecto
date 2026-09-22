@@ -222,7 +222,7 @@ function VisualizationsTab({ result }) {
       <div className="mb-5 space-y-3">
         {numericVis.length > 0 && (
           <div>
-            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-faint">Numeric ({numericVis.length})</div>
+            <div className="mb-1.5 text-[12px] font-medium text-ink-faint">Numeric ({numericVis.length})</div>
             <div className="flex flex-wrap gap-1.5">
               {numericVis.map((v) => (
                 <button
@@ -241,7 +241,7 @@ function VisualizationsTab({ result }) {
         )}
         {categoricalVis.length > 0 && (
           <div>
-            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-faint">Categorical ({categoricalVis.length})</div>
+            <div className="mb-1.5 text-[12px] font-medium text-ink-faint">Categorical ({categoricalVis.length})</div>
             <div className="flex flex-wrap gap-1.5">
               {categoricalVis.map((v) => (
                 <button
