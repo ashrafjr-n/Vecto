@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { TriangleAlert, RotateCcw, Sparkles } from "lucide-react";
+import { TriangleAlert, RotateCcw } from "lucide-react";
 
 import { buildReviewPayload, verifyReview } from "../../../lib/ai/review.js";
 import { findCleaningCandidates } from "../../../lib/ai/cleaning.js";
 import { requestAi } from "../../../lib/ai/requestAi.js";
 import { askDossier } from "../../../lib/ai/askDossier.js";
+import { Link } from "react-router-dom";
 import AiPanel  from "../shared/AiPanel.jsx";
+import AiBadge  from "../shared/AiBadge.jsx";
 import { SENSITIVE_LABEL } from "../shared/sensitive.js";
 import AiPayloadPreview from "../shared/AiPayloadPreview.jsx";
 import RolePill from "../shared/RolePill.jsx";
@@ -84,43 +86,32 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
 
   return (
     <AiPanel
-      title="AI assistant"
+      title="Column review"
       className="mt-6"
       status={status}
       failure={failure}
       onCancel={handleCancel}
-      loadingText="Scanning the file, then waiting for the model. Free models can take a minute, and a file over 25 columns is asked in parts."
+      loadingText="Waiting for the model — usually under a minute. Files over 25 columns are sent in parts."
     >
       {!dossier && (
         <>
-          <p className="mt-6 text-[13.5px] leading-[1.7] text-ink-soft">
-            Ask a language model what each column records, which one is most likely the
-            target, and how to clean values the engine found dirty. It suggests; nothing
-            changes unless you accept it, and every value it quotes and every rule it
-            proposes is checked against your file first.
-          </p>
-          <p className="mt-3 text-[12.5px] leading-[1.7] text-ink-faint">
-            Sent to OpenRouter's free models, which may log or train on requests: column
-            names, per-column counts and summary statistics, up to 8 frequent values and 5
-            example values per column, and for values the engine flags as dirty, each unit,
-            spelling or placeholder with its count and up to 3 examples. No rows, and no
-            values from free-text columns.
+          <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+            Suggests what each column records, the likely target, and fixes for messy
+            values. Every suggestion is checked against your file, and nothing changes
+            unless you accept it.
           </p>
           {/* Asking here is the opt-in for the whole session, so it is stated here —
               not in the leakage panel, which by then has already sent its request. */}
-          <p className="mt-3 text-[12.5px] leading-[1.7] text-ink-faint">
-            Asking once also lets the leakage review run by itself when a report is built,
-            so it is ready when you reach it. It sends column names, roles and the engine&apos;s
-            measured associations — again no rows. Nothing is sent until you ask here.
-          </p>
-          <AiPayloadPreview build={payload} />
+          <AiPayloadPreview
+            build={payload}
+            sent={<>Sends column names and summaries, never rows, to OpenRouter&apos;s free models, which may log requests. Asking also turns on the leakage review for your report. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
+          />
           <button
             type="button"
             onClick={handleAsk}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl border border-line-strong px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
+            className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
           >
-            <Sparkles size={14} />
-            {status === "error" ? "Try again" : "Ask AI to review these columns"}
+            {status === "error" ? "Try again" : "Review columns"}
           </button>
         </>
       )}
@@ -163,13 +154,13 @@ function DossierResult({ dossier, overrides, onToggleOverride, onUseTarget, curr
 
       <section>
         <h3 className="text-[11px] font-medium text-ink-faint">Suggested targets</h3>
-        {/* The one measured claim the panel makes, so it must stay the held-out figure:
-           10 new-domain files with published dictionaries, run once, expectations written
-           first (vecto-plan item 19). The tuning corpus reads 15/16 and is not quotable. */}
-        <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
-          On 10 files with published data dictionaries, never used to write this prompt, the
-          first suggestion matched the documented target 10 times out of 10 — the engine&rsquo;s own
-          guess matched 5. Ten files is a small test; check the reason before you accept one.
+        {/* The one measured claim the panel makes, so it must stay a held-out figure:
+           the item-19 test set (10/10, engine 5/10) plus the item-40 final set (9/9, engine
+           3/9) — files with published dictionaries, run once, expectations written first.
+           The tuning corpus reads 15/16 and is not quotable. Keep in step with AI_MEASURED. */}
+        <p className="mt-1.5 text-[12px] leading-relaxed text-ink-faint">
+          On 19 held-out files with published data dictionaries, the first suggestion matched the
+          documented target every time; the engine&rsquo;s own guess matched 8. Check the reason before you accept one.
         </p>
         {dossier.targets.length === 0 ? (
           <p className="mt-2 text-[13px] text-ink-soft">No usable target was suggested.</p>
@@ -301,9 +292,7 @@ function ColumnRow({ col, accepted, onToggle }) {
       )}
       {col.sensitive && SENSITIVE_LABEL[col.sensitive] && (
         <p className="mt-1.5 text-[12px] text-ink-soft">
-          <span className="rounded border border-dashed border-line-strong px-1.5 py-0.5 text-[11px] text-ink-faint">
-            personal data
-          </span>
+          <AiBadge>personal data</AiBadge>
           {" "}Read by the model as {SENSITIVE_LABEL[col.sensitive]}. Whether it may be used is your call — the engine does not decide it, and nothing here changes the analysis.
         </p>
       )}
