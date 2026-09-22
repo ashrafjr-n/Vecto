@@ -99,6 +99,10 @@ changes the report only when you accept a suggestion.
 - **Methodology page** — `/methodology` documents every stage of the engine: the rule
   behind each decision, the thresholds and estimators it uses, what it cannot decide, and
   how well the optional AI assistant scores on files its prompts were never tuned on
+- **Sample report** — `/analyze?sample=1` opens a full report on generated data, linked
+  from the home page, for a first look without a file of your own
+- **About, Privacy and Terms pages** — Privacy lists everything that leaves the browser;
+  Terms are provisional until sign-in exists
 
 ## Getting started
 
@@ -275,7 +279,7 @@ Run `npm test` after any change under `src/components/utils/core/`.
 ```text
 src/
   App.jsx                     routes: / (upload), /analyze (target → processing → results),
-                              /methodology (how the engine works)
+                              /methodology, /about, /privacy, /terms, and a 404 for the rest
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
     csvIntake.js              upload rules: size/format, encoding, ragged rows, headerless files
@@ -288,20 +292,26 @@ src/
   content/
     methodology.js            copy for /methodology — thresholds quoted from the engine,
                               AI figures quoted from held-out eval runs
+    pages.js                  copy for /about, /privacy and /terms
   pages/
     Home.jsx                  intro + the functional CSV dropzone
     Analyze.jsx                3-step machine: Target → Processing → Results
     Methodology.jsx           engine stages, trust principles, measured AI accuracy, limits
+    TextPage.jsx              About, Privacy and Terms, over content/pages.js
+    NotFound.jsx              any unknown path
   components/
     layout/Header.jsx         fixed, full-width, shared by every page
+    layout/Footer.jsx         page links and the repository
+    layout/DocPage.jsx        the reading-page frame: title, lead, sticky "On this page"
     common/                   shared primitives (ErrorBoundary, SectionLabel)
     analyze/
       shared/                 primitives used across steps/tabs (RolePill, StatTile,
-                               SectionCard, StatusBadge, correlationColor)
+                               SectionCard, StatusBadge, correlationColor) and the AI
+                               frame (AiBadge, AiPanel, AiPayloadPreview)
       TargetStep/              target-column picker
       ResultsDashboard/        tabbed report (Overview/Quality/Statistics/
-                                Visualizations/Target Signal/Relationships/
-                                Class Balance/Preparation)
+                                Visualizations/Target signal/Relationships/
+                                Class balance/Preparation)
     utils/core/                the analysis engine (pure functions, no side effects)
       roles.constants.js      ROLE enum — the single source of truth for role strings
       index.js                analyzeDataset() orchestrator
@@ -330,8 +340,12 @@ chunk only once an analysis finishes.
 
 ## Privacy
 
-Vecto has no backend. CSV parsing and every statistic are computed client-side in
-JavaScript; nothing is transmitted, stored, or logged anywhere.
+CSV parsing and every statistic are computed client-side in JavaScript; the file is never
+uploaded. Three things do leave the browser, all listed on the in-app `/privacy` page:
+the optional AI review (column summaries, never rows, sent through the Worker to
+OpenRouter, and only after the user asks), Google Analytics page views, and ordinary
+requests to the host and to Google Fonts. The only browser storage is the AI answer
+cache in `localStorage`.
 
 ## License
 
