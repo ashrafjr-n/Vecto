@@ -30,28 +30,31 @@ const METRIC_GROUPS = [
   {
     key:   "cramers_v",
     title: "Categorical features",
-    sub:   "Cramér's V with the Bergsma bias correction, so a column with one distinct value per row scores 0 rather than climbing on cardinality alone.",
+    sub:   "Cramér's V, corrected so a column with a distinct value on every row scores 0 instead of looking strong.",
     range: "0 to 1",
   },
   {
     key:   "eta",
     title: "Numeric against categorical",
-    sub:   "Rank-based η (Kruskal–Wallis, bias-corrected) — how strongly the categories separate the numeric side's ranks: a numeric feature across the target's classes, or a numeric target across a categorical feature's levels. Ranks keep one extreme value from deciding it.",
+    sub:   "Rank-based η — how well the categories separate the numbers. Computed on ranks, so one extreme value cannot decide it.",
     range: "0 to 1",
   },
 ];
 
-/* Plain language first, the number second, and the sample size always beside it.
-   A bare "p = 0.03" reads as "important" to anyone who is not a statistician,
-   and a p-value without n is not interpretable. */
+/* The p-value and the sample size always sit beside each other — a bare
+   "p = 0.03" reads as "important" to anyone who is not a statistician, and a
+   p-value without n is not interpretable. The plain-language verdict is stated
+   once per group (SIGNIFICANCE_NOTE) and repeated on a row only when that row is
+   the exception; printed on every row it was the same sentence eight times. */
 function significanceOf(entry) {
   const { pValue, n } = entry;
   if (pValue == null) return { text: "not testable at this sample size", strong: false };
   const shown = pValue < 0.001 ? "p < 0.001" : `p = ${pValue.toFixed(pValue < 0.01 ? 4 : 3)}`;
   return pValue < 0.05
-    ? { text: `distinguishable from chance (${shown}, n = ${n})`, strong: true }
-    : { text: `not distinguishable from chance (${shown}, n = ${n})`, strong: false };
+    ? { text: `${shown} · n = ${n.toLocaleString()}`, strong: true }
+    : { text: `not distinguishable from chance · ${shown} · n = ${n.toLocaleString()}`, strong: false };
 }
+const SIGNIFICANCE_NOTE = "Each association is distinguishable from chance (p < 0.05) unless its row says otherwise.";
 
 /* Below this share of the dataset the coefficient describes a slice, not the
    file. openpowerlifting.csv's top row is a fourth-attempt column measured on
@@ -200,7 +203,7 @@ function MetricGroup({ group, entries, rows }) {
       title={group.title}
       action={<span className="font-mono text-[11px] text-ink-faint">{group.range}</span>}
     >
-      <p className="-mt-2 mb-3 text-[12px] leading-relaxed text-ink-faint">{group.sub}</p>
+      <p className="-mt-1 mb-3 text-[12px] leading-relaxed text-ink-faint">{group.sub} {SIGNIFICANCE_NOTE}</p>
       <div className="divide-y divide-line">
         {entries.map(([col, entry], i) => (
           <SignalRow key={col} col={col} entry={entry} index={i} rows={rows} />

@@ -55,6 +55,9 @@ function CorrelationRanking({ strongRelationships }) {
 
   return (
     <SectionCard title={`Top relationships — ${strongRelationships.length} found`}>
+      <p className="-mt-1 mb-3 text-[12px] leading-relaxed text-ink-faint">
+        Each pair is distinguishable from chance (p &lt; 0.05) unless its row says otherwise.
+      </p>
       <div className="divide-y divide-line">
         {strongRelationships.map((rel, i) => {
           const abs = Math.abs(rel.correlation);
@@ -92,9 +95,9 @@ function CorrelationRanking({ strongRelationships }) {
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 pl-7 text-[11.5px] text-ink-faint">
                 {rel.pValue != null && (
                   <span>
-                    {rel.pValue < 0.05 ? "distinguishable from chance" : "not distinguishable from chance"}
-                    {" ("}{rel.pValue < 0.001 ? "p < 0.001" : `p = ${rel.pValue.toFixed(3)}`}
-                    {", n = "}{rel.nPairs.toLocaleString()})
+                    {rel.pValue >= 0.05 && "not distinguishable from chance · "}
+                    {rel.pValue < 0.001 ? "p < 0.001" : `p = ${rel.pValue.toFixed(3)}`}
+                    {" · n = "}{rel.nPairs.toLocaleString()}
                   </span>
                 )}
                 {rel.monotonicNotLinear && (
