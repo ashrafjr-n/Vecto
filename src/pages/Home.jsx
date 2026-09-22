@@ -64,6 +64,25 @@ const TALKING_POINTS = [
   },
 ];
 
+/* What the intake actually does with an awkward file — the three questions worth
+   answering at the moment someone is choosing which file to drag, and nowhere
+   else on the page. Each one describes real behaviour in lib/csvIntake.js:
+   headerlessVerdict, decodeCsv and inspectParseResult. */
+const INTAKE_NOTES = [
+  {
+    title: "The header row",
+    text: "The first row becomes the column names. If it looks like data, you are asked which it is.",
+  },
+  {
+    title: "Encoding",
+    text: "UTF-8, or Windows-1252 when the bytes are not valid UTF-8, so accented headers survive.",
+  },
+  {
+    title: "Rows that do not line up",
+    text: "Lines that do not match the header's column count are counted and named, never dropped.",
+  },
+];
+
 const PROCESS_FLOW = [
   { title: "Drop a CSV",         desc: "It is parsed in this tab. Nothing is uploaded." },
   { title: "Choose the target",  desc: "Or none. Column roles are read from the values, not the names." },
@@ -132,12 +151,17 @@ function Home() {
      rather than dissolving over the layer it is uncovering. */
   const heroY     = useTransform(heroExit, [0, 1], [0, -70]);
   const heroScale = useTransform(heroExit, [0, 1], [1, 0.97]);
-  /* The dropzone doesn't merely become visible — it settles into place as the
-     hero clears it, so the eye reads one layer being uncovered, not two cuts. */
-  const dropY     = useTransform(heroExit, [0.15, 0.95], [64, 0]);
-  const dropScale = useTransform(heroExit, [0.15, 0.95], [0.9, 1]);
+  /* The canvas rises into place as the hero clears it — travel only, no scaling:
+     a box that grows reads as a zoom, a box that comes up from below reads as the
+     layer it is. The three blocks travel different distances, which is what makes
+     the band read as depth rather than as one sheet sliding. */
+  const headY = useTransform(heroExit, [0.15, 0.95], [60, 0]);
+  const dropY = useTransform(heroExit, [0.15, 0.95], [120, 0]);
+  const railY = useTransform(heroExit, [0.15, 0.95], [190, 0]);
   const heroMotion = reduceMotion ? undefined : { y: heroY, scale: heroScale };
-  const dropMotion = reduceMotion ? undefined : { y: dropY, scale: dropScale };
+  const headMotion = reduceMotion ? undefined : { y: headY };
+  const dropMotion = reduceMotion ? undefined : { y: dropY };
+  const railMotion = reduceMotion ? undefined : { y: railY };
   const [isDragOver, setIsDragOver] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
   const [error,      setError]      = useState(null);
@@ -256,14 +280,24 @@ function Home() {
             rounded corner on the page. ─────────────────────────────────── */}
         <section className="sticky top-0 z-0 flex h-[100svh] items-center justify-center overflow-hidden px-6 pt-16 sm:px-10">
           <div aria-hidden className="dot-grid pointer-events-none absolute inset-0" />
-          <motion.div style={dropMotion} className="relative w-full max-w-2xl">
+
+          <div className="relative w-full max-w-4xl">
+
+            <motion.h2
+              style={headMotion}
+              className="text-center text-[15px] font-medium text-ink-soft"
+            >
+              Start with a file. It is read here, in this tab.
+            </motion.h2>
+
+            <motion.div style={dropMotion} className="mx-auto mt-6 w-full max-w-2xl sm:mt-8">
 
             <div
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
               onDrop={onDrop}
               onClick={() => !isParsing && inputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-14 text-center transition-colors sm:py-20 ${
+              className={`flex cursor-pointer flex-col items-center rounded-[2rem] border px-8 py-10 text-center transition-colors sm:py-20 ${
                 isDragOver
                   ? "border-accent bg-accent-tint"
                   : "border-line-strong bg-paper-sunken hover:border-ink-faint"
@@ -372,7 +406,23 @@ function Home() {
               </div>
             )}
 
-          </motion.div>
+            </motion.div>
+
+            {/* What the intake does with an awkward file, answered where the file is
+                chosen — and what fills a band that was otherwise all negative space. */}
+            <motion.dl
+              style={railMotion}
+              className="mt-9 grid gap-x-10 gap-y-4 border-t border-line pt-5 sm:mt-14 sm:gap-y-5 sm:pt-6 sm:grid-cols-3"
+            >
+              {INTAKE_NOTES.map((note) => (
+                <div key={note.title}>
+                  <dt className="text-[13.5px] font-medium tracking-tight text-ink">{note.title}</dt>
+                  <dd className="mt-1.5 text-[12.5px] leading-[1.7] text-ink-soft">{note.text}</dd>
+                </div>
+              ))}
+            </motion.dl>
+
+          </div>
         </section>
 
         {/* ── LAYER 1 — HERO PANEL, lying over the pinned canvas and lifting off
