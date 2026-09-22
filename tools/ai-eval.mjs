@@ -171,6 +171,9 @@ const slug = (file) => file.replace(/\.csv$/, "").replace(/[^a-z0-9]+/gi, "_");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let lastCallAt = 0;
+/* Worker calls that needed its provider retry (item 43), counted per file — a wide file is
+   several calls, so the count lives here rather than on the merged answer. */
+let retries = 0;
 async function send(task, payload) {
   const wait = lastCallAt + delayMs - Date.now();
   if (wait > 0) await sleep(wait);
@@ -183,6 +186,7 @@ async function send(task, payload) {
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     });
     const body = await res.json().catch(() => ({ error: "non_json_response" }));
+    if (body.retried) retries += 1;
     return body.result ? { result: body.result, model: body.model } : { error: body.error, message: body.message, status: res.status };
   } catch (err) {
     return { error: "request_failed", message: err.message, status: 0 };
@@ -237,6 +241,7 @@ for (const expect of selected) {
     continue;
   } else {
     const t0 = Date.now();
+    retries = 0;
     const reply = await def.ask(ctx, send);
     response = reply.error
       ? { error: reply.error, message: reply.message ?? null, status: reply.status }
@@ -252,11 +257,14 @@ for (const expect of selected) {
 
   writeFileSync(outPath, JSON.stringify({
     file: expect.file, task: taskName, rows: data.length, columns: columns.length, ...record,
-    model: response.model ?? null, ms, payloadChars: payloadJson.length, payloadHash, promptHash,
+    model: response.model ?? null, ms, retries: source === "live" ? retries : cached?.retries ?? 0,
+    payloadChars: payloadJson.length, payloadHash, promptHash,
     error, score, verified, response,
   }, null, 2));
 
-  rows.push({ file: expect.file, source, model: response.model ?? null, ms, error, score, record });
+  // A cached answer keeps the count it was recorded with.
+  const fileRetries = source === "live" ? retries : cached?.retries ?? 0;
+  rows.push({ file: expect.file, source, model: response.model ?? null, ms, error, score, record, retries: fileRetries });
   console.log(error
     ? `${expect.file}: ERROR (${source}) — ${error}`
     : `${expect.file}: ${score.passed}/${score.total} (${source}, ${response.model}, ${(ms / 1000).toFixed(1)}s) · ${def.line(score)}`);
@@ -280,6 +288,9 @@ function summarize(results) {
     `# ${def.title} eval — ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`,
     "",
     `Endpoint \`${endpoint}\` · prompt \`${promptHash}\` · ${ok.length}/${results.length} files answered · models: ${models.join(", ") || "none"}`,
+    "",
+    /* Item 43: the overload retry is proven or disproven by real traffic, never by probes. */
+    `Provider retries (an error inside a 200, retried once): ${results.filter((r) => r.retries).length} file(s) — ${results.filter((r) => r.retries && r.score).length} answered after it, ${results.filter((r) => r.retries && !r.score).length} still failed`,
     "",
     "| Measure | Score |",
     "| --- | --- |",
