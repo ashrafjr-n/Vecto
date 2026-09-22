@@ -34,8 +34,9 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import Papa from "papaparse";
 
-import { analyzeDataset, detectColumnRoles, detectTarget } from "../src/components/utils/core/index.js";
+import { detectColumnRoles, detectTarget } from "../src/components/utils/core/index.js";
 import { transformHeader } from "../src/lib/csvIntake.js";
+import { analyzeWithDiagnostic } from "../src/lib/prep/diagnostic.js";
 import { askDossier } from "../src/lib/ai/askDossier.js";
 import { buildLeakagePayload, verifyLeakage } from "../src/lib/ai/leakage.js";
 import { findCleaningCandidates } from "../src/lib/ai/cleaning.js";
@@ -76,7 +77,8 @@ const TASK_DEFS = {
        independent of phase B's answers. The page adds meanings when the user has
        asked for a dossier. */
     prepare: (e, data, columns) => {
-      const result = analyzeDataset(data, columns, e.target);
+      // What the app's worker returns — the report plus sameTargetValues — so the payload is the app's.
+      const result = analyzeWithDiagnostic(data, columns, e.target);
       return { result, payload: buildLeakagePayload(result, null) };
     },
     ask: (ctx, send) => send("leakage", ctx.payload),
