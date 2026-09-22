@@ -66,6 +66,16 @@ check(`the one-column check flags it (score ≥ ${SUSPICIOUS_SCORE})`, dU.suspic
 const regression = base.map(r => ({ ...r, y: String(3 * Number(r.a) - Number(r.b) + rand()) }));
 const dReg = run(regression, "y");
 check("a regression target is scored in R², against the training mean", dReg.metric === "r2" && dReg.signal && dReg.baseline.mean < 0.05);
+check("a well-behaved regression target is not called unstable", dReg.unstable === false);
+
+/* Ask a Manager salaries: one 870,000,000 salary in a training fold moves its mean so far
+   that "predict the average" scored R² −11 and the model −164. Those numbers describe the
+   outlier, not the columns — the verdict is "cannot tell", not "no signal". */
+const extreme = regression.map((r, i) => (i === 7 ? { ...r, y: "1e9" } : r));
+const dExt = run(extreme, "y");
+check("one extreme target value makes R² unstable: no signal verdict, no too-good flags",
+  dExt.status === "ok" && dExt.unstable === true && dExt.signal === null && dExt.suspicious.length === 0
+  && !dExt.nearPerfect && dExt.worstBaseline < -1);
 
 check("the same file gives the same diagnostic twice",
   JSON.stringify(run(signal, "y")) === JSON.stringify(dSignal));

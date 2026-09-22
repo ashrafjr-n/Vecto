@@ -35,6 +35,13 @@ const MIN_ROWS = 50;
 export const DIAG_BINS = 20;
 /* Two-sided 5% critical value of Student's t with DIAG_FOLDS − 1 = 4 degrees of freedom. */
 const T_CRITICAL = 2.776;
+/* "Predict the training average" scores about 0 in R² — it falls below −1 only when that
+   average misses a fold's rows by more than they vary among themselves, i.e. the folds
+   disagree about the target's scale. Then every R² here, the model's included, measures a
+   few extreme target values, not the columns. Measured 2026-09-22 over every regression
+   target in the test sets: −0.12 at worst (flights, 144 rows); Ask a Manager's salaries
+   (one of 870,000,000) −11.4. */
+export const UNSTABLE_BASELINE = -1;
 
 /* ── ridge ────────────────────────────────────────────────────────────────────
    Solves (XcᵀXc + αI) w = Xcᵀ(y − ȳ) with X centred, and the intercept
@@ -190,7 +197,8 @@ function crossValidate(plan, rows, idx, folds, y, classes, features, bins) {
 /* ── the diagnostic ────────────────────────────────────────────────────────────
    → { status: "unavailable", reason } or
      { status: "ok", task, metric, rows, sampled, folds, split,
-       model: { mean, sd }, baseline: { mean, sd }, lift, t, signal,
+       model: { mean, sd }, baseline: { mean, sd }, lift, t, unstable, worstBaseline,
+       signal (null when unstable),
        nearPerfect, columns: [{ col, score }] (best first), suspicious: [col] } */
 export function runDiagnostic(result, rows) {
   const plan = buildPrepPlan(result);
@@ -223,6 +231,8 @@ export function runDiagnostic(result, rows) {
   const k = lifts.length;
   const variance = sdOf(lifts) ** 2 * (1 / k + 1 / (k - 1));
   const t = variance === 0 ? (lift > 0 ? Infinity : 0) : lift / Math.sqrt(variance);
+  const worstBaseline = Math.min(...full.baseline);   // one entry per fold, never column data
+  const unstable = plan.task === "regression" && worstBaseline < UNSTABLE_BASELINE;
 
   const features = [...plan.numeric.map(f => f.col), ...plan.categorical.map(f => f.col), ...plan.presence];
   const columns = features
@@ -243,10 +253,13 @@ export function runDiagnostic(result, rows) {
     baseline: { mean: meanOf(full.baseline), sd: sdOf(full.baseline) },
     lift,
     t,
-    signal: lift > 0 && t >= T_CRITICAL,
-    nearPerfect: meanOf(full.model) >= SUSPICIOUS_SCORE,
+    /* Unstable: neither verdict is readable from these folds, so none is given. */
+    unstable,
+    worstBaseline,
+    signal: unstable ? null : lift > 0 && t >= T_CRITICAL,
+    nearPerfect: !unstable && meanOf(full.model) >= SUSPICIOUS_SCORE,
     columns,
-    suspicious: columns.filter(c => c.score >= SUSPICIOUS_SCORE).map(c => c.col),
+    suspicious: unstable ? [] : columns.filter(c => c.score >= SUSPICIOUS_SCORE).map(c => c.col),
   };
 }
 

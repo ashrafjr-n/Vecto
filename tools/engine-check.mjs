@@ -62,7 +62,7 @@ for (const e of ENGINE_EXPECTATIONS) {
     health: result?.healthScore?.score ?? null,
     suspects: result?.relationships?.leakageSuspects?.map((s) => s.col ?? s.feature).join(", ") || "—",
     diag: d?.status === "ok"
-      ? `${d.metric} ${fmt(d.model.mean)} vs ${fmt(d.baseline.mean)} · t ${fmt(d.t)} · signal ${d.signal}${d.nearPerfect ? " · NEAR-PERFECT" : ""}${d.suspicious.length ? ` · too good: ${d.suspicious.join(", ")}` : ""} · split ${d.split}`
+      ? `${d.metric} ${fmt(d.model.mean)} vs ${fmt(d.baseline.mean)} · t ${fmt(d.t)} · ${d.unstable ? `R² UNSTABLE (worst fold baseline ${fmt(d.worstBaseline)})` : `signal ${d.signal}`}${d.nearPerfect ? " · NEAR-PERFECT" : ""}${d.suspicious.length ? ` · too good: ${d.suspicious.join(", ")}` : ""} · split ${d.split}`
       : d ? `unavailable: ${d.reason}` : "—",
     plan: plan?.usable ? `${plan.numeric.length} numeric, ${plan.categorical.length} categorical, ${plan.presence.length} presence, ${plan.excluded.length} excluded${plan.groupBy ? `, grouped by ${plan.groupBy}` : ""}` : plan ? `not usable: ${plan.reason}` : "—",
   });
