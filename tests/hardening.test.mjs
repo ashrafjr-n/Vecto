@@ -859,7 +859,7 @@ check("missingness that restates the label is flagged as leakage",
    "r = 0.99" for a Cramér's V, which is a different statistic. */
 const detInsights = analyzeDataset(detRows, ["code", "noise", "y"], "y");
 check("the leakage message is not relabelled as an r by the insight that renders it",
-  detInsights.insights.some(i => i.title.includes("Leakage") && i.text.includes("Cramér")
+  detInsights.insights.some(i => i.title.includes("leakage") && i.text.includes("Cramér")
                               && !/\br = /.test(i.text)));
 
 /* ── Coverage ──────────────────────────────────────────────────────────────
@@ -1146,7 +1146,7 @@ check("a constant target is flagged, capped, and gets no feature-style advice",
   && constRes.recommendations.some(r => r.issue === "Target never varies")
   && !constRes.recommendations.some(r => /SMOTE|Constant column|imbalance/i.test(r.issue + r.action))
   && Object.keys(constRes.relationships.targetCorrelations).length === 0
-  && constRes.insights[0]?.title === "Target Never Varies"
+  && constRes.insights[0]?.title === "Target never varies"
   && constRes.meta.datasetType === "Unknown");
 
 /* Titanic "Name" as target: not a name/sequence identifier, but 100% distinct. */
@@ -1317,16 +1317,16 @@ console.log("\nINSIGHT CARDS — one decision per column, as in the recommendati
 const leakCards = analyzeDataset(presRows, ["amt", "keep", "y"], "y").insights;
 check("a leaking column has its leakage card and no separate missing-values card",
   leakCards.filter(i => i.text.includes('"amt"')).length === 1
-  && leakCards.some(i => i.title === "Possible Target Leakage"));
+  && leakCards.some(i => i.title === "Possible target leakage"));
 
 /* Two columns carrying the same value and both >50% empty: the advice replaces
    both with indicators, so no card may tell the reader to drop one of the pair. */
 const cardPairCards = analyzeDataset(pairRows, ["p1", "p2", "f", "y"], "y").insights;
 check("no correlated-pair card for columns the advice already replaces",
-  !cardPairCards.some(i => /Highly Correlated|Strong Feature Correlations|Feature Cluster/.test(i.title) && /"?p1"?/.test(i.text)));
+  !cardPairCards.some(i => /Highly correlated|Strong feature correlations|Feature cluster/.test(i.title) && /"?p1"?/.test(i.text)));
 check("columns sharing one missing-values message share one card",
-  cardPairCards.filter(i => /Critical Missing Values/.test(i.title)).length === 1
-  && cardPairCards.some(i => i.title === "Critical Missing Values in 2 Columns"));
+  cardPairCards.filter(i => /Critical missing values/.test(i.title)).length === 1
+  && cardPairCards.some(i => i.title === "Critical missing values in 2 columns"));
 
 /* ══════════════════════════════════════════
    STAGE 10e — one extreme value does not decide η

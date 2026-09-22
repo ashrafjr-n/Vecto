@@ -28,7 +28,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   // The target is unusable — nothing else on the page matters until it changes.
   if (meta.targetIsConstant) {
     push("critical",
-      "Target Never Varies",
+      "Target never varies",
       `Every row of "${meta.target}" has the same value — there is nothing to predict. Pick a different target.`,
       101
     );
@@ -39,7 +39,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   relationships.leakageSuspects.forEach(l => leakByCol.set(l.col, [...(leakByCol.get(l.col) ?? []), l.warning]));
   leakByCol.forEach(warnings => {
     push("critical",
-      "Possible Target Leakage",
+      "Possible target leakage",
       /* The warning is composed where the metric is known. Re-writing it here
          printed "r = 0.99" for a Cramér's V, which is a different statistic. */
       warnings.join(" "),
@@ -56,13 +56,13 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   if (sparse.length === 1) {
     const c = sparse[0];
     push("critical",
-      `Critical Missing Values in "${c.col}"`,
+      `Critical missing values in "${c.col}"`,
       `${pctOf(c)}% of values in "${c.col}" are missing — too sparse to impute. See the recommendations for keeping its presence as an indicator.`,
       98
     );
   } else if (sparse.length > 1) {
     push("critical",
-      `Critical Missing Values in ${sparse.length} Columns`,
+      `Critical missing values in ${sparse.length} columns`,
       `${sparse.map(c => `"${c.col}" (${pctOf(c)}%)`).join(", ")} are more than half empty — too sparse to impute. See the recommendations for keeping their presence as indicators.`,
       98
     );
@@ -77,7 +77,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
     const majPct     = majority?.pct ?? 0;
     if (majPct > 90) {
       push("critical",
-        "Severe Class Imbalance",
+        "Severe class imbalance",
         `Target class "${majority.value}" dominates at ${majPct}%. Model will likely predict only the majority class.` +
         ` The smallest class "${minority.value}" has only ${minority.count} sample(s)${minorityFlavor(minority.count)}.`,
         95
@@ -90,7 +90,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   // Duplicate rows
   if (quality.duplicateRows > 0) {
     push("warning",
-      "Duplicate Rows Detected",
+      "Duplicate rows",
       `${quality.duplicateRows} duplicate row${quality.duplicateRows > 1 ? "s" : ""} found. Remove before training to avoid biased evaluation.`,
       80
     );
@@ -101,13 +101,13 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   if (moderate.length === 1) {
     const c = moderate[0];
     push("warning",
-      `Missing Values in "${c.col}"`,
+      `Missing values in "${c.col}"`,
       `${pctOf(c)}% of values in "${c.col}" are missing — imputation recommended.`,
       70 + pctOf(c) * 0.3
     );
   } else if (moderate.length > 1) {
     push("warning",
-      `Missing Values in ${moderate.length} Columns`,
+      `Missing values in ${moderate.length} columns`,
       `${moderate.map(c => `"${c.col}" (${pctOf(c)}%)`).join(", ")} — imputation recommended; see the recommendations for the method per column.`,
       70 + moderate.reduce((m, c) => Math.max(m, pctOf(c)), 0) * 0.3
     );
@@ -117,7 +117,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   const targetMissing = quality.columnsWithIssues.find(c => c.issue === "missing" && c.col === meta.target);
   if (targetMissing && !meta.targetIsConstant && pctOf(targetMissing) > 5) {
     push("warning",
-      `Missing Values in the Target "${meta.target}"`,
+      `Missing values in the target "${meta.target}"`,
       `${pctOf(targetMissing)}% of target values are missing — drop those rows; never impute the target.`,
       70 + Math.min(50, pctOf(targetMissing)) * 0.3
     );
@@ -130,7 +130,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
       .map(p => `"${p.col1}" ↔ "${p.col2}"`)
       .join(", ");
     push("warning",
-      "Highly Correlated Features",
+      "Highly correlated features",
       `${keptPairs.length} pair${keptPairs.length > 1 ? "s" : ""} of nearly identical features: ${pairs}. Consider dropping one from each pair.`,
       75
     );
@@ -144,7 +144,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
     const majPct     = majority?.pct ?? 0;
     if (majPct <= 90) {
       push("warning",
-        "Class Imbalance",
+        "Class imbalance",
         `Target class "${majority.value}" represents ${majPct}% of data. Consider class-weighted training.` +
         ` The smallest class "${minority.value}" has ${minority.count} sample(s)${minorityFlavor(minority.count)}.`,
         72
@@ -163,7 +163,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
       .map(s => `"${s.col}" (${s.outlierCount})`)
       .join(", ");
     push("warning",
-      "Outliers Detected",
+      "Outliers",
       `Outliers found in ${desc}. Review whether these are valid extreme values or data errors.`,
       65
     );
@@ -173,7 +173,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   const hiCard = quality.columnsWithIssues.filter(c => c.issue === "high_cardinality" && kept(c.col));
   if (hiCard.length > 0) {
     push("warning",
-      "High Cardinality Columns",
+      "High-cardinality columns",
       `${hiCard.map(c => `"${c.col}"`).join(", ")} ${hiCard.length > 1 ? "have" : "has"} very high uniqueness. Encoding may create sparse features.`,
       62
     );
@@ -184,7 +184,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   const constCols = quality.columnsWithIssues.filter(c => c.issue === "constant" && dropped.has(c.col) && !leaking.has(c.col));
   if (constCols.length > 0) {
     push("warning",
-      "Constant Columns",
+      "Constant columns",
       `${constCols.map(c => `"${c.col}"`).join(", ")} ${constCols.length > 1 ? "have" : "has"} zero variance and should be removed.`,
       68
     );
@@ -203,14 +203,14 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
 
     if (ratio < 5) {
       push("warning",
-        "High Overfitting Risk",
+        "High overfitting risk",
         `Only ${meta.rows} rows for ${featureCount} modeling features (~${ratioStr} rows per feature). ` +
         `High overfitting risk — models may memorize noise. Consider more data, fewer features, or strong regularization.${caveat}`,
         78
       );
     } else if (ratio < 10) {
       push("info",
-        "Limited Rows per Feature",
+        "Limited rows per feature",
         `${meta.rows} rows for ${featureCount} features (~${ratioStr} rows per feature). ` +
         `Limited rows per feature — prefer simpler models and cross-validation.${caveat}`,
         55
@@ -228,7 +228,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   if (strongNonMC.length > 0) {
     const top = strongNonMC[0];
     push("info",
-      "Strong Feature Correlations",
+      "Strong feature correlations",
       `${top.statement} (r = ${top.correlation.toFixed(2)}, ${top.confidence} estimate).`,
       50
     );
@@ -238,7 +238,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   const keptCluster = (relationships.clusterCols ?? []).filter(kept);
   if (relationships.clusterDetected && keptCluster.length >= 3) {
     push("info",
-      "Feature Cluster Detected",
+      "Feature cluster",
       `Feature cluster detected: ${keptCluster.join(", ")} are heavily intercorrelated. Consider dimensionality reduction within this group.`,
       48
     );
@@ -250,13 +250,13 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
 
   if (noSignalObs) {
     push("warning",
-      "No Feature-Target Signal Detected",
+      "No feature–target signal",
       noSignalObs,
       60
     );
   } else if (weakSignalObs) {
     push("info",
-      "Weak Feature-Target Signal",
+      "Weak feature–target signal",
       weakSignalObs,
       45
     );
@@ -285,7 +285,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
         ? `Strongest predictor of "${meta.target}": ${strongest}. Next strongest: ${rest.join(", ")}.`
         : `Strongest predictor of "${meta.target}": ${strongest}.`;
 
-      push("info", "Top Predictors of Target", body, 48);
+      push("info", "Top predictors of the target", body, 48);
     }
   }
 
@@ -295,7 +295,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   const temporalFeatures = (meta.temporalCols ?? []).filter(c => c !== meta.target);
   if (temporalFeatures.length > 0) {
     push("info",
-      "Date Columns Detected",
+      "Date columns",
       `Date column(s) detected: ${temporalFeatures.join(", ")}. Raw dates aren't directly usable by ` +
       `most models — consider extracting year / month / day-of-week / is-weekend as features. ` +
       `(These columns are excluded from correlation and numeric stats.)`,
@@ -307,7 +307,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   // "Time Series" by getMeta when targetRole === TEMPORAL). Reframes the whole analysis.
   if (meta.datasetType === "Time Series") {
     push("info",
-      "Temporal Target (Forecasting)",
+      "Temporal target (forecasting)",
       `The target "${meta.target}" is a date/time column, so this is a forecasting problem. ` +
       `This analysis covers tabular data quality and structure — it does not perform time-series ` +
       `forecasting (trend/seasonality/lags) yet. Interpret the readiness signals with that scope in mind.`,
@@ -325,7 +325,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   if (heavyTailed.length > 0) {
     const list = heavyTailed.map(s => `"${s.col}" (kurtosis=${s.kurtosis.toFixed(1)})`).join(", ");
     push("info",
-      "Heavy-Tailed Features",
+      "Heavy-tailed features",
       `Heavy-tailed distributions: ${list}. These features have more extreme values than a ` +
       `normal distribution — consider robust scaling, a transform (log/Box-Cox), or outlier-robust models.`,
       46
@@ -338,7 +338,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   // never claim "clean" when the duplicate scan was skipped (duplicateRows === null).
   if (quality.missingCells === 0 && quality.duplicatesComputed && quality.duplicateRows === 0) {
     push("success",
-      "Dataset is Clean",
+      "Dataset is clean",
       "No missing values or duplicate rows detected.",
       40
     );
@@ -346,11 +346,11 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
 
   // Balanced classes. An identifier target passes the plain imbalance test —
   // 891 classes of one row each have a majority/minority ratio of exactly 1.0 —
-  // so this used to print a green "Classes are Balanced" for PassengerId.
+  // so this used to print a green "Classes are balanced" for PassengerId.
   if (classBalance && !classBalance.isImbalanced && classesMeaningful) {
     const majority = classBalance.classes.filter(c => !c.missing)[0];
     push("success",
-      "Classes are Balanced",
+      "Classes are balanced",
       `Target classes are well-distributed — majority class at ${majority?.pct ?? "?"}%.`,
       38
     );
@@ -360,7 +360,7 @@ export function getPriorityInsights({ meta, quality, statistics, relationships, 
   // A statement about the data, not the advice: any near-perfect pair at all falsifies it.
   if (relationships.multicollinearPairs.length === 0 && relationships.cols.length >= 2) {
     push("success",
-      "No Highly Correlated Pairs",
+      "No highly correlated pairs",
       "No near-perfect correlations between features — low redundancy.",
       35
     );

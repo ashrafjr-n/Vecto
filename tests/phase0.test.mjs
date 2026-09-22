@@ -446,7 +446,7 @@ const missRows = Array.from({ length: 20 }, (_, i) => ({
   y:     i % 2 === 0 ? "1" : "0",
 }));
 const missAnalysis = analyzeDataset(missRows, ["feat", "other", "y"], "y");
-const missInsight = missAnalysis.insights.find(ins => ins.title === 'Missing Values in "feat"');
+const missInsight = missAnalysis.insights.find(ins => ins.title === 'Missing values in "feat"');
 
 const missBandPass = !!missInsight && missInsight.severity === "warning" && /30%/.test(missInsight.text);
 if (!missBandPass) failures++;
@@ -468,7 +468,7 @@ const predRows = Array.from({ length: 40 }, (_, i) => ({
   feat_noise:  (i * 37) % 11,              // ~independent of y
 }));
 const predAnalysis = analyzeDataset(predRows, ["y", "feat_strong", "feat_mid", "feat_noise"], "y");
-const predInsight  = predAnalysis.insights.find(ins => ins.title === "Top Predictors of Target");
+const predInsight  = predAnalysis.insights.find(ins => ins.title === "Top predictors of the target");
 
 const pBody   = predInsight?.text ?? "";
 const iStrong = pBody.indexOf("feat_strong");
@@ -503,9 +503,9 @@ const runRatio = (nRows, nFeat) => {
   const cols = mkCols(nFeat);
   const a = analyzeDataset(mkRatioRows(nRows, nFeat), cols, null);
   return {
-    high: a.insights.some(i => i.title === "High Overfitting Risk"),
-    mod:  a.insights.some(i => i.title === "Limited Rows per Feature"),
-    body: (a.insights.find(i => i.title === "High Overfitting Risk" || i.title === "Limited Rows per Feature") || {}).text ?? "",
+    high: a.insights.some(i => i.title === "High overfitting risk"),
+    mod:  a.insights.some(i => i.title === "Limited rows per feature"),
+    body: (a.insights.find(i => i.title === "High overfitting risk" || i.title === "Limited rows per feature") || {}).text ?? "",
   };
 };
 
@@ -534,7 +534,7 @@ const titles = a => a.insights.map(i => i.title);
 // a. temporal FEATURE (date col is NOT the target)
 const aRows = Array.from({ length: 40 }, (_, i) => ({ signup: isoDay(i), y: String(i) }));
 const aOut  = analyzeDataset(aRows, ["signup", "y"], "y");
-const aDate = aOut.insights.find(i => i.title === "Date Columns Detected");
+const aDate = aOut.insights.find(i => i.title === "Date columns");
 
 // b. temporal TARGET (date col passed AS target)
 const bRows = Array.from({ length: 40 }, (_, i) => ({ signup: isoDay(i), f1: String((i * 7) % 23 + 3) }));
@@ -547,11 +547,11 @@ const cRows = Array.from({ length: 40 }, (_, i) => ({
 const cOut  = analyzeDataset(cRows, ["num1", "num2", "cat1"], null);
 
 const tempChecks = [
-  ["FEATURE: 'Date Columns Detected' fires & names signup", !!aDate && /signup/.test(aDate.text)],
-  ["FEATURE: no 'Temporal Target' insight",                 !titles(aOut).includes("Temporal Target (Forecasting)")],
-  ["TARGET: 'Temporal Target (Forecasting)' fires",         titles(bOut).includes("Temporal Target (Forecasting)")],
-  ["TARGET: 'Date Columns Detected' does NOT fire",         !titles(bOut).includes("Date Columns Detected")],
-  ["NONE: neither temporal insight fires",                  !titles(cOut).includes("Date Columns Detected") && !titles(cOut).includes("Temporal Target (Forecasting)")],
+  ["FEATURE: 'Date columns' fires & names signup", !!aDate && /signup/.test(aDate.text)],
+  ["FEATURE: no 'Temporal Target' insight",                 !titles(aOut).includes("Temporal target (forecasting)")],
+  ["TARGET: 'Temporal Target (Forecasting)' fires",         titles(bOut).includes("Temporal target (forecasting)")],
+  ["TARGET: 'Date columns' does NOT fire",         !titles(bOut).includes("Date columns")],
+  ["NONE: neither temporal insight fires",                  !titles(cOut).includes("Date columns") && !titles(cOut).includes("Temporal target (forecasting)")],
 ];
 for (const [msg, ok] of tempChecks) {
   if (!ok) failures++;
@@ -572,17 +572,17 @@ const titlesOf = a => a.insights.map(i => i.title);
 
 // a. heavy-tailed column + normal column
 const kaOut  = analyzeDataset(mk({ hcol: heavyA, ncol: normalC }), ["hcol", "ncol"], null);
-const kaIns  = kaOut.insights.find(i => i.title === "Heavy-Tailed Features");
+const kaIns  = kaOut.insights.find(i => i.title === "Heavy-tailed features");
 // b. two heavy-tailed columns of differing kurtosis (distinctive names avoid substring collisions)
 const kbOut  = analyzeDataset(mk({ spikebig: heavyA, spikemid: heavyB }), ["spikebig", "spikemid"], null);
-const kbBody = (kbOut.insights.find(i => i.title === "Heavy-Tailed Features") || {}).text ?? "";
+const kbBody = (kbOut.insights.find(i => i.title === "Heavy-tailed features") || {}).text ?? "";
 // c. only roughly-normal columns
 const kcOut  = analyzeDataset(mk({ n1: normalC, n2: i => String(20 + (i % 7)) }), ["n1", "n2"], null);
 
 const kChecks = [
   ["HEAVY: insight fires, names hcol not ncol", !!kaIns && /hcol/.test(kaIns.text) && !/ncol/.test(kaIns.text)],
   ["RANKING: higher-kurtosis 'spikebig' before 'spikemid'", kbBody.indexOf("spikebig") !== -1 && kbBody.indexOf("spikebig") < kbBody.indexOf("spikemid")],
-  ["NORMAL: insight does NOT fire",             !titlesOf(kcOut).includes("Heavy-Tailed Features")],
+  ["NORMAL: insight does NOT fire",             !titlesOf(kcOut).includes("Heavy-tailed features")],
 ];
 for (const [msg, ok] of kChecks) {
   if (!ok) failures++;
@@ -601,7 +601,7 @@ const mkImb = (counts) => {
 };
 const imbBody = (counts) => {
   const a = analyzeDataset(mkImb(counts), ["y", "f"], "y");
-  const ins = a.insights.find(i => i.title === "Severe Class Imbalance" || i.title === "Class Imbalance");
+  const ins = a.insights.find(i => i.title === "Severe class imbalance" || i.title === "Class imbalance");
   return ins?.text ?? "";
 };
 
