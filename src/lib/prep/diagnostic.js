@@ -18,6 +18,7 @@
 import { isMissing, normalizeValue, sampleIndices } from "../../components/utils/core/helpers.js";
 import { analyzeDataset, ANALYSIS_PHASES } from "../../components/utils/core/index.js";
 import { buildPrepPlan } from "./plan.js";
+import { findSameTargetValues } from "./sameTarget.js";
 import { assignFolds } from "./folds.js";
 import { usableRows, encodeTarget, fitPrep, transformRows } from "./encode.js";
 
@@ -280,10 +281,18 @@ export function withDiagnostic(result, rows) {
 /* The engine's run, then the diagnostic as one more announced phase, so the
    processing screen counts "step 7 of 7" instead of stalling on step 6 while the
    folds run. The engine itself still announces six and knows nothing of this. */
-export const DIAGNOSTIC_PHASE = { id: "diagnostic", label: "Cross-validating a baseline model" };
+export const DIAGNOSTIC_PHASE = { id: "diagnostic", label: "Cross-validating a baseline model, checking repeated values" };
 export function analyzeWithDiagnostic(data, columns, target, onPhase = () => {}, roleOverrides) {
   const total = ANALYSIS_PHASES.length + 1;
   const result = analyzeDataset(data, columns, target, (phase) => onPhase({ ...phase, total }), roleOverrides);
   onPhase({ ...DIAGNOSTIC_PHASE, index: total - 1, total });
-  return withDiagnostic(result, data);
+  /* Same rows, same worker, so it cannot describe different data than the report — and
+     like the diagnostic it is a measurement ON the report: a failure leaves it empty. */
+  let sameTargetValues;
+  try {
+    sameTargetValues = findSameTargetValues(data, result);
+  } catch {
+    sameTargetValues = [];
+  }
+  return { ...withDiagnostic(result, data), sameTargetValues };
 }

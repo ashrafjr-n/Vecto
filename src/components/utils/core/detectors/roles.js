@@ -99,7 +99,7 @@ const isKeyName = (col) => {
   const tokens = nameTokens(col);
   return tokens.some(t => KEY_TOKENS.has(t)) || (tokens.length === 1 && tokens[0] === "index");
 };
-const ENTITY_KEY_MIN_DISTINCT = 50;
+export const ENTITY_KEY_MIN_DISTINCT = 50;
 
 /* One full-column pass: cardinality, numeric share, and integrality.
 

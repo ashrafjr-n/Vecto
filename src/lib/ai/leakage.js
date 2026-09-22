@@ -54,6 +54,9 @@ export function buildLeakagePayload(result, dossier) {
     taskType: meta.datasetType,
     rowGrain: dossier?.rowGrain || undefined,
     target: describe(meta.target),
+    /* Measured in the analysis worker (prep/sameTarget.js), not claimed: counts only,
+       never a value. Absent on a report built without it. */
+    sameTargetValues: result.sameTargetValues?.length ? result.sameTargetValues : undefined,
     columns: Object.keys(meta.columnRoles)
       .filter((c) => c !== meta.target)
       .slice(0, LEAKAGE_MAX_COLUMNS)
@@ -226,7 +229,10 @@ export function verifyLeakage(answer, { data, result }) {
     .filter((l) => !findings.some((f) => f.column === l.col))
     .map((l) => ({ column: l.col, warning: l.warning }));
 
-  return { findings, split: verifySplit(answer.split, { data, result, known }), withheld, engineOnly };
+  const sameTargetNotRaised = (result.sameTargetValues ?? [])
+    .filter((s) => !findings.some((f) => f.column === s.column));
+
+  return { findings, split: verifySplit(answer.split, { data, result, known }), withheld, engineOnly, sameTargetNotRaised };
 }
 
 const CHECKS = {

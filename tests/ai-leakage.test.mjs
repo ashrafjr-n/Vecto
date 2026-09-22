@@ -5,6 +5,8 @@
 
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { buildLeakagePayload, verifyLeakage, evaluateFormula, measureGroupLeak } from "../src/lib/ai/leakage.js";
+import { findSameTargetValues } from "../src/lib/prep/sameTarget.js";
+import { analyzeWithDiagnostic } from "../src/lib/prep/diagnostic.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 import { LEAK_CATEGORIES, FINDING_CATEGORIES } from "../src/lib/ai/leakageSchema.js";
 
@@ -156,6 +158,41 @@ check("a relevance category is still not a leak category",
 check("an invented relevance-sounding category is still withheld",
   !verifyLeakage({ findings: [{ column: "rating", category: "probably_fine", reason: "", formula: null }], split: null },
     { data: ROWS, result }).findings.length);
+
+
+/* ── Same target within a repeated value (vecto-plan item 41) ──────────────────
+   Spotify: a track listed in several playlists repeats with the SAME popularity, and
+   the model never raised track_id. The engine measures it before asking: more than 50
+   distinct values (an entity, not a category), ≥ 20 rows in repeated groups, and the
+   target the same within them far beyond the overall rate. Evidence, never a verdict. */
+const songs = Array.from({ length: 600 }, (_, i) => {
+  const track = i % 450;                       // 150 tracks appear twice
+  return { track_id: `t${track}`, genre: ["pop", "rock", "rap"][i % 3], energy: String((i * 37) % 100),
+           popularity: String((track * 7919) % 100) };
+});
+const songResult = analyzeWithDiagnostic(songs, Object.keys(songs[0]), "popularity");
+const same = songResult.sameTargetValues;
+check("a repeated key whose target never changes is measured",
+  same.length === 1 && same[0].column === "track_id" && same[0].sameTargetShare === 1 && same[0].repeatedRows === 300);
+check("a category with few levels is not an entity, and a noise column is not listed",
+  !same.some((s) => s.column === "genre" || s.column === "energy"));
+check("the analysis worker's result carries it, and the scan alone agrees",
+  JSON.stringify(findSameTargetValues(songs, songResult)) === JSON.stringify(same));
+check("the payload carries the measurement, never a value, and nothing when none was measured",
+  buildLeakagePayload(songResult, null).sameTargetValues?.[0]?.column === "track_id"
+  && !JSON.stringify(buildLeakagePayload(songResult, null).sameTargetValues).includes('"t1')
+  && !JSON.stringify(buildLeakagePayload(result, null)).includes("sameTargetValues"));
+/* A column recorded only where the target never varies is a presence fact, not an entity
+   (events.csv player_in: substitutions, never a goal). */
+const subs = songs.map((r, i) => ({ ...r, sub: i % 5 === 0 ? `p${i % 300}` : "", popularity: i % 5 === 0 ? "0" : r.popularity }));
+check("a column recorded only where the target is constant is not listed",
+  !analyzeWithDiagnostic(subs, Object.keys(subs[0]), "popularity").sameTargetValues.some((s) => s.column === "sub"));
+const songReview = verifyLeakage({ findings: [], split: null }, { data: songs, result: songResult });
+check("a measured repeated key the model did not raise is listed for the reader",
+  songReview.sameTargetNotRaised.length === 1 && songReview.sameTargetNotRaised[0].column === "track_id");
+check("once the model raises it, it is not listed again",
+  verifyLeakage({ findings: [{ column: "track_id", category: "group_leak", reason: "x" }], split: null }, { data: songs, result: songResult })
+    .sameTargetNotRaised.length === 0);
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall ai-leakage checks passed");
 process.exit(failures ? 1 : 0);
