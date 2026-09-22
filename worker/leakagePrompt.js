@@ -9,7 +9,12 @@
    question to leakage and they are not accusations, which is why the instruction says
    so in as many words: the engine's number and the column's meaning can disagree in
    both directions, and the one thing that must not happen is a good feature reading
-   like a suspect. */
+   like a suspect.
+
+   2026-09-22 (vecto-plan item 41): sameTargetValues, a measurement from the engine. The
+   final test's one missed leak (Spotify track_id) was a repeated key whose target never
+   changes; the prompt names the measurement and its three causes, and the verdict stays
+   the model's. */
 
 import { LEAK_CATEGORIES, RELEVANCE_CATEGORIES, FORMULA_OPS } from "../src/lib/ai/leakageSchema.js";
 
@@ -28,6 +33,7 @@ Two more categories are NOT leakage and NOT accusations. They are about whether 
 
 Rules:
 - **Check presence, not only values.** A column can be innocent in what it holds and still give the target away by WHETHER it was filled in: a question only asked of some people, a measurement only taken after one kind of outcome. presenceV is the engine's measurement of that, on a 0-1 scale — high presenceV means "is this cell filled" nearly answers the target by itself. Raise such a column (recorded_after_outcome, or restates_label when its presence simply is the label) and say in the reason which rows are empty and what they have in common.
+- **Check repeated values the engine measured.** sameTargetValues, when present, lists columns with many distinct values where rows sharing a value almost always share the target (sameTargetShare, against overallShare for the most common target value among the rows where the column is filled). It is a measurement, not a verdict, and it has three common causes: an entity key a random split would memorise (group_leak), a value only known once the outcome happened (recorded_after_outcome), or an artefact of how the file was built. Decide from the column's meaning, raise it in the category that fits, and leave it out only when you can say why it is harmless.
 - **A field that describes what happened is recorded after the outcome**, even when nothing is missing: a result, a status set later, a commentary on the event, an amount settled once the outcome was known. It does not have to be arithmetically related to the target to be unusable at prediction time.
 - Work through every column in the profile before answering. Returning no findings is a real answer, but only after you have considered each column; a file with an obvious result column, a later-settled amount or a question asked of only some rows is not such a file.
 - List ONLY columns with a real concern. A strong association alone is NOT leakage — a genuinely predictive feature measured before the outcome is exactly what a model should use. The association numbers are evidence; the names, meanings and timing decide.
