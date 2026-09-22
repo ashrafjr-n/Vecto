@@ -50,6 +50,7 @@ let res = await post({ task: "ping", messages: [{ role: "user", content: "inject
 let out = await res.json();
 check("success is 200 with parsed result", res.status === 200 && out.result.ok === true);
 check("answering model is reported", out.model === "b/two:free");
+check("an answer with no retry carries no retried key", !("retried" in out));
 check("model list forwarded in order", JSON.stringify(sent[0].models) === '["a/one:free","b/two:free"]');
 check("client-sent messages are ignored", !JSON.stringify(sent[0].messages).includes("injected"));
 
@@ -90,6 +91,7 @@ res = await post({ task: "ping" });
 out = await res.json();
 check("an error inside a 200 twice is upstream_error with the provider message, exactly one retry, no repair round",
   res.status === 502 && out.error === "upstream_error" && /overloaded/.test(out.message) && sent.length === 2);
+check("a failure after the retry says the retry ran", out.retried === true);
 
 script(overloaded("a/one:free"), answer('{"ok": true}', "b/two:free"));
 res = await post({ task: "ping" });
@@ -97,6 +99,8 @@ out = await res.json();
 check("an error inside a 200 is retried once and the retry's answer is returned",
   res.status === 200 && out.result.ok === true && out.model === "b/two:free" && sent.length === 2);
 check("the retry leaves out the model that failed", JSON.stringify(sent[1].models) === '["b/two:free"]');
+// vecto-plan item 43: the path had never run on a real overload — the flag lets evidence collect itself.
+check("an answer that needed the retry says so", out.retried === true);
 
 script(overloaded(null), answer('{"ok": true}'));
 res = await post({ task: "ping" });

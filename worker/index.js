@@ -1,8 +1,9 @@
 /* Vecto's Worker entry. Static files are served by the ASSETS binding without
    running this script — wrangler.jsonc's run_worker_first sends only /api/* here.
 
-   POST /api/ai  { task, payload }  →  200 { task, model, result }
-                                    →  4xx/5xx { error, message? }
+   POST /api/ai  { task, payload }  →  200 { task, model, result, retried? }
+                                    →  4xx/5xx { error, message?, retried? }
+   `retried: true` only when a provider failed inside a 200 and the one retry ran.
 
    The client names a TASK and never sends a prompt. If it could, this endpoint
    would be a general-purpose LLM proxy on the account's quota for anyone who finds
@@ -107,15 +108,20 @@ async function handleAi(request, env) {
      fallback never runs — measured 2026-09-15: 5/18 dossier files lost this way and the
      second model answered none. Ask once more, without the model that failed when the
      reply names it. One retry, not a loop over models; further fallback stays with OpenRouter. */
+  /* `retried` goes into the response, success or failure (vecto-plan item 43): the path
+     had never run on a real overload, so every reply that used it is the evidence. */
+  let retried = false;
   const ask = async (msgs) => {
     const first = await complete(env.OPENROUTER_API_KEY, models, name, task, msgs);
     if (first.unavailable === undefined) return first;
+    retried = true;
     const rest = models.filter((m) => m !== first.unavailable);
     return complete(env.OPENROUTER_API_KEY, rest.length ? rest : models, name, task, msgs);
   };
+  const failed = async (res) => (retried ? json({ ...(await res.json()), retried }, res.status) : res);
 
   let reply = await ask(messages);
-  if (reply.error) return reply.error;
+  if (reply.error) return failed(reply.error);
 
   // A 200 carrying invalid JSON is not an error to OpenRouter, so its fallback never
   // fires. Ask once more with the parse error.
@@ -126,12 +132,12 @@ async function handleAi(request, env) {
       { role: "assistant", content: reply.content },
       { role: "user", content: `That was not valid JSON (${parsed.error}). Reply with only the JSON object.` },
     ]);
-    if (reply.error) return reply.error;
+    if (reply.error) return failed(reply.error);
     parsed = parseJson(reply.content);
-    if (parsed.error) return json({ error: "invalid_json", message: parsed.error }, 502);
+    if (parsed.error) return json({ error: "invalid_json", message: parsed.error, ...(retried && { retried }) }, 502);
   }
 
-  return json({ task: name, model: reply.model, result: parsed.value });
+  return json({ task: name, model: reply.model, result: parsed.value, ...(retried && { retried }) });
 }
 
 async function complete(apiKey, models, name, task, messages) {
