@@ -107,7 +107,7 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
   // What the picker shows: detected roles, with any role the user accepted from the AI.
   const shownTypes = { ...colTypes, ...roleOverrides };
 
-  const useTarget = (col) => { setMode("select"); setSelected(col); };
+  const pickTarget = (col) => { setMode("select"); setSelected(col); };
 
   const effectiveTarget =
     mode === "none" ? null :
@@ -206,7 +206,7 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
                   setSelected={setSelected}
                   initialTarget={initialTarget}
                   aiTarget={dossier?.targets?.[0]?.column ?? null}
-                  onUseTarget={useTarget}
+                  onUseTarget={pickTarget}
                 />
               </motion.div>
             </AnimatePresence>
@@ -241,7 +241,7 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
             overrides={roleOverrides}
             onOverridesChange={onRoleOverridesChange}
             currentTarget={effectiveTarget}
-            onUseTarget={useTarget}
+            onUseTarget={pickTarget}
             cleaning={cleaning}
             onCleaning={onCleaning}
             acceptedRules={acceptedRules}
