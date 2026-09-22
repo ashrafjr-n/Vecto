@@ -8,6 +8,13 @@ import { NavLink, useNavigate } from "react-router-dom";
    than a darker strip laid over it. Side padding matches the pages' own
    (px-6 / sm:px-10, OUTSIDE the 1400px box, as the page sections do), so the
    logo sits on the same left edge as the content at every width. */
+/* About is the one link that gives way on a phone: it is also in the footer, and
+   the bar has to fit the wordmark, Methodology and Log in at 375px. */
+const NAV = [
+  { to: "/methodology", label: "Methodology" },
+  { to: "/about",       label: "About", wide: true },
+];
+
 function Header() {
   const navigate = useNavigate();
 
@@ -15,7 +22,7 @@ function Header() {
     <header className="fixed top-0 left-0 z-50 h-16 w-full border-b border-line bg-paper-sunken/85 px-6 backdrop-blur sm:px-10">
       <div className="mx-auto flex h-full max-w-[1400px] items-center justify-between">
 
-        <nav aria-label="Primary" className="flex items-center gap-5 sm:gap-8">
+        <nav aria-label="Primary" className="flex items-center gap-4 sm:gap-7">
           <button
             type="button"
             onClick={() => { window.scrollTo(0, 0); navigate("/"); }}
@@ -24,27 +31,28 @@ function Header() {
           >
             {/* Wordmark, not a symbol — it carries the name, so no text sits beside it.
                 White artwork: legible only because every page renders in `.night`. */}
-            <img src="/vecto-logo.png" alt="Vecto" width={538} height={238} className="h-10 w-auto" />
+            <img src="/vecto-logo.png" alt="Vecto" width={538} height={238} className="h-9 w-auto sm:h-10" />
           </button>
 
-          <span aria-hidden="true" className="h-5 w-px bg-line-strong" />
+          <span aria-hidden="true" className="hidden h-5 w-px bg-line-strong sm:block" />
 
           {/* scrollTo in the handler: BrowserRouter keeps the previous page's
               scroll position, which would open a long page halfway down. */}
-          <NavLink
-            to="/methodology"
-            onClick={() => window.scrollTo(0, 0)}
-            className={({ isActive }) =>
-              isActive
-                ? "text-[13px] font-medium text-ink"
-                : "text-[13px] font-medium text-ink-soft transition-colors hover:text-ink"}
-          >
-            Methodology
-          </NavLink>
+          {NAV.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={() => window.scrollTo(0, 0)}
+              className={({ isActive }) =>
+                `${item.wide ? "hidden sm:inline" : ""} text-[13px] font-medium transition-colors ${isActive ? "text-ink" : "text-ink-soft hover:text-ink"}`}
+            >
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
 
-        {/* Placeholder — no auth is wired yet. Same ink-on-light treatment as the
-            page CTAs, so the one action in the bar matches every other action. */}
+        {/* Placeholder — no auth is wired yet; kept on purpose so the bar is designed
+            with it (owner's call, 2026-09-22). Same treatment as the page CTAs. */}
         <button
           type="button"
           className="rounded-lg bg-ink px-4 py-2 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
