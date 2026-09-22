@@ -123,7 +123,7 @@ function ResultsDashboard({ result, onReset, ai }) {
 
         <nav
           aria-label="Report sections"
-          className="sticky top-16 z-20 -mx-6 flex gap-1 overflow-x-auto border-b border-line bg-paper/95 px-6 py-2 backdrop-blur sm:-mx-10 sm:px-10 lg:top-24 lg:mx-0 lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:border-b-0 lg:border-t lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+          className="sticky top-16 z-20 -mx-6 flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-line bg-paper/95 px-6 py-2 backdrop-blur sm:-mx-10 sm:px-10 lg:top-24 lg:mx-0 lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:border-b-0 lg:border-t lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
         >
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;

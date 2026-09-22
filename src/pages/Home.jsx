@@ -260,10 +260,10 @@ function Home() {
               </p>
             </div>
 
-            <div className="mt-16 grid grid-cols-1 border-t border-line sm:grid-cols-3">
+            <div className="mt-12 grid grid-cols-3 border-t border-line sm:mt-16">
               {DIAGNOSTICS.map((d) => (
-                <div key={d.label} className="border-b border-line py-8 pr-8 sm:border-b-0">
-                  <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
+                <div key={d.label} className="py-6 pr-4 sm:py-8 sm:pr-8">
+                  <div className="whitespace-nowrap font-mono text-2xl font-medium tracking-tight text-ink sm:text-5xl">{d.value}</div>
                   <div className="mt-2 text-[13px] text-ink-faint">{d.label}</div>
                 </div>
               ))}

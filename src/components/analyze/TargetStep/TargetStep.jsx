@@ -155,7 +155,7 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
                 key={opt.id}
                 type="button"
                 onClick={() => setMode(opt.id)}
-                className={`flex-1 rounded-lg px-2 py-2 text-[12.5px] font-medium transition-colors sm:px-3 ${
+                className={`flex-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] font-medium transition-colors sm:px-3 sm:text-[12.5px] ${
                   mode === opt.id ? "bg-accent-tint text-accent-ink" : "text-ink-soft hover:text-ink"
                 }`}
               >
