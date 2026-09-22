@@ -165,17 +165,17 @@ export const PRINCIPLES = [
 
 /* How well the optional AI assistant actually does, measured. Every figure here is
    from vecto-plan items 19 (validation and test sets, expectations committed before
-   any request) and 17 (the owner's blind labels) — NOT from the corpus the prompts
+   any request), 40 (the final test set, same rules) and 17 (the owner's blind labels) — NOT from the corpus the prompts
    were tuned on, which scores higher and would flatter the assistant. Update these
    only from a recorded run; a rounder number here is a worse number. */
 export const AI_MEASURED = [
   {
     title: "Choosing the target",
-    text: "On 10 files never used to write the prompt — new domains, each with a published data dictionary, run once — the assistant's first suggestion matched the documented target 10 times out of 10. The engine's own name-and-shape guess matched 5 of 10 on the same files. On a separate 8-file set used while the prompt was still moving: 7 of 7 against the engine's 2 of 7.",
+    text: "On 19 files never used to write the prompt — new domains, each with a published data dictionary, run once in two test sets of 10 and 9 — the assistant's first suggestion matched the documented target 19 times out of 19. The engine's own name-and-shape guess matched 8 (5 of 10, then 3 of 9).",
   },
   {
     title: "Describing columns",
-    text: "On that same 10-file run, 213 of 214 checks passed: roles 118 of 118, subtypes 75 of 76. The one miss called a census sampling weight a count. Cleaning rules were the weaker half at 9 of 11, both misses on one file that writes decimals with commas — the cause was a bug in the engine's own scan, since fixed.",
+    text: "On the 10-file test, 213 of 214 checks passed: roles 118 of 118, subtypes 75 of 76. Cleaning rules were the weaker half at 9 of 11, both misses on one file that writes decimals with commas — the cause was a bug in the engine's own scan, since fixed. On the final 9-file test, 275 of 280 checks passed.",
   },
   {
     title: "A person labelled the same columns blind",
@@ -183,7 +183,7 @@ export const AI_MEASURED = [
   },
   {
     title: "Leakage is the weaker task",
-    text: "92% of checks on the files the prompt was written against, but only 11 of 14 known leaks were raised. On the 10-file held-out run it scored 88% and raised 4 of 12, under an earlier model setting. It also raises columns that turn out to be legitimate \u2014 which is why a claim the engine cannot measure is shown as a question, never as a verdict.",
+    text: "On the final 9-file test it raised 5 of 6 documented leaks and accused none of the 45 legitimate columns. On the earlier 10-file test, under an older model setting, it raised only 4 of 12. It can still question a column that turns out to be legitimate \u2014 which is why a claim the engine cannot measure is shown as a question, never as a verdict.",
   },
 ];
 
