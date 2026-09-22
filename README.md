@@ -186,10 +186,16 @@ Answers are verified exactly as the page verifies them, cached by payload hash i
 `reports/ai-eval-review/`, and summarised in that directory's `summary.md`, including the
 engine's own target guess for comparison.
 
-`--set=validation` and `--set=test` score held-out files from new domains instead, against
-`tools/ai-eval/validation-expectations.mjs` and `test-expectations.mjs` (written from each
-file's published dictionary before any request), into `reports/ai-eval-<task>-<set>/`. They
-are never used to tune a prompt, and the test set is run once.
+`--set=validation`, `--set=test` and `--set=final` score held-out files from new domains
+instead, against `tools/ai-eval/<set>-expectations.mjs` (written from each file's published
+dictionary before any request), into `reports/ai-eval-<task>-<set>/`. They are never used to
+tune a prompt, and the test and final sets are run once. The final set's engine half —
+no crash, no silently dropped column, a diagnostic verdict that matches the documentation —
+runs with no request at all:
+
+```bash
+node --max-old-space-size=8192 tools/engine-check.mjs --set=final
+```
 
 ```bash
 npx wrangler dev                                   # terminal 1, reads .dev.vars
@@ -264,7 +270,7 @@ src/
                               /methodology (how the engine works)
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
-    csvIntake.js              upload rules: size/format, ragged rows, headerless files
+    csvIntake.js              upload rules: size/format, encoding, ragged rows, headerless files
     prep/                     preparation plan, folds, train-only fitting, scikit-learn
                               script export, and the cross-validated baseline model
     ai/                       AI client (requestAi) and its browser answer cache; per
@@ -301,6 +307,7 @@ worker/index.js               Cloudflare Worker entry: POST /api/ai (OpenRouter 
 worker/leakagePrompt.js       the leakage-review prompt
 worker/reviewPrompt.js        the column-review prompt (dossier + cleaning in one request)
 tools/ai-eval.mjs, ai-eval/   AI evals over the test corpus, known answers, scoring
+tools/engine-check.mjs        a test set's engine half: crash, silent drop, diagnostic verdict
 tools/blind-*.mjs             blind labelling sheet and agreement (checks the eval itself)
 wrangler.jsonc                Worker + static-assets config, AI model list
 ```
