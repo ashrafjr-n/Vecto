@@ -6,8 +6,10 @@
    again for free — the exact fallback /analyze needs with no prior upload. */
 let pending = null;
 
-export function setPendingDataset(data, columns) {
-  pending = { data, columns };
+/* `encoding` is what decodeCsv read the bytes as — shown on the target step when it
+   was not UTF-8, because the fallback is a guess the user can check and we cannot. */
+export function setPendingDataset(data, columns, encoding = "utf-8") {
+  pending = { data, columns, encoding };
 }
 
 /* Non-destructive on purpose: React 19 StrictMode double-invokes a lazy useState

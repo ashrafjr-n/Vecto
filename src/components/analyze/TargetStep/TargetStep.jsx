@@ -69,7 +69,7 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
 }
 
 /* `ai` (from Analyze.jsx) carries the column review state: dossier, role overrides, cleaning, accepted rules. */
-function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack, ai }) {
+function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBack, ai }) {
   const { dossier, onDossier, roleOverrides, onRoleOverridesChange, cleaning, onCleaning, acceptedRules, onAcceptedRulesChange, onOptIn } = ai;
   const [mode,     setMode]     = useState("auto");
   const [selected, setSelected] = useState(initialTarget || columns[0] || "");
@@ -127,6 +127,15 @@ function TargetStep({ columns, csvData, initialTarget, onConfirm, onBack, ai }) 
               <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">Columns</div>
             </div>
           </div>
+
+          {/* decodeCsv fell back: the bytes were not UTF-8, and windows-1252 is a guess. */}
+          {encoding === "windows-1252" && (
+            <p className="flex max-w-2xl items-start gap-2 text-[13px] leading-relaxed text-ink-soft">
+              <Info size={14} className="mt-[3px] shrink-0 text-ink-faint" />
+              This file is not UTF-8, so it was read as Windows-1252 (Western European). If any column name or value looks
+              garbled, save the file as UTF-8 and upload it again.
+            </p>
+          )}
 
         </div>
       </section>

@@ -145,7 +145,7 @@ function Home() {
   }, [navigate]);
 
   const readFirstRowAsData = () => {
-    const { text } = headerless;
+    const { text, encoding } = headerless;
     setHeaderless(null);
     setIsParsing(true);
     Papa.parse(text, {
@@ -153,7 +153,7 @@ function Home() {
       skipEmptyLines: true,
       complete: (results) => {
         const { data, fields, malformed: ragged } = headerlessRows(results.data);
-        setPendingDataset(data, fields);
+        setPendingDataset(data, fields, encoding);
         proceed(ragged);
       },
     });
@@ -183,7 +183,7 @@ function Home() {
     /* Decoded here, not by PapaParse: a Latin-1 file read as UTF-8 turns every
        accented header into replacement characters (decodeCsv in csvIntake.js). */
     file.arrayBuffer().then((bytes) => {
-      const { text } = decodeCsv(bytes);
+      const { text, encoding } = decodeCsv(bytes);
       Papa.parse(text, {
         header:         true,
         skipEmptyLines: true,
@@ -196,7 +196,7 @@ function Home() {
             return;
           }
 
-          setPendingDataset(results.data, results.meta.fields);
+          setPendingDataset(results.data, results.meta.fields, encoding);
 
           /* A headerless file used to lose its first row into the column names
              without a word. Ask before anything else: which row is the header
@@ -204,7 +204,7 @@ function Home() {
           const firstRowIsData = headerlessVerdict(results);
           if (firstRowIsData) {
             setIsParsing(false);
-            setHeaderless({ ...firstRowIsData, text, malformed });
+            setHeaderless({ ...firstRowIsData, text, encoding, malformed });
             return;
           }
 

@@ -93,8 +93,8 @@ function Analyze() {
     }
     const pending = getPendingDataset();
     if (pending) {
-      const { data, columns: cols } = pending;
-      return { step: "target", data, columns: cols, target: detectTarget(cols, data), result: null, error: null };
+      const { data, columns: cols, encoding } = pending;
+      return { step: "target", data, columns: cols, encoding, target: detectTarget(cols, data), result: null, error: null };
     }
     return null;
   });
@@ -254,6 +254,7 @@ function Analyze() {
               <TargetStep
                 columns={columns}
                 csvData={csvData}
+                encoding={entry?.encoding}
                 initialTarget={target}
                 onConfirm={handleTargetConfirmed}
                 onBack={handleReset}
