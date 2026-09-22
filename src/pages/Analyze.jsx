@@ -47,11 +47,11 @@ function ProcessingStep({ phase, onCancel }) {
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-6">
       <LoaderCircle size={26} className="animate-spin text-accent-ink" />
       {phase && (
-        <div className="mt-10 text-center">
-          <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
-            step {phase.index + 1} of {phase.total}
+        <div className="mt-8 text-center">
+          <div className="text-[13px] text-ink-faint">
+            Step {phase.index + 1} of {phase.total}
           </div>
-          <div className="mt-5 text-[1.75rem] font-semibold leading-tight tracking-[-0.03em] text-ink sm:text-4xl">
+          <div className="mt-3 text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-3xl">
             {phase.label}
           </div>
         </div>
@@ -239,11 +239,9 @@ function Analyze() {
   const handleReset = () => navigate("/");
 
   return (
-    /* Same `.night` scope as Home — see the gotcha in CLAUDE.md. The dotted
-       canvas is the page itself here: every panel below is opaque, so the
-       texture only shows in the gaps between them, which is exactly where Home
-       puts it. */
-    <div className="night dot-grid min-h-screen bg-paper text-ink">
+    /* Same `.night` scope as Home — see the gotcha in CLAUDE.md. A plain canvas:
+       the dotted texture belongs to Home's drop zone only. */
+    <div className="night min-h-screen bg-paper text-ink">
       <Header />
 
       <main className="pt-16">
@@ -277,14 +275,13 @@ function Analyze() {
 
           {step === "failed" && (
             <motion.div key="failed" {...stepVariants}>
-              <div className="mx-auto max-w-2xl px-6 py-24 sm:py-32">
-                <div className="rounded-[2rem] border border-line bg-paper-sunken p-8 sm:p-10">
-                  <div className="flex items-baseline gap-4 font-mono text-[11px] uppercase tracking-[0.22em] text-critical">
+              <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
+                <div className="rounded-2xl border border-line bg-paper-sunken p-6 sm:p-8">
+                  <div className="flex items-center gap-2 text-[13px] font-medium text-critical">
                     <TriangleAlert size={14} className="shrink-0" />
-                    <span>Failed</span>
-                    <span className="h-px flex-1 bg-line" />
+                    Failed
                   </div>
-                  <h1 className="mt-8 text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em] text-ink sm:text-4xl">
+                  <h1 className="mt-4 text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-3xl">
                     Analysis could not be completed.
                   </h1>
                   <p className="mt-6 text-[15px] leading-[1.7] text-ink-soft">
