@@ -9,9 +9,9 @@ import AiBadge                from "../shared/AiBadge.jsx";
 import AiDossier              from "./AiDossier.jsx";
 
 const TARGET_MODES = [
-  { id: "auto",   label: "Auto Detect"   },
-  { id: "select", label: "Select Column" },
-  { id: "none",   label: "No Target"     },
+  { id: "auto",   label: "Auto-detect"   },
+  { id: "select", label: "Choose column" },
+  { id: "none",   label: "No target"     },
 ];
 
 function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarget, aiTarget, onUseTarget }) {
@@ -35,15 +35,15 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
             but choosing the target stays a click — the model's answer never moves it. */}
         {aiTarget && aiTarget === initialTarget && (
           <div className="flex items-center gap-2 px-1 text-[12px] text-ink-faint">
-            <AiBadge>AI&apos;s pick</AiBadge> the column review picks the same target.
+            <AiBadge>review</AiBadge> agrees with this target.
           </div>
         )}
         {aiTarget && aiTarget !== initialTarget && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-line-strong bg-paper px-4 py-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-paper px-4 py-3.5">
             <span className="font-mono text-[13px] text-ink">{aiTarget}</span>
             <div className="flex items-center gap-2">
               <RolePill role={colTypes[aiTarget] ?? ROLE.CATEGORICAL} />
-              <AiBadge>AI&apos;s pick</AiBadge>
+              <AiBadge>top pick</AiBadge>
               <button type="button" onClick={() => onUseTarget(aiTarget)} className="rounded-lg border border-line-strong px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-accent-tint">
                 Use as target
               </button>
@@ -82,8 +82,8 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
     return (
       <div className="flex items-start gap-2.5 rounded-xl border border-line bg-paper px-4 py-3.5 text-[12.5px] leading-relaxed text-ink-soft">
         <Info size={14} className="mt-0.5 shrink-0 text-ink-faint" />
-        Class balance and ML task type will be unavailable without a target
-        column. Every other section of the report runs normally.
+        Without a target there is no task type, class balance, target signal or
+        preparation plan. Every other section runs normally.
       </div>
     );
   }
@@ -114,143 +114,140 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
     mode === "auto" ? initialTarget :
     selected;
 
-  /* Home's composition, one step in: an editorial hero panel whose bottom
-     corners curve away, then the interaction itself on the dotted canvas
-     below it. Same two radii constants Home uses — see frontend.md. */
+  // Columns in file order, each with the role the analysis will use for it.
+  const columnList = columns.map((col) => ({ col, role: shownTypes[col] ?? ROLE.CATEGORICAL }));
+
+  /* One quiet column: the heading and the file's facts, the picker, the optional
+     AI review, then every column with its role — which doubles as the fastest
+     way to choose a target by name. */
   return (
-    <>
-      <section className="rounded-b-[2.5rem] bg-paper-sunken px-6 pt-16 pb-16 sm:rounded-b-[4.5rem] sm:px-10 sm:pt-24 sm:pb-20 lg:rounded-b-[7rem]">
-        <div className="mx-auto max-w-[1400px]">
+    <section className="px-6 pt-10 pb-24 sm:px-10 sm:pt-14">
+      <div className="mx-auto max-w-3xl">
 
-          <div className="flex items-baseline gap-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
-            <span>01</span>
-            <span className="h-px flex-1 bg-line" />
-            <span>Configuration</span>
-          </div>
+        <h1 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-4xl">
+          Choose a target column
+        </h1>
+        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-soft">
+          The column you want to predict. It sets the task type, the class-balance check and
+          the leakage checks. With no target you still get every other section of the report.
+        </p>
+        <p className="mt-4 font-mono text-[13px] text-ink-faint">
+          {csvData.length.toLocaleString()} rows · {columns.length} columns
+        </p>
 
-          <h1 className="mt-12 max-w-[20ch] text-[2.25rem] font-semibold leading-[1.05] tracking-[-0.035em] text-ink sm:text-5xl lg:text-6xl">
-            Select a target column.
-          </h1>
-
-          <p className="mt-10 max-w-2xl border-t border-line pt-10 text-[16px] leading-[1.7] text-ink-soft">
-            The target determines the ML task type, the class-balance report, and which
-            columns are checked for leakage. Every other section of the report is computed
-            either way — picking none is a valid answer, not a skipped step.
+        {/* decodeCsv fell back: the bytes were not UTF-8, and windows-1252 is a guess. */}
+        {encoding === "windows-1252" && (
+          <p className="mt-3 flex max-w-2xl items-start gap-2 text-[13px] leading-relaxed text-ink-soft">
+            <Info size={14} className="mt-[3px] shrink-0 text-ink-faint" />
+            This file is not UTF-8, so it was read as Windows-1252 (Western European). If any column name or value looks
+            garbled, save the file as UTF-8 and upload it again.
           </p>
+        )}
 
-          <div className="mt-14 grid grid-cols-2 border-t border-line sm:max-w-md">
-            <div className="py-8 pr-8">
-              <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">
-                {csvData.length.toLocaleString()}
-              </div>
-              <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">Rows</div>
-            </div>
-            <div className="py-8 pr-8">
-              <div className="font-mono text-4xl font-medium tracking-tight text-ink sm:text-5xl">
-                {columns.length}
-              </div>
-              <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">Columns</div>
-            </div>
+        <div className="mt-8 rounded-2xl border border-line bg-paper-sunken p-5 sm:p-6">
+
+          {/* Segmented control. The active segment wears the accent wash rather
+              than a raised `bg-paper` tile: on a dark surface the page color
+              is the DARKEST value, so a lifted tile would read as recessed. */}
+          <div className="flex gap-1 rounded-xl bg-paper p-1">
+            {TARGET_MODES.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setMode(opt.id)}
+                className={`flex-1 rounded-lg px-2 py-2 text-[12.5px] font-medium transition-colors sm:px-3 ${
+                  mode === opt.id ? "bg-accent-tint text-accent-ink" : "text-ink-soft hover:text-ink"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
 
-          {/* decodeCsv fell back: the bytes were not UTF-8, and windows-1252 is a guess. */}
-          {encoding === "windows-1252" && (
-            <p className="flex max-w-2xl items-start gap-2 text-[13px] leading-relaxed text-ink-soft">
-              <Info size={14} className="mt-[3px] shrink-0 text-ink-faint" />
-              This file is not UTF-8, so it was read as Windows-1252 (Western European). If any column name or value looks
-              garbled, save the file as UTF-8 and upload it again.
-            </p>
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={mode}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              className="mt-5"
+            >
+              <ModePanel
+                mode={mode}
+                columns={columns}
+                colTypes={shownTypes}
+                selected={selected}
+                setSelected={setSelected}
+                initialTarget={initialTarget}
+                aiTarget={dossier?.targets?.[0]?.column ?? null}
+                onUseTarget={pickTarget}
+              />
+            </motion.div>
+          </AnimatePresence>
 
+          <div className="mt-6 flex items-center justify-between border-t border-line pt-5">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-soft transition-colors hover:text-ink"
+            >
+              <ArrowLeft size={14} />
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => onConfirm(effectiveTarget)}
+              className="inline-flex items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
+            >
+              Start analysis
+              <ArrowRight size={14} />
+            </button>
+          </div>
         </div>
-      </section>
 
-      <section className="px-6 py-20 sm:px-10 sm:py-28">
-        <div className="mx-auto max-w-2xl">
-          <div className="rounded-[2rem] border border-line bg-paper-sunken p-6 sm:p-8">
+        <AiDossier
+          data={csvData}
+          columns={columns}
+          roles={colTypes}
+          dossier={dossier}
+          onDossier={onDossier}
+          overrides={roleOverrides}
+          onOverridesChange={onRoleOverridesChange}
+          currentTarget={effectiveTarget}
+          onUseTarget={pickTarget}
+          cleaning={cleaning}
+          onCleaning={onCleaning}
+          acceptedRules={acceptedRules}
+          onAcceptedRulesChange={onAcceptedRulesChange}
+          onOptIn={onOptIn}
+        />
 
-            {/* Segmented control. The active segment wears the accent wash rather
-                than a raised `bg-paper` tile: on a dark surface the page color
-                is the DARKEST value, so the old lifted-tile treatment made the
-                selected mode read as recessed. Same active token as the report's
-                tab nav, so "selected" looks the same in both places. */}
-            <div className="flex gap-1 rounded-xl bg-paper p-1">
-              {TARGET_MODES.map((opt) => (
+        <div className="mt-6 rounded-2xl border border-line bg-paper-sunken p-5 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[14px] font-semibold tracking-tight text-ink">Columns</h2>
+            <span className="text-[12px] text-ink-faint">Select one to use it as the target</span>
+          </div>
+          <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
+            {columnList.map(({ col, role }) => (
+              <li key={col}>
                 <button
-                  key={opt.id}
                   type="button"
-                  onClick={() => setMode(opt.id)}
-                  className={`flex-1 rounded-lg px-3 py-2 text-[12.5px] font-medium transition-colors ${
-                    mode === opt.id ? "bg-accent-tint text-accent-ink" : "text-ink-soft hover:text-ink"
+                  onClick={() => pickTarget(col)}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
+                    effectiveTarget === col ? "border-line-strong bg-accent-tint" : "border-line bg-paper hover:border-line-strong"
                   }`}
                 >
-                  {opt.label}
+                  <span className="min-w-0 truncate font-mono text-[12.5px] text-ink">{col}</span>
+                  <RolePill role={role} />
                 </button>
-              ))}
-            </div>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={mode}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                className="mt-5"
-              >
-                <ModePanel
-                  mode={mode}
-                  columns={columns}
-                  colTypes={shownTypes}
-                  selected={selected}
-                  setSelected={setSelected}
-                  initialTarget={initialTarget}
-                  aiTarget={dossier?.targets?.[0]?.column ?? null}
-                  onUseTarget={pickTarget}
-                />
-              </motion.div>
-            </AnimatePresence>
-
-            <div className="mt-8 flex items-center justify-between border-t border-line pt-6">
-              <button
-                type="button"
-                onClick={onBack}
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-soft transition-colors hover:text-ink"
-              >
-                <ArrowLeft size={14} />
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={() => onConfirm(effectiveTarget)}
-                className="inline-flex items-center gap-2 rounded-xl bg-ink px-6 py-3 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
-              >
-                Start Analysis
-                <ArrowRight size={14} />
-              </button>
-            </div>
-
-          </div>
-
-          <AiDossier
-            data={csvData}
-            columns={columns}
-            roles={colTypes}
-            dossier={dossier}
-            onDossier={onDossier}
-            overrides={roleOverrides}
-            onOverridesChange={onRoleOverridesChange}
-            currentTarget={effectiveTarget}
-            onUseTarget={pickTarget}
-            cleaning={cleaning}
-            onCleaning={onCleaning}
-            acceptedRules={acceptedRules}
-            onAcceptedRulesChange={onAcceptedRulesChange}
-            onOptIn={onOptIn}
-          />
+              </li>
+            ))}
+          </ul>
         </div>
-      </section>
-    </>
+
+      </div>
+    </section>
   );
 }
 
