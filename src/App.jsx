@@ -2,13 +2,14 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import ErrorBoundary from "./components/common/ErrorBoundary.jsx";
-import { ABOUT, PRIVACY, TERMS } from "./content/pages.js";
+import { PRIVACY, TERMS } from "./content/pages.js";
 
 /* Route-level code splitting: the landing page, the analyzer (PapaParse + the whole
    results dashboard) and the reading pages never load together. */
 const Home    = lazy(() => import("./pages/Home"));
 const Analyze = lazy(() => import("./pages/Analyze"));
 const Methodology = lazy(() => import("./pages/Methodology"));
+const About       = lazy(() => import("./pages/About"));
 const TextPage    = lazy(() => import("./pages/TextPage"));
 const NotFound    = lazy(() => import("./pages/NotFound"));
 
@@ -24,7 +25,7 @@ function App() {
         <Routes>
           <Route path="/"        element={<Home />} />
           <Route path="/methodology" element={<Methodology />} />
-          <Route path="/about"   element={<TextPage page={ABOUT} />} />
+          <Route path="/about"   element={<About />} />
           <Route path="/privacy" element={<TextPage page={PRIVACY} />} />
           <Route path="/terms"   element={<TextPage page={TERMS} />} />
           <Route path="/home"    element={<Navigate to="/" replace />} />

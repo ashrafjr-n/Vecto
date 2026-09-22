@@ -9,43 +9,48 @@
 const UPDATED = "22 September 2026";
 const GITHUB = "https://github.com/ashrafjr-n/vecto";
 
+/* /about is its own page (pages/About.jsx), not a TextPage: it is the one place
+   that says what the product is and refuses to be, and that opposition is the
+   layout. Shape: a masthead, a colophon, two opposed columns, a build ledger. */
 export const ABOUT = {
-  title: "About Vecto",
+  kicker: "About",
+  title: "A dataset analyzer that shows its working.",
   lead: [
-    "Vecto is a dataset analyzer for people preparing data for machine learning. Drop a CSV and it reports what the data can and cannot support — before anything is trained on it.",
+    "Vecto is for the hour before training: you have a CSV, you know roughly what you want to predict, and you do not yet know what the file will and will not support. Drop it in, pick the column, and read what is actually there.",
+    "It is one person's tool, built in the open, and it states its own limits as plainly as its findings — including where the answer is “this cannot be decided from the data”.",
   ],
-  sections: [
-    {
-      id: "what",
-      title: "What it does",
-      body: [
-        "It reads what each column is from its values, measures quality, statistics and relationships, checks every column against the target — including for leakage — and turns the result into prioritised advice, a preparation plan and a scikit-learn script that repeats it.",
-        "Every figure comes with its reasoning: a coefficient with its p-value and sample size, a capped score with what capped it, a column that could not be measured named as such.",
-      ],
-    },
-    {
-      id: "how",
-      title: "How it is built",
-      body: [
-        "The analysis is a deterministic JavaScript engine that runs in your browser tab. Its statistics are checked against pandas and scipy, and every rule was tested on more than 40 public datasets before it shipped.",
-        "An optional AI review sits on top of the engine as the last layer. It suggests what columns mean and which ones may leak the target; every claim is checked against the file, labelled as AI, and changes the report only when you accept it.",
-      ],
-    },
-    {
-      id: "not",
-      title: "What it is not",
-      body: [
-        "It does not train or tune models — the one baseline model in the report is a measurement, not a result to use. It does not store your data: there is no server that receives files.",
-      ],
-    },
-    {
-      id: "source",
-      title: "Source and contact",
-      body: [
-        { link: GITHUB, text: "The source code is on GitHub. Questions, bugs and suggestions are welcome as issues there." },
-      ],
-    },
+  facts: [
+    { label: "Where it runs",    value: "Your browser tab" },
+    { label: "Rows uploaded",    value: "0" },
+    { label: "Report sections",  value: "8" },
+    { label: "Tested on",        value: "40+ datasets" },
   ],
+  does: {
+    title: "What it does",
+    rows: [
+      { label: "Reads the columns", text: "Each column's role — identifier, temporal, binary, numeric, categorical or free text — is inferred from its values over the whole column, never from its name and never from a head sample." },
+      { label: "Measures the file", text: "Missing values, duplicates, mixed types, distributions and outliers, correlations between features, and every column against the target with the metric its type allows — including the ones that restate the target." },
+      { label: "Says what to do",   text: "Prioritised advice, a per-column preparation plan, a linear baseline as a measurement of how much signal is there, and a scikit-learn script that repeats exactly what the plan describes." },
+      { label: "Shows its reasons", text: "A coefficient arrives with its p-value and sample size, a capped score with what capped it, and a column the engine could not measure is named as unmeasured rather than shown as clean." },
+    ],
+  },
+  isNot: {
+    title: "What it is not",
+    rows: [
+      { label: "Not a training tool", text: "It does not train or tune models. The one baseline model in the report exists to measure whether the columns carry signal at all; it is a floor, not a result to use." },
+      { label: "Not a data store",    text: "There is no server that receives files. Nothing is uploaded, nothing is kept, and closing the tab ends it." },
+      { label: "Not an oracle",       text: "The engine sees values, not meaning. Whether a column was recorded after the outcome, or an outlier is an error rather than a real event, is handed back to you — stated, not guessed." },
+    ],
+  },
+  built: {
+    title: "How it is built",
+    rows: [
+      { label: "A deterministic engine", text: "Pure JavaScript in a background worker in your tab. The same file and the same target produce the same report, every time. Its statistics are checked against pandas and scipy to a 1e-6 tolerance by a test suite that runs on every change." },
+      { label: "Tested on real files",   text: "Every rule and threshold was run against more than 40 public datasets — and the held-out ones were written up before they were ever run, so a threshold could not be fitted to them after the fact." },
+      { label: "AI as the last layer",   text: "An optional review suggests what columns mean, which may leak the target and how dirty values could be cleaned. Every claim is checked against the file, labelled as AI, and changes the report only when you accept it." },
+    ],
+  },
+  source: { link: GITHUB, text: "The source is on GitHub — issues, questions and corrections are welcome there." },
 };
 
 export const PRIVACY = {
