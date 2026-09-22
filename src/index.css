@@ -103,7 +103,10 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  /* clip, not hidden: `overflow-x: hidden` makes <body> a scroll container,
+     which silently breaks every `position: sticky` inside it — including Home's
+     pinned canvas layer. `clip` cuts the same overflow without that side effect. */
+  overflow-x: clip;
 }
 
 /* ── Scrollbar (neutral, matches the accent rule) ── */
