@@ -5,6 +5,7 @@ import { ArrowRight, ArrowLeft, Info, ChevronDown } from "lucide-react";
 import { detectColumnRoles } from "../../utils/core/detectors/roles.js";
 import { ROLE }              from "../../utils/core/roles.constants.js";
 import RolePill               from "../shared/RolePill.jsx";
+import AiBadge                from "../shared/AiBadge.jsx";
 import AiDossier              from "./AiDossier.jsx";
 
 const TARGET_MODES = [
@@ -13,20 +14,42 @@ const TARGET_MODES = [
   { id: "none",   label: "No Target"     },
 ];
 
-function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarget }) {
+function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarget, aiTarget, onUseTarget }) {
   if (mode === "auto") {
     if (!initialTarget) return null;
     const type = colTypes[initialTarget] ?? ROLE.CATEGORICAL;
     return (
-      /* Nested surfaces recess INWARD here: the enclosing panel is
-         `paper-sunken` (the lifted token), so a box inside it takes `paper`.
-         Reusing `paper-sunken` would make it vanish into its own container. */
-      <div className="flex items-center justify-between rounded-xl border border-line bg-paper px-4 py-3.5">
-        <span className="font-mono text-[13px] text-ink">{initialTarget}</span>
-        <div className="flex items-center gap-2">
-          <RolePill role={type} />
-          <span className="text-[11px] text-ink-faint">auto-detected</span>
+      <div className="space-y-2">
+        {/* Nested surfaces recess INWARD here: the enclosing panel is
+            `paper-sunken` (the lifted token), so a box inside it takes `paper`.
+            Reusing `paper-sunken` would make it vanish into its own container. */}
+        <div className="flex items-center justify-between rounded-xl border border-line bg-paper px-4 py-3.5">
+          <span className="font-mono text-[13px] text-ink">{initialTarget}</span>
+          <div className="flex items-center gap-2">
+            <RolePill role={type} />
+            <span className="text-[11px] text-ink-faint">engine&apos;s guess</span>
+          </div>
         </div>
+        {/* The review's top pick beside the engine's, never in its place: on new files the
+            engine's guess was right 3 times in 9 and the review's 9 in 9 (vecto-plan item 40),
+            but choosing the target stays a click — the model's answer never moves it. */}
+        {aiTarget && aiTarget === initialTarget && (
+          <div className="flex items-center gap-2 px-1 text-[12px] text-ink-faint">
+            <AiBadge>AI&apos;s pick</AiBadge> the column review picks the same target.
+          </div>
+        )}
+        {aiTarget && aiTarget !== initialTarget && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-line-strong bg-paper px-4 py-3.5">
+            <span className="font-mono text-[13px] text-ink">{aiTarget}</span>
+            <div className="flex items-center gap-2">
+              <RolePill role={colTypes[aiTarget] ?? ROLE.CATEGORICAL} />
+              <AiBadge>AI&apos;s pick</AiBadge>
+              <button type="button" onClick={() => onUseTarget(aiTarget)} className="rounded-lg border border-line-strong px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-accent-tint">
+                Use as target
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -83,6 +106,8 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
   );
   // What the picker shows: detected roles, with any role the user accepted from the AI.
   const shownTypes = { ...colTypes, ...roleOverrides };
+
+  const useTarget = (col) => { setMode("select"); setSelected(col); };
 
   const effectiveTarget =
     mode === "none" ? null :
@@ -180,6 +205,8 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
                   selected={selected}
                   setSelected={setSelected}
                   initialTarget={initialTarget}
+                  aiTarget={dossier?.targets?.[0]?.column ?? null}
+                  onUseTarget={useTarget}
                 />
               </motion.div>
             </AnimatePresence>
@@ -214,7 +241,7 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
             overrides={roleOverrides}
             onOverridesChange={onRoleOverridesChange}
             currentTarget={effectiveTarget}
-            onUseTarget={(col) => { setMode("select"); setSelected(col); }}
+            onUseTarget={useTarget}
             cleaning={cleaning}
             onCleaning={onCleaning}
             acceptedRules={acceptedRules}
