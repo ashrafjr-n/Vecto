@@ -11,7 +11,7 @@ export const METHODOLOGY_INTRO = {
   ],
 };
 
-/* The eight stages, in the order a report is assembled. */
+/* The stages, in the order a report is assembled. */
 export const PHASES = [
   {
     id: "target",
@@ -119,6 +119,7 @@ export const PHASES = [
     ],
   },
   {
+    id: "preparation",
     title: "Preparation plan and baseline model",
     lead: "The recommendations become a training pipeline, and one untuned model measures what that pipeline can support. Neither lives in the engine: both read its finished report, so they cannot make a decision the report did not.",
     points: [
