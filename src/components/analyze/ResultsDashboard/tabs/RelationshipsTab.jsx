@@ -189,7 +189,7 @@ function SensitiveProxies({ relationships, dossier, roles }) {
   return (
     <SectionCard
       title="Columns that stand in for personal data"
-      action={<AiBadge>flagged by AI, measured by the engine</AiBadge>}
+      action={<AiBadge>flagged · measured by the engine</AiBadge>}
     >
       <p className="-mt-2 mb-3 text-[12px] leading-relaxed text-ink-faint">
         The review read {flagged.length} column{flagged.length > 1 ? "s" : ""} as recording a

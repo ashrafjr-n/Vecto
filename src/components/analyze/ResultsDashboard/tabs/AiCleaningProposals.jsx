@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { RotateCcw, Sparkles, ScanSearch, Copy, Check } from "lucide-react";
+import { Link } from "react-router-dom";
+import { RotateCcw, ScanSearch, Copy, Check } from "lucide-react";
 
 import { detectColumnRoles } from "../../../utils/core/detectors/roles.js";
 import { findCleaningCandidates, cleaningRulesToPandas } from "../../../../lib/ai/cleaning.js";
@@ -95,11 +96,10 @@ function AiCleaningProposals({ result, ai }) {
   return (
     <AiPanel
       title="Cleaning proposals"
-      size="report"
       status={status}
       failure={failure}
       onCancel={() => { runRef.current?.abort(); setStatus("idle"); }}
-      loadingText="Waiting for the model — free models can take a minute, and a file over 25 columns is asked in parts."
+      loadingText="Waiting for the model — usually under a minute. Files over 25 columns are sent in parts."
     >
       {cleaningRules.length > 0 && <AppliedRules rules={cleaningRules} onRemoveAll={() => onApplyCleaning([])} />}
 
@@ -107,12 +107,12 @@ function AiCleaningProposals({ result, ai }) {
 
       {status !== "scanning" && !candidates && (
         <>
-          <p className="mt-5 text-[13px] leading-[1.7] text-ink-soft">
-            The engine first scans the file for values that look dirty: numbers written with a
-            unit or bound (&quot;42 Lac&quot;, &quot;125+&quot;), one category spelled several ways, placeholder
-            values such as -999. That scan runs here and sends nothing.
+          <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+            Finds values that look dirty: numbers written with a unit or bound (&quot;42 Lac&quot;,
+            &quot;125+&quot;), one category spelled several ways, placeholders such as -999. The scan
+            runs in this tab and sends nothing.
           </p>
-          <button type="button" onClick={handleScan} className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line-strong px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
+          <button type="button" onClick={handleScan} className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
             <ScanSearch size={14} /> Scan for cleaning candidates
           </button>
         </>
@@ -123,15 +123,16 @@ function AiCleaningProposals({ result, ai }) {
           <CandidateSummary candidates={candidates} />
           {candidates.length > 0 && (
             <>
-              <p className="mt-4 text-[12px] leading-[1.7] text-ink-faint">
-                Asking a language model sends a profile of every column to OpenRouter&apos;s free models, which
-                may log or train on requests: names, the engine&apos;s role, counts, a numeric summary, the most
-                frequent values and a few examples, with these candidates on the columns they were found in.
-                No rows. It is one request, and the answer also describes what each column is{dossier ? "" : " — the same column review offered on the target step"}.
+              <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+                The column review can propose a rule for each one. Every rule is measured on a copy
+                of your file before you can tick it{dossier ? "" : ", and the answer also describes each column"}.
               </p>
-              <AiPayloadPreview build={payload} />
-              <button type="button" onClick={handleAsk} className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line-strong px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
-                <Sparkles size={14} /> {status === "error" ? "Try again" : "Ask AI what they mean"}
+              <AiPayloadPreview
+                build={payload}
+                sent={<>Sends a summary of every column with these values, never rows, to OpenRouter&apos;s free models, which may log requests. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
+              />
+              <button type="button" onClick={handleAsk} className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
+                {status === "error" ? "Try again" : "Propose cleaning rules"}
               </button>
             </>
           )}
