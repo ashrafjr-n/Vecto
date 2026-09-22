@@ -1248,6 +1248,14 @@ check("a repeated key named as an id is an identifier, not a measurement",
 check("a key with a handful of groups is categorical, never numeric",
   fkRoles.store_id === ROLE.CATEGORICAL && fkRoles.weight === ROLE.NUMERIC);
 
+/* UCI absenteeism "Body mass index": 17 whole numbers read as a key because its name
+   ends in "index" — the report stripped its mean, and the AI review followed the role.
+   "index" is a key only as the whole name (house_prices "Index"). */
+const bmiRows = Array.from({ length: 740 }, (_, i) => ({ "Body mass index": String(19 + (i * 7) % 17), Index: String(i % 60), y: String(i % 2) }));
+const bmiRoles = detectColumnRoles(bmiRows, ["Body mass index", "Index", "y"], "y");
+check("a measurement whose name ends in index stays numeric; a bare Index is still a key",
+  bmiRoles["Body mass index"] === ROLE.NUMERIC && bmiRoles.Index === ROLE.IDENTIFIER);
+
 /* openpowerlifting.csv: 136,687 lifter names determine each lifter's sex, and the
    report said "Keep one of Name or Sex" — reproduced verbatim on 8d02d07. */
 const lifterRows = Array.from({ length: 1500 }, (_, i) => {

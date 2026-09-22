@@ -90,7 +90,15 @@ export const IDENTIFIER_MIN_DISTINCT_SHARE = 0.95;
    set of groups that can be a real feature, so it is CATEGORICAL — never NUMERIC,
    because an id's arithmetic means nothing. 50 is a stated default, not a
    measurement: the corpus's repeated keys all sit in the thousands. */
-const KEY_TOKENS = new Set(["id", "uuid", "key", "ref", "index"]);
+const KEY_TOKENS = new Set(["id", "uuid", "key", "ref"]);
+/* "index" is a key only as the WHOLE name (house_prices "Index", pandas' index column).
+   Inside a longer name it is usually a measurement: UCI absenteeism "Body mass index"
+   (17 whole numbers) was read as a key and lost its mean — and so are price_index,
+   uv_index, heat_index. Measured over all 53 test files: those are the only two hits. */
+const isKeyName = (col) => {
+  const tokens = nameTokens(col);
+  return tokens.some(t => KEY_TOKENS.has(t)) || (tokens.length === 1 && tokens[0] === "index");
+};
 const ENTITY_KEY_MIN_DISTINCT = 50;
 
 /* One full-column pass: cardinality, numeric share, and integrality.
@@ -186,7 +194,7 @@ export function detectColumnRoles(data, columns, target) {
       return;
     }
 
-    if (col !== target && nameTokens(col).some(t => KEY_TOKENS.has(t))) {
+    if (col !== target && isKeyName(col)) {
       roles[col] = profile.distinct > ENTITY_KEY_MIN_DISTINCT ? ROLE.IDENTIFIER : ROLE.CATEGORICAL;
       return;
     }
