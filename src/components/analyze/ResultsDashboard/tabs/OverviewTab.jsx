@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
 import RolePill     from "../../shared/RolePill.jsx";
@@ -241,16 +242,19 @@ function InsightsCard({ insights }) {
   const sorted = [...insights].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
 
   return (
-    <SectionCard title="Priority insights">
-      <div className="space-y-3">
+    <SectionCard title="Key findings">
+      {/* Titles only until opened: the detail of most findings is the same sentence
+          the recommendation beside it gives, and printed twice it read as noise. */}
+      <div className="divide-y divide-line">
         {sorted.map((ins, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <StatusBadge severity={ins.severity}>{ins.severity}</StatusBadge>
-            <div className="flex-1">
-              <div className="text-[13px] font-medium text-ink">{ins.title}</div>
-              <div className="mt-0.5 text-[12.5px] leading-relaxed text-ink-soft">{ins.text}</div>
-            </div>
-          </div>
+          <details key={i} className="group py-2.5 first:pt-0 last:pb-0">
+            <summary className="flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
+              <StatusBadge severity={ins.severity}>{ins.severity}</StatusBadge>
+              <span className="flex-1 text-[13px] font-medium text-ink">{ins.title}</span>
+              <ChevronDown size={14} className="shrink-0 text-ink-faint transition-transform group-open:rotate-180" />
+            </summary>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-ink-soft">{ins.text}</p>
+          </details>
         ))}
       </div>
     </SectionCard>
