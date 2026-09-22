@@ -64,7 +64,7 @@ function ColumnScores({ diagnostic }) {
   );
 }
 
-function DiagnosticCard({ diagnostic }) {
+function DiagnosticCard({ diagnostic, target }) {
   if (!diagnostic) return null;
   if (diagnostic.status !== "ok") {
     return (
@@ -73,8 +73,9 @@ function DiagnosticCard({ diagnostic }) {
       </SectionCard>
     );
   }
-  const { model, baseline, metric, t, signal, suspicious, nearPerfect } = diagnostic;
+  const { model, baseline, metric, t, signal, suspicious, nearPerfect, unstable } = diagnostic;
   const tText = Number.isFinite(t) ? t.toFixed(1) : "∞";
+  if (unstable) return <UnstableDiagnostic diagnostic={diagnostic} target={target} />;
   return (
     <SectionCard title="Diagnostic baseline">
       <p className="text-[13px] leading-relaxed text-ink-soft">
@@ -123,6 +124,25 @@ function DiagnosticCard({ diagnostic }) {
       )}
       <ColumnScores diagnostic={diagnostic} />
       <p className="mt-4 text-[11.5px] text-ink-faint">Columns the report already flags as leakage are left out of the plan, so they are not measured again here.</p>
+    </SectionCard>
+  );
+}
+
+/* R² from folds that disagree about the target's scale describes its extreme values, not
+   the columns — so no score and no verdict are printed, only why (UNSTABLE_BASELINE). */
+function UnstableDiagnostic({ diagnostic, target }) {
+  return (
+    <SectionCard title="Diagnostic baseline">
+      <div className="flex items-start gap-3 rounded-lg border border-warning/25 bg-warning-tint px-4 py-3">
+        <TriangleAlert size={15} className="mt-0.5 shrink-0 text-warning" />
+        <div className="text-[12.5px] leading-relaxed text-ink-soft">
+          <div className="font-semibold text-warning">R² is not meaningful for this target</div>
+          Predicting the training average — which scores about 0 on an ordinary target — scored {fmt(diagnostic.worstBaseline)} in
+          one of the {diagnostic.folds} folds. A few extreme values of "{target}" put the folds on different scales, so every
+          R² here, the model&apos;s included, would describe those values rather than the columns. No signal verdict is given either way.
+          Check the target&apos;s extreme values in the Statistics tab; once they are explained or removed, this can be measured.
+        </div>
+      </div>
     </SectionCard>
   );
 }
@@ -239,7 +259,7 @@ function PreparationTab({ result, ai }) {
   }
   return (
     <div className="space-y-5">
-      <DiagnosticCard diagnostic={result.diagnostic} />
+      <DiagnosticCard diagnostic={result.diagnostic} target={result.meta.target} />
       <PlanCard plan={plan} />
       <ScriptCard plan={plan} cleaningRules={cleaningRules} />
     </div>
