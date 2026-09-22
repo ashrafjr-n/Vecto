@@ -16,9 +16,9 @@ const BASE_TABS = [
   { id: "quality",        label: "Quality"                             },
   { id: "statistics",     label: "Statistics"                          },
   { id: "visualizations", label: "Visualizations"                      },
-  { id: "targetsignal",   label: "Target Signal", requiresTarget: true },
+  { id: "targetsignal",   label: "Target signal", requiresTarget: true },
   { id: "relationships",  label: "Relationships"                       },
-  { id: "classbalance",   label: "Class Balance", requiresClasses: true },
+  { id: "classbalance",   label: "Class balance", requiresClasses: true },
   { id: "preparation",    label: "Preparation",   requiresTarget: true },
 ];
 
@@ -65,122 +65,107 @@ function ResultsDashboard({ result, onReset, ai }) {
   };
 
   return (
-    <>
-      {/* ── REPORT HEADER — the editorial hero of this page, same shape as
-          Home's and TargetStep's: one large surface curving away at the
-          bottom into the dotted canvas that holds the report itself.
+    <div className="mx-auto max-w-[1400px] px-6 pt-10 pb-24 sm:px-10 sm:pt-12">
 
-          The six figures live here rather than in the sidebar, where they used
-          to sit directly above the tab nav. They were the only numbers on the
-          page with no section of their own, and repeating them in a rail beside
-          a report that states each one again is duplication, not emphasis. ── */}
-      <section className="rounded-b-[2.5rem] bg-paper-sunken px-6 pt-14 pb-14 sm:rounded-b-[4.5rem] sm:px-12 sm:pt-20 sm:pb-16 lg:rounded-b-[7rem]">
-        <div className="mx-auto max-w-[1400px]">
-
-          <div className="flex items-baseline gap-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-faint">
-            <span>02</span>
-            <span className="h-px flex-1 bg-line" />
-            <span>Dataset report</span>
-          </div>
-
-          <h1 className="mt-10 max-w-[22ch] text-[2rem] font-semibold leading-[1.06] tracking-[-0.035em] text-ink sm:text-5xl">
-            {meta.target ? <>Audited against <span className="font-mono text-accent-ink">{meta.target}</span>.</> : "Exploratory audit, no target."}
+      {/* ── REPORT HEADER — what was analysed, then the six figures that have no
+          section of their own. Compact on purpose: the report is the content. ── */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[13px] text-ink-faint">Dataset report</p>
+          <h1 className="mt-1.5 text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-3xl">
+            {meta.target ? <>Target: <span className="break-all font-mono text-accent-ink">{meta.target}</span></> : "No target — exploratory report"}
           </h1>
-
-          <p className="mt-8 max-w-2xl text-[15px] leading-[1.7] text-ink-soft">
-            {meta.target && (meta.targetIsConstant || meta.targetIsIdentifier)
-              ? <>No task type can be read: <span className="font-mono text-ink">{meta.target}</span> {meta.targetIsConstant ? "has the same value on every row" : "is unique per row — an identifier, not a label"}. Pick a different target; the sections below describe the data, not a model problem.</>
-              : meta.target
-              ? <>Task type read as {meta.datasetType}. Every figure below is computed from the file in this tab, and each one is stated with the reasoning that produced it.</>
-              : <>Class balance and task type need a target and are omitted. Every other section is computed normally.</>}
-          </p>
-          {/* Provenance: a report built from cleaned rows must say so where the report starts. */}
-          {ai?.cleaningRules?.length > 0 && (
-            <p className="mt-4 flex max-w-2xl flex-wrap items-center gap-2 text-[13px] text-ink-soft">
-              <AiBadge>set by you</AiBadge>
-              Built after {ai.cleaningRules.length} cleaning rule{ai.cleaningRules.length > 1 ? "s" : ""} you accepted — listed on the Quality tab.
-            </p>
-          )}
-
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.32 }}
-            className="mt-12 grid grid-cols-2 border-t border-line sm:grid-cols-3 lg:grid-cols-6"
-          >
-            {stats.map((s) => (
-              <div key={s.label} className="border-b border-line py-6 pr-6 lg:border-b-0">
-                <div className={`font-mono text-[1.75rem] font-medium tracking-tight sm:text-4xl ${toneCls[s.tone] ?? "text-ink"}`}>
-                  {s.value}
-                  {s.suffix && <span className="text-sm font-normal text-ink-faint">{s.suffix}</span>}
-                </div>
-                <div className="mt-3 font-mono text-[10.5px] uppercase tracking-[0.16em] text-ink-faint">{s.label}</div>
-              </div>
-            ))}
-          </motion.div>
-
         </div>
-      </section>
-
-      {/* ── THE REPORT — panels on the dotted canvas ── */}
-      <div className="mx-auto max-w-[1400px] px-6 pb-24 pt-16 sm:px-12 sm:pt-20">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
-
-          <div className="lg:sticky lg:top-24 lg:w-[220px] lg:shrink-0">
-            <nav className="border-t border-line">
-              {tabs.map((tab, i) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className="flex w-full items-center gap-4 border-b border-line py-3.5 text-left transition-colors"
-                  >
-                    <span className={`font-mono text-[10.5px] ${isActive ? "text-accent-ink" : "text-ink-faint"}`}>
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span className={`text-[14px] tracking-tight ${isActive ? "text-ink" : "text-ink-soft"}`}>
-                      {tab.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            <button
-              type="button"
-              onClick={onReset}
-              className="mt-8 inline-flex items-center rounded-xl border border-line px-4 py-2.5 text-[12.5px] font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
-            >
-              New analysis
-            </button>
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.22, ease: "easeOut" }}
-              >
-                {activeTab === "overview"       && <OverviewTab       result={result} />}
-                {activeTab === "quality"        && <QualityTab        result={result} ai={ai} />}
-                {activeTab === "statistics"     && <StatisticsTab     result={result} />}
-                {activeTab === "visualizations" && <VisualizationsTab result={result} />}
-                {activeTab === "targetsignal"   && <TargetSignalTab   result={result} ai={ai} />}
-                {activeTab === "relationships"  && <RelationshipsTab  result={result} ai={ai} />}
-                {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
-                {activeTab === "preparation"    && <PreparationTab    result={result} ai={ai} />}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          className="inline-flex shrink-0 items-center rounded-xl border border-line px-4 py-2 text-[12.5px] font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+        >
+          New analysis
+        </button>
       </div>
-    </>
+
+      <p className="mt-3 max-w-3xl text-[14px] leading-relaxed text-ink-soft">
+        {meta.target && (meta.targetIsConstant || meta.targetIsIdentifier)
+          ? <>No task type can be read: <span className="font-mono text-ink">{meta.target}</span> {meta.targetIsConstant ? "has the same value on every row" : "is unique per row — an identifier, not a label"}. Pick a different target; the sections below describe the data, not a model problem.</>
+          : meta.target
+          ? <>{meta.datasetType} task. Every figure below is computed in this tab and comes with the reasoning behind it.</>
+          : <>Class balance, target signal and preparation need a target and are omitted. Every other section is computed normally.</>}
+      </p>
+      {/* Provenance: a report built from cleaned rows must say so where the report starts. */}
+      {ai?.cleaningRules?.length > 0 && (
+        <p className="mt-3 flex max-w-3xl flex-wrap items-center gap-2 text-[13px] text-ink-soft">
+          <AiBadge>set by you</AiBadge>
+          Built after {ai.cleaningRules.length} cleaning rule{ai.cleaningRules.length > 1 ? "s" : ""} you accepted — listed on the Quality tab.
+        </p>
+      )}
+
+      <motion.dl
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-3 lg:grid-cols-6"
+      >
+        {stats.map((s) => (
+          <div key={s.label} className="bg-paper-sunken px-4 py-4">
+            <dt className="text-[12px] text-ink-faint">{s.label}</dt>
+            <dd className={`mt-1 font-mono text-[1.375rem] font-medium tracking-tight ${toneCls[s.tone] ?? "text-ink"}`}>
+              {s.value}
+              {s.suffix && <span className="text-[12px] font-normal text-ink-faint">{s.suffix}</span>}
+            </dd>
+          </div>
+        ))}
+      </motion.dl>
+
+      {/* ── THE REPORT — tabs beside the content on large screens; above it, as one
+          scrollable sticky row, on small ones. ── */}
+      <div className="mt-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-10">
+
+        <nav
+          aria-label="Report sections"
+          className="sticky top-16 z-20 -mx-6 flex gap-1 overflow-x-auto border-b border-line bg-paper/95 px-6 py-2 backdrop-blur sm:-mx-10 sm:px-10 lg:top-24 lg:mx-0 lg:w-[200px] lg:shrink-0 lg:flex-col lg:gap-0 lg:overflow-visible lg:border-b-0 lg:border-t lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                aria-current={isActive ? "page" : undefined}
+                onClick={() => setActiveTab(tab.id)}
+                className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13.5px] transition-colors lg:rounded-none lg:border-b lg:border-line lg:px-0 lg:py-3 lg:bg-transparent ${
+                  isActive ? "bg-accent-tint font-medium text-ink" : "text-ink-soft hover:text-ink"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="min-w-0 flex-1">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              {activeTab === "overview"       && <OverviewTab       result={result} />}
+              {activeTab === "quality"        && <QualityTab        result={result} ai={ai} />}
+              {activeTab === "statistics"     && <StatisticsTab     result={result} />}
+              {activeTab === "visualizations" && <VisualizationsTab result={result} />}
+              {activeTab === "targetsignal"   && <TargetSignalTab   result={result} ai={ai} />}
+              {activeTab === "relationships"  && <RelationshipsTab  result={result} ai={ai} />}
+              {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
+              {activeTab === "preparation"    && <PreparationTab    result={result} ai={ai} />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+      </div>
+    </div>
   );
 }
 
