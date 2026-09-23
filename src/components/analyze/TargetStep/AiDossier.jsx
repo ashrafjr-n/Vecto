@@ -108,7 +108,10 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
             build={payload}
             sent={<>Sends column names and summaries, never rows, to OpenRouter&apos;s free models, which may log requests. Asking also turns on the leakage review for your report. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
           />
-          <AiGate>
+          {/* `onAfterSignIn` is this panel's own ask: signing in from here runs the
+              review the user asked for, instead of returning them to a button they
+              have to press again. */}
+          <AiGate ctaLabel="Sign in to review columns" onAfterSignIn={handleAsk}>
             <button
               type="button"
               onClick={handleAsk}

@@ -133,7 +133,8 @@ function AiCleaningProposals({ result, ai }) {
                 build={payload}
                 sent={<>Sends a summary of every column with these values, never rows, to OpenRouter&apos;s free models, which may log requests. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
               />
-              <AiGate>
+              {/* The scan above is local and ungated; only this ask needs an account. */}
+              <AiGate ctaLabel="Sign in to propose cleaning rules" onAfterSignIn={handleAsk}>
                 <button type="button" onClick={handleAsk} className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
                   {status === "error" ? "Try again" : "Propose cleaning rules"}
                 </button>

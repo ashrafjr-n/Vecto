@@ -83,7 +83,9 @@ function AiLeakageReview({ result, dossier, review, status, failure, onAsk, onCa
             build={payload}
             sent={<>Sends column names, roles and the engine&apos;s measurements{dossier ? ", plus the column meanings from the review" : ""}, never cell values, to OpenRouter&apos;s free models, which may log requests. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
           />
-          <AiGate>
+          {/* Signing in here runs the leakage check itself — `onAsk` is the same
+              request the button fires, owned by Analyze.jsx. */}
+          <AiGate ctaLabel="Sign in to check for leakage" onAfterSignIn={onAsk}>
             <button
               type="button"
               onClick={onAsk}
