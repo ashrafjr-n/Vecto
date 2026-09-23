@@ -6,7 +6,7 @@
    payload field, a new third-party script), this copy is wrong until it changes
    too; nothing links the two. */
 
-const UPDATED = "22 September 2026";
+const UPDATED = "23 September 2026";
 const GITHUB = "https://github.com/ashrafjr-n/vecto";
 
 /* /about is its own page (pages/About.jsx), not a TextPage: it is the one place
@@ -56,7 +56,7 @@ export const ABOUT = {
 export const PRIVACY = {
   title: "Privacy",
   lead: [
-    "Vecto analyses your file in your browser. This page lists everything that does leave it.",
+    "Vecto analyses your file in your browser. This page lists everything that does leave it, and everything an account stores.",
   ],
   updated: UPDATED,
   sections: [
@@ -105,7 +105,16 @@ export const PRIVACY = {
       id: "accounts",
       title: "Accounts",
       body: [
-        "There are no accounts yet. When sign-in is switched on, this page will say what it stores first.",
+        "An account is needed only to use the AI review. Uploading a file, the analysis, the report, the preparation plan and the script export need no account and are not affected by signing in.",
+        "Signing in is done through GitHub. Vecto asks GitHub for no permissions beyond your public profile, and stores only:",
+        { list: [
+          "your GitHub numeric id, username and avatar image address — no email address is requested or stored",
+          "one row per browser you are signed in on, holding a one-way hash of the session value, when it was created and when it expires (30 days)",
+          "one row per AI analysis you run: an identifier the browser generated for that dataset, the month, and how many AI requests it needed — never the file, its column names or anything from the report",
+        ] },
+        "The sign-in cookie holds a random value and nothing else — no name, no identifier. It is marked HttpOnly, so no script on the page can read it, and Secure, so it is never sent over an unencrypted connection. The token GitHub issues during sign-in is used once to read your profile and is not stored.",
+        "Free accounts may run 3 AI analyses a month. The count exists to keep the shared AI budget from being spent by one visitor; it is enforced on the server.",
+        "Deleting your account removes your user row, every session and your whole usage history immediately and permanently. The button is in the account menu in the site header.",
       ],
     },
     {
@@ -118,12 +127,13 @@ export const PRIVACY = {
   ],
 };
 
-/* Provisional on purpose (the owner's call, 2026-09-22): the page exists now and is
-   completed when sign-in arrives. Not reviewed by a lawyer. */
+/* Extended 2026-09-23 for accounts. Written plainly, NOT reviewed by a lawyer —
+   the owner's standing note. If the account rules in worker/usage.js change (the
+   free limit, deletion), this copy is wrong until it changes too. */
 export const TERMS = {
   title: "Terms of use",
   lead: [
-    "Provisional terms for the current version of Vecto, which has no accounts. They will be completed before sign-in is switched on.",
+    "Terms for the current version of Vecto. They are written plainly rather than by a lawyer, and they will be revised as the product changes.",
   ],
   updated: UPDATED,
   sections: [
@@ -131,7 +141,16 @@ export const TERMS = {
       id: "use",
       title: "Using Vecto",
       body: [
-        "Vecto is free to use as it is offered today. You may analyse any file you have the right to use.",
+        "Vecto is free to use as it is offered today. You may analyse any file you have the right to use. Analysing a file, reading the report and exporting the preparation script need no account.",
+      ],
+    },
+    {
+      id: "accounts",
+      title: "Accounts and the AI review",
+      body: [
+        "The optional AI review needs an account, which is created by signing in with GitHub. You are responsible for what happens under your account, and you should not share access to it.",
+        "A free account may run 3 AI analyses a month. One dataset counts as one analysis however many requests it needs internally. The limit protects a shared, limited AI budget: it may change, and the AI review may be unavailable at times for the same reason.",
+        "You can delete your account at any time from the account menu, which removes your sign-in and your usage history immediately. Accounts may be suspended for attempts to work around the limits or to abuse the endpoint.",
       ],
     },
     {
@@ -159,7 +178,7 @@ export const TERMS = {
       id: "changes",
       title: "Changes",
       body: [
-        "These terms will change, first when accounts are introduced. The date above shows the latest version.",
+        "These terms will change as the product does — the date above shows the latest version. Paid plans do not exist today; if they are introduced, their terms will be separate and will not change what a free account was promised without notice.",
       ],
     },
   ],
