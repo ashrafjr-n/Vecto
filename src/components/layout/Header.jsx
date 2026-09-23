@@ -1,4 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
+
+import { useSession } from "../auth/sessionContext.js";
 
 /* Fixed, full-width, edge-to-edge — NOT floating/pill-shaped. See frontend.md
    "Header" spec. Shared by every page (Home + Methodology + the /analyze flow).
@@ -51,17 +54,72 @@ function Header() {
           ))}
         </nav>
 
-        {/* Placeholder — no auth is wired yet; kept on purpose so the bar is designed
-            with it (owner's call, 2026-09-22). Same treatment as the page CTAs. */}
-        <button
-          type="button"
-          className="rounded-lg bg-ink px-4 py-2 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
-        >
-          Log in
-        </button>
+        <AccountMenu />
 
       </div>
     </header>
+  );
+}
+
+/* Sign in, or who is signed in. Signing in opens a POPUP — the header is on every
+   page including the report, and a full-page redirect there would destroy the
+   parsed dataset and the built report, both of which live only in memory.
+
+   The menu is a native <details>: focusable, keyboard-operable and open/closed
+   without a line of state. It stays open until clicked again, which is the one
+   thing a hand-rolled dropdown would do better and not worth the code. */
+function AccountMenu() {
+  const { user, usage, loading, signIn, signOut, deleteAccount } = useSession();
+
+  // Nothing during the first load, so the bar does not flash "Log in" at someone
+  // who is already signed in.
+  if (loading) return <div className="h-9 w-20" aria-hidden />;
+
+  if (!user) {
+    return (
+      <button
+        type="button"
+        onClick={signIn}
+        className="rounded-lg bg-ink px-4 py-2 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
+      >
+        Log in
+      </button>
+    );
+  }
+
+  const handleDelete = async () => {
+    /* A plain confirm, by the owner's decision: this is destructive and rare, and
+       a dedicated page would be more ceremony than the action deserves today. */
+    if (!window.confirm("Delete your Vecto account? Your sign-in and your AI usage history are removed. This cannot be undone.")) return;
+    if (!(await deleteAccount())) window.alert("The account could not be deleted. Please try again.");
+  };
+
+  return (
+    <details className="relative">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-line-strong px-2.5 py-1.5 text-[13px] font-medium text-ink transition-colors hover:border-ink-faint [&::-webkit-details-marker]:hidden">
+        {user.avatarUrl && (
+          <img src={user.avatarUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-full" />
+        )}
+        <span className="hidden sm:inline">{user.login}</span>
+        <ChevronDown size={13} className="text-ink-faint" />
+      </summary>
+
+      <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-line bg-paper-sunken p-3 shadow-lg">
+        <p className="px-1 text-[12.5px] leading-relaxed text-ink-soft">
+          {usage
+            ? <>{Math.max(0, usage.limit - usage.used)} of {usage.limit} AI analyses left this month. Resets {usage.resets}.</>
+            : "Signed in."}
+        </p>
+        <div className="mt-3 border-t border-line pt-2">
+          <button type="button" onClick={signOut} className="w-full rounded-lg px-1 py-1.5 text-left text-[13px] text-ink transition-colors hover:bg-paper">
+            Sign out
+          </button>
+          <button type="button" onClick={handleDelete} className="w-full rounded-lg px-1 py-1.5 text-left text-[13px] text-critical transition-colors hover:bg-paper">
+            Delete account
+          </button>
+        </div>
+      </div>
+    </details>
   );
 }
 
