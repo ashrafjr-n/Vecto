@@ -341,26 +341,33 @@ function AiNudgeCard({ ai }) {
       }
     >
       <p className="text-[13px] leading-relaxed text-ink-soft">
-        Everything on this page — the score, the roles, the findings and the recommendations
-        — is measured by Vecto&apos;s engine, reading your file in this browser tab. A deeper
-        review is available separately: it can explain what a column likely means, judge
-        whether a strong signal is real leakage or a legitimate predictor, and suggest the
-        target column. Nothing it returns changes the report unless you accept it.
+        Every figure in this report is computed by Vecto&apos;s engine, in this browser tab.
+        A deeper review is a separate, optional step: it reads a summary of your columns and
+        proposes what each one means, whether a strong signal is leakage or a real predictor,
+        and which column is the target. Nothing it proposes enters the report unless you
+        accept it.
       </p>
       {user ? (
-        <p className="mt-3 text-[12.5px] text-ink-faint">
-          Target Signal asks about leakage; Quality proposes cleaning rules where the
-          engine found something to clean. The column review sits with the target, under
-          &ldquo;Change target&rdquo; above.
+        <p className="mt-3 text-[12.5px] leading-relaxed text-ink-faint">
+          Leakage review is on Target Signal, cleaning proposals on Quality, and the column
+          review sits with the target under &ldquo;Change target&rdquo;.
         </p>
       ) : (
-        <button
-          type="button"
-          onClick={signIn}
-          className="mt-4 inline-flex items-center rounded-xl bg-ink px-4 py-2.5 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
-        >
-          Sign in for the deeper review
-        </button>
+        /* A secondary button, not the solid ink one: this is a notice, not the page's
+           action. The label names the mechanism (GitHub) rather than selling the
+           feature — "Sign in for the deeper review" read as a pitch. */
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button
+            type="button"
+            onClick={signIn}
+            className="inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
+          >
+            Sign in with GitHub
+          </button>
+          <span className="text-[12.5px] text-ink-faint">
+            Needed for the deeper review only — this report is already complete.
+          </span>
+        </div>
       )}
     </SectionCard>
   );
