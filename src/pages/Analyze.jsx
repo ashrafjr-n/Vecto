@@ -297,6 +297,7 @@ function Analyze() {
                 initialTarget={target}
                 onConfirm={handleTargetConfirmed}
                 onBack={analysisResult ? () => setStep("results") : handleReset}
+                returning={Boolean(analysisResult)}
                 ai={{
                   dossier, onDossier: setDossier,
                   roleOverrides, onRoleOverridesChange: setRoleOverrides,

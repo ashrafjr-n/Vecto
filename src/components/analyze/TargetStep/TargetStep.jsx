@@ -92,7 +92,11 @@ function ModePanel({ mode, columns, colTypes, selected, setSelected, initialTarg
 }
 
 /* `ai` (from Analyze.jsx) carries the column review state: dossier, role overrides, cleaning, accepted rules. */
-function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBack, ai }) {
+/* `returning` is true when this was opened from a finished report ("Change
+   target"), false for a file that has not been analysed yet. It changes two
+   labels only: a page that says "Choose a target column" and "Back" is lying
+   about where the user is and where Back goes. */
+function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBack, returning, ai }) {
   const { dossier, onDossier, roleOverrides, onRoleOverridesChange, cleaning, onCleaning, acceptedRules, onAcceptedRulesChange, onOptIn } = ai;
   const [mode,     setMode]     = useState("auto");
   const [selected, setSelected] = useState(initialTarget || columns[0] || "");
@@ -125,7 +129,7 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
       <div className="mx-auto max-w-3xl">
 
         <h1 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-4xl">
-          Choose a target column
+          {returning ? "Change the target column" : "Choose a target column"}
         </h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-soft">
           The column you want to predict. It sets the task type, the class-balance check and
@@ -216,14 +220,14 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
               className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-soft transition-colors hover:text-ink"
             >
               <ArrowLeft size={14} />
-              Back
+              {returning ? "Back to report" : "Back"}
             </button>
             <button
               type="button"
               onClick={() => onConfirm(effectiveTarget)}
               className="inline-flex items-center gap-2 rounded-xl bg-ink px-5 py-2.5 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
             >
-              Start analysis
+              {returning ? "Rebuild the report" : "Start analysis"}
               <ArrowRight size={14} />
             </button>
           </div>
