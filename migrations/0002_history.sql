@@ -1,5 +1,5 @@
 -- History (v1): two counts per analysis, so a signed-in user can see what they
--- have run. Applied with
+-- have run, in the account menu in the site header. Applied with
 --   npx wrangler d1 execute vecto-db --local  --file=migrations/0002_history.sql
 --   npx wrangler d1 execute vecto-db --remote --file=migrations/0002_history.sql
 --

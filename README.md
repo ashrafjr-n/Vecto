@@ -167,8 +167,8 @@ The deeper review is the only part of Vecto behind a sign-in. A free account may
 internally — behind a per-user **monthly ceiling**, and a **global daily budget** caps
 requests across all users, because the upstream free tier is account-wide. Every limit is
 enforced in the Worker; what the page shows is informational. A signed-in user's own runs
-are listed at `/history`, as counts and dates only — no file, filename, schema or target
-is stored.
+are listed in the account menu in the header, as counts and dates only — no file,
+filename, schema or target is stored.
 
 Sign-in is GitHub OAuth in a **popup**: the parsed dataset and the built report live in
 the page's memory, and a full-page redirect would destroy them.
@@ -323,12 +323,12 @@ worker/
   http.js                     JSON replies, cookies, origin check, random tokens
 migrations/
   0001_init.sql               users, sessions, analyses, budget
-  0002_history.sql            row and column counts on `analyses`, for /history
+  0002_history.sql            row and column counts on `analyses`, for the account menu
 
 src/
   App.jsx                     routes: / (upload), /analyze (processing → report, with the
-                              target picker reachable from it), /history, /methodology,
-                              /about, /privacy, /terms, and a 404 for the rest
+                              target picker reachable from it), /methodology, /about,
+                              /privacy, /terms, and a 404 for the rest
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
     csvIntake.js              upload rules: size/format, encoding, ragged rows, headerless files
@@ -347,7 +347,6 @@ src/
     Analyze.jsx               a dropped file starts analysing on mount; steps are
                               processing → results, with target → back to results when
                               the report's "Change target" opens the picker
-    History.jsx               a signed-in account's past analyses: counts and dates only
     Methodology.jsx           engine stages as a spec sheet: contents, sticky stage
                               headers, rules, measured AI accuracy, limits
     About.jsx                 what the tool does, set against what it is not

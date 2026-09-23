@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 
@@ -69,8 +70,19 @@ function Header() {
    without a line of state. It stays open until clicked again, which is the one
    thing a hand-rolled dropdown would do better and not worth the code. */
 function AccountMenu() {
-  const navigate = useNavigate();
   const { user, usage, loading, signIn, signOut, deleteAccount } = useSession();
+  /* Past analyses, loaded the first time the menu is opened — in the handler for
+     the click that asked for them, not in an effect (reactjs-principles.md §6),
+     and never for a visitor who never opens the menu. `null` is "not asked yet". */
+  const [history, setHistory] = useState(null);
+
+  const loadHistory = () => {
+    if (history) return;
+    fetch("/api/history", { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : { analyses: [] }))
+      .catch(() => ({ analyses: [] }))
+      .then((data) => setHistory(data.analyses ?? []));
+  };
 
   // Nothing during the first load, so the bar does not flash "Sign in" at someone
   // who is already signed in.
@@ -96,7 +108,7 @@ function AccountMenu() {
   };
 
   return (
-    <details className="relative">
+    <details className="relative" onToggle={(e) => { if (e.currentTarget.open) loadHistory(); }}>
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-line-strong px-2.5 py-1.5 text-[13px] font-medium text-ink transition-colors hover:border-ink-faint [&::-webkit-details-marker]:hidden">
         {user.avatarUrl && (
           <img src={user.avatarUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-full" />
@@ -105,20 +117,43 @@ function AccountMenu() {
         <ChevronDown size={13} className="text-ink-faint" />
       </summary>
 
-      <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-line bg-paper-sunken p-3 shadow-lg">
+      <div className="absolute right-0 z-50 mt-2 w-[19rem] rounded-xl border border-line bg-paper-sunken p-3 shadow-lg">
         <p className="px-1 text-[12.5px] leading-relaxed text-ink-soft">
           {usage
             ? <>{Math.max(0, usage.limit - usage.used)} of {usage.limit} deeper reviews left today. Resets {usage.resets}.</>
             : "Signed in."}
         </p>
+
+        {/* History, in the menu rather than on a page of its own: it is two counts
+            and a date per analysis, which is a panel's worth of content and not a
+            destination. It cannot reopen a report — the file was never stored. */}
         <div className="mt-3 border-t border-line pt-2">
-          <button
-            type="button"
-            onClick={() => { window.scrollTo(0, 0); navigate("/history"); }}
-            className="w-full rounded-lg px-1 py-1.5 text-left text-[13px] text-ink transition-colors hover:bg-paper"
-          >
-            History
-          </button>
+          <p className="px-1 text-[11.5px] uppercase tracking-[0.06em] text-ink-faint">Past analyses</p>
+          {history === null ? (
+            <p className="px-1 py-2 text-[12.5px] text-ink-faint">Loading…</p>
+          ) : history.length === 0 ? (
+            <p className="px-1 py-2 text-[12.5px] leading-relaxed text-ink-faint">
+              Nothing yet. An analysis appears here once a deeper review has run on it;
+              reports you read without one are not recorded.
+            </p>
+          ) : (
+            <dl className="mt-1 max-h-52 overflow-y-auto">
+              {history.map((entry) => (
+                <div key={entry.analysisId} className="flex items-baseline justify-between gap-3 px-1 py-1.5">
+                  <dt className="font-mono text-[12px] text-ink">
+                    {entry.rows === null ? "—" : `${entry.rows.toLocaleString()} rows`}
+                    {entry.columns !== null && ` · ${entry.columns} cols`}
+                  </dt>
+                  <dd className="shrink-0 text-[11.5px] text-ink-faint">
+                    {new Date(entry.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+
+        <div className="mt-2 border-t border-line pt-2">
           <button type="button" onClick={signOut} className="w-full rounded-lg px-1 py-1.5 text-left text-[13px] text-ink transition-colors hover:bg-paper">
             Sign out
           </button>
