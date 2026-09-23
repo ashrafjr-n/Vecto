@@ -1,418 +1,177 @@
 # Vecto
 
-Know your dataset before you train on it.
+### Know your dataset before you train on it.
 
-Vecto is a browser-based CSV dataset analyzer. Upload a CSV, pick a target column, and
-get a full readiness report: data quality, per-column statistics, correlations, class
-balance, a 0–100 health score, and prioritized recommendations.
+A privacy-first workspace for exploring data quality, relationships, target signal and
+ML readiness — directly in the browser.
 
-**Every byte of analysis runs in your browser.** No file is uploaded and no model computes
-any part of the report. An optional AI assistant on the target picker can suggest what each
-column means — it runs only when asked, sends a column summary you can inspect first, and
-changes the report only when you accept a suggestion.
+**[Live demo](https://vecto.aannaelj.workers.dev)** ·
+[Methodology](https://vecto.aannaelj.workers.dev/methodology) ·
+[Privacy](https://vecto.aannaelj.workers.dev/privacy) ·
+[About](https://vecto.aannaelj.workers.dev/about)
 
-## Features
+Upload a CSV → inspect its quality, structure, relationships and target signal → build a
+preparation plan.
 
-- **Data quality** — missing cells, duplicate rows, constant columns, per-column issue list
-- **Statistics** — mean, median, sample standard deviation, skewness, excess kurtosis,
-  quartiles and outlier counts for every numeric column
-- **Column roles** — automatic classification into numeric, categorical, binary,
-  identifier, temporal, and free text, read from whole columns rather than a head sample
-- **Relationships** — Pearson and Spearman with two-sided p-values, bias-corrected
-  Cramér's V for categorical pairs, a rank-based correlation ratio (η, Kruskal–Wallis) for
-  numeric–categorical pairs, mutual information for
-  non-monotonic signal, multicollinearity and target-leakage warnings, feature clusters
-- **Missingness as signal** — whether a column was recorded at all is measured against
-  the target, so a mostly-empty column whose absence tracks the label is reported rather
-  than discarded
-- **Nothing dropped silently** — any column the target scan cannot score is listed with
-  the reason, and values excluded to keep a column numeric are counted and shown
-- **Class balance** — class distribution for a classification target, including an explicit
-  missing-value bucket and minority-class sizing
-- **Health score** — a weighted 0–100 score across quality, structure, relationships, and
-  target readiness, with a letter grade and per-dimension breakdown
-- **Recommendations** — prioritized, human-readable next steps for making the dataset
-  ML-ready
-- **AI column review (optional)** — on the target picker, one request asks a language model
-  to read a per-column summary and suggest what each column records, a finer subtype, a
-  unit, a plausible range, **whether the column records a personal attribute** (one value
-  from a closed list — sex or gender, race or ethnicity, health, age, nationality, and so
-  on — or nothing at all) and the likely target, together with cleaning rules for the values
-  the engine's scan found dirty (see cleaning proposals below). Every claim is checked against the file before it is shown: quoted values
-  must exist, a suggested role the data contradicts is not offered, the plausible range is
-  counted by the engine, and an unusable target is withheld. An accepted role becomes an
-  explicit input to the analysis and is marked in the report; accepted cleaning rules are
-  applied to the upload before the first analysis, so no re-run is needed.
-- **Proxies for personal data** — when the review flags a column as recording a personal
-  attribute, the Relationships tab lists the columns the engine **measured** against it,
-  because dropping a column does not remove the attribute if another column predicts it.
-  On Titanic, `who` is read as age and `adult_male` reproduces it at Cramér's V = 1.00.
-  The card also says how many columns were never compared with it at all — between
-  features the engine measures numeric against numeric and categorical against
-  categorical, never one against the other — so silence is not read as an all-clear. It
-  appears only when something was flagged: there is no "no personal data found" message,
-  because that would be a claim nobody measured.
-- **AI leakage review (optional)** — on the Target Signal tab, a language model reads column
-  names, roles and the engine's measured associations (no cell values) and names the
-  columns a model could not use at prediction time: derived from the target, recorded after
-  the outcome, the label under another name, or an entity repeated across rows — plus the
-  split an honest evaluation needs. Every proposed formula is evaluated on the rows, and a
-  total that differs only by a few fixed amounts (an unrecorded surcharge) is recognised as
-  such; group claims are measured; timing claims are shown as questions. Before asking, the
-  engine measures columns whose repeated values almost always share the target (an entity
-  a random split would memorise, or a value known only afterwards) and hands them over as
-  evidence; any the model leaves out are listed for the reader as a question. Advisory only.
-  It also carries two **relevance** categories, which are the opposite question and are not
-  accusations: a column worth keeping despite a weak measured association, and a strong
-  association with no reason behind it. Both always render as open questions with the
-  engine's own number quoted — including where that number disagrees with the claim.
-- **AI cleaning proposals (optional)** — the engine scans the file for values that look
-  dirty (numbers written with a unit or bound such as `42 Lac` or `125+`, one category
-  spelled several ways, placeholders such as `-999`) and a language model proposes rules in
-  a closed format, as the second half of the column review above. The Quality tab shows the
-  same proposal and can run that scan and ask for itself, for a report reached without a
-  review. Each rule is applied to a copy and measured before it can be accepted, accepted
-  rules run the analysis on the original rows, the report says it was built from cleaned
-  data, and the rules export as a pandas snippet.
-- **Rare flags get a second number** — a binary feature present on a small share of rows
-  cannot show a large correlation however well it predicts, so where one appears the report
-  adds an odds ratio with its 95% interval and says in words whether the interval crosses 1.
-- **Answers are reused, not re-bought** — an AI answer is stored in the viewer's own
-  browser, keyed on the task and the exact bytes that were sent, so asking the same
-  question about the same file again costs no request. Nothing is stored on a server, the
-  panels say so, and a button clears the lot.
-- **Preparation plan and pipeline export** — a Preparation tab turns the report's decisions
-  into a training pipeline: split first (stratified, or grouped by an entity column the
-  advice names), every imputation, scale and category list fitted on the training rows only,
-  and each left-out column listed with its reason. It downloads as a runnable scikit-learn
-  script — prepared features, no model.
-- **Diagnostic baseline** — one fixed, untuned ridge model, cross-validated over five folds
-  through that same pipeline, answers whether the columns carry any signal (a corrected
-  paired t-test against a majority-class or mean baseline) and whether one column alone
-  nearly decides the target — including a curved relationship the correlations miss. When a
-  few extreme target values put the folds on different scales, it says R² is not
-  meaningful instead of printing a score.
-- **Legacy encodings** — a file that is not UTF-8 is read as Windows-1252, and the target
-  step says so in one line.
-- **Headerless files** — a first row that looks like data (decimal or negative numbers) is
-  offered back as data instead of silently becoming the column names.
-- **Methodology page** — `/methodology` documents every stage of the engine: the rule
-  behind each decision, the thresholds and estimators it uses, what it cannot decide, and
-  how well the optional AI assistant scores on files its prompts were never tuned on
-- **Sample report** — `/analyze?sample=1` opens a full report on generated data, linked
-  from the home page, for a first look without a file of your own
-- **About, Privacy and Terms pages** — Privacy lists everything that leaves the browser;
-  Terms are provisional until sign-in exists
+![The Vecto report: health score, column roles and a data preview, with the target and the dataset's headline figures pinned above the section rail](docs/screenshots/report-overview.png)
 
-## Getting started
+## What Vecto does
 
-Requires Node.js 20+.
+Most tooling tells you what is *in* a dataset. Vecto is built to answer a narrower
+question: is this data ready to train on, and what would go wrong if you did?
+
+A report covers data quality and missingness, per-column statistics and outliers, feature
+relationships, how much signal the target actually carries, class balance, likely leakage,
+a weighted health score, and prioritised recommendations — each figure shown with the
+reasoning and the sample size behind it. From the same analysis it builds a preparation
+plan and exports it as a runnable scikit-learn pipeline.
+
+It is not a CSV viewer with charts bolted on: every section exists to support or refute
+the decision to model the data as it stands.
+
+## Built around deterministic analysis
+
+```text
+CSV
+ ↓
+Browser
+ ↓
+Deterministic Analysis Engine        ← pure functions, Web Worker, no network
+ ↓
+Analysis Dashboard
+ ↓
+Optional Deeper Review               ← only when asked
+ ↓
+Cloudflare Worker  →  model provider
+```
+
+Parsing and analysis run in the page. The engine is a set of pure functions with no
+network access, so the same file and the same target produce the same report every time,
+and no language model computes any part of it. The report is complete without the AI
+layer, without an account, and without a request leaving the browser.
+
+## Analysis engine
+
+Quality and missingness · per-column statistics and skew-adjusted outlier fences · column
+role detection · Pearson and Spearman with two-sided p-values · bias-corrected Cramér's V ·
+rank-based correlation ratio · mutual information · multicollinearity and leakage signals ·
+class balance · health score · recommendations · preparation plan · scikit-learn pipeline
+export · a cross-validated baseline model.
+
+Every threshold and method is documented on the
+[Methodology](https://vecto.aannaelj.workers.dev/methodology) page.
+
+![The Relationships section: a leakage warning, dataset observations, and categorical associations with their levels, row counts and p-values](docs/screenshots/relationships.png)
+
+## Engineering highlights
+
+**Deterministic analysis engine** — pure, side-effect-free functions covered by regression
+tests against a Python-generated reference (pandas, scipy) and by contract tests that pin
+the exact shape of the engine's output.
+
+**Full-stack architecture** — React/Vite front end, Cloudflare Worker back end, D1 for
+persistence, deployed as static assets with the Worker in front of `/api/*`.
+
+**Privacy-aware design** — the raw dataset is never uploaded. Analysis, the preparation
+plan and the script export all run client-side; the back end exists only for the optional
+review and for accounts.
+
+**AI integration** — a server-side task registry with prompts the client never sends,
+strict JSON schemas, and a verification layer that checks every claim against the file
+before it is shown: proposed formulas are evaluated on the rows, contradicted column types
+are withheld, and unverifiable claims are labelled as questions rather than findings.
+
+**ML preparation** — seeded, deterministic folds; preprocessing fitted on training rows
+only; a ridge baseline scored with 5-fold cross-validation and a corrected paired *t*-test,
+to say whether the signal is distinguishable from a naive predictor.
+
+**Production concerns** — GitHub OAuth in a popup (a redirect would destroy in-memory
+state), opaque sessions stored as hashes, per-user and global quotas, a client-side answer
+cache, upstream error handling with bounded retries, and browser-level verification of the
+real user journeys.
+
+## AI, where it actually helps
+
+AI is optional. The core report is deterministic and reproducible; a model is introduced
+only where semantic interpretation is useful — reading what an ambiguous column probably
+records, proposing cleaning rules for messy values, and reviewing candidate leakage.
+
+The dataset itself is never sent. A column review receives derived per-column summaries —
+names, roles, counts, summary statistics and a handful of clipped example values — and the
+leakage review receives no cell values at all. Nothing a model proposes enters the report
+until it has been checked against the file and accepted by the user.
+
+## Privacy by design
+
+```text
+CSV
+ ↓
+Browser
+ ├── Quality
+ ├── Statistics
+ ├── Relationships
+ ├── Target Signal
+ └── ML Preparation
+```
+
+No raw dataset upload is required for the core analysis. When a deeper review is
+requested, Vecto sends derived column summaries rather than the original dataset, and
+shows exactly what will be sent before the request is made. Details:
+[Privacy](https://vecto.aannaelj.workers.dev/privacy).
+
+## Tech stack
+
+**Frontend** React · Vite · React Router · Tailwind CSS · Framer Motion · PapaParse
+
+**Backend** Cloudflare Workers · D1
+
+**AI** OpenRouter
+
+**Data / ML** JavaScript analysis engine · scikit-learn pipeline export
+
+## Methodology and validation
+
+The engine's statistics are checked against a Python reference; contract tests lock the
+output shape the interface is built against; hardening tests run malformed and very large
+inputs through it. The exported pipeline was validated by running it in Python, and the
+baseline model's coefficients match scikit-learn's. User journeys are verified by driving
+the real app in a headless browser, not only by unit tests.
 
 ```bash
+npm test     # analysis engine, AI layer, preparation and baseline
+npm run lint
+```
+
+## Local development
+
+```bash
+git clone https://github.com/ashrafjr-n/Vecto.git
+cd Vecto
 npm install
 npm run dev
 ```
 
-The dev server prints a local URL. **The whole local product — upload, analysis, the
-report, the preparation plan and the script export — runs with no backend and no
-account.** Only the optional deeper review (column review, leakage review, cleaning
-proposals) needs the Worker and a signed-in user; to work on that half, see "Accounts and
-the AI endpoint" below.
-
-### Scripts
-
-| Script | What it does |
-| --- | --- |
-| `npm run dev` | Start the Vite dev server with HMR |
-| `npm run build` | Production build into `dist/` |
-| `npm run preview` | Serve the built output locally |
-| `npm run lint` | Run ESLint over the project |
-| `npm test` | Engine, Worker, account and quota regression suites (plain Node) |
-
-Ad-hoc dataset reports (no npm script — it takes file arguments):
-
-```bash
-node tools/report.mjs data/*.csv [--target=Col] [--out=reports]
-```
-
-Parses each CSV exactly as the app does, runs the analysis engine over it, and
-writes the full `analyzeDataset()` output to `reports/<name>.json` — one file per
-dataset, so a result can be diffed or re-read later. Written for testing the
-engine against many datasets; it is not part of the shipped app.
-
-## Deployment
-
-Deployed on **Cloudflare Workers** with static assets, connected to the GitHub repository
-through Workers Builds. Every push triggers a build and a deploy — there is nothing to
-upload by hand and no build output in the repository.
-
-| Setting | Value |
-| --- | --- |
-| Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy` (the default) |
-| Static assets | `dist` |
-| Worker config | `wrangler.jsonc` (entry script `worker/index.js`) |
-| Secret | `OPENROUTER_API_KEY` |
-
-The app is a static single-page application; Cloudflare serves `index.html` for client-side
-routes such as `/methodology` and `/analyze`. Only `/api/*` requests run the Worker script —
-everything else is served straight from `dist`. Server-side code lives in `worker/index.js`,
-not in a `functions/` directory, which is a Cloudflare Pages feature and does not run on
-Workers.
-
-### Accounts and the AI endpoint
-
-The deeper review is the only part of Vecto behind a sign-in. A free account may run
-**3 analyses a day** — one dataset is one analysis however many requests it needs
-internally — behind a per-user **monthly ceiling**, and a **global daily budget** caps
-requests across all users, because the upstream free tier is account-wide. Every limit is
-enforced in the Worker; what the page shows is informational. A signed-in user's own runs
-are listed in the account menu in the header, as counts and dates only — no file,
-filename, schema or target is stored.
-
-Sign-in is GitHub OAuth in a **popup**: the parsed dataset and the built report live in
-the page's memory, and a full-page redirect would destroy them.
-
-One-time setup:
-
-```bash
-# 1. Two GitHub OAuth apps (one callback URL each):
-#      prod  https://<your-worker>.workers.dev/api/auth/callback
-#      dev   http://localhost:3001/api/auth/callback
-# 2. The database, then the schema, locally and remotely:
-npx wrangler d1 create vecto-db          # paste database_id into wrangler.jsonc
-npx wrangler d1 execute vecto-db --local  --file=migrations/0001_init.sql
-npx wrangler d1 execute vecto-db --remote --file=migrations/0001_init.sql
-npx wrangler d1 execute vecto-db --local  --file=migrations/0002_history.sql
-npx wrangler d1 execute vecto-db --remote --file=migrations/0002_history.sql
-# 3. Production secrets:
-npx wrangler secret put GITHUB_CLIENT_SECRET
-npx wrangler secret put EVAL_TOKEN
-# 4. Locally: cp .dev.vars.example .dev.vars and fill it in.
-```
-
-`GITHUB_CLIENT_ID`, `ALLOWED_ORIGINS`, `FREE_ANALYSES_PER_DAY`, `MONTHLY_ANALYSIS_CEILING`
-and `DAILY_AI_BUDGET`
-are plain vars in `wrangler.jsonc`. `GITHUB_CLIENT_SECRET`, `EVAL_TOKEN` and
-`OPENROUTER_API_KEY` are Worker **secrets** and never appear in the repo or the bundle.
-
-### AI endpoint
-
-`POST /api/ai` with `{ "task": "<name>", "payload": { ... } }` forwards a server-defined
-prompt to [OpenRouter](https://openrouter.ai) and returns `{ task, model, result }` (plus
-`retried: true` when a provider failure inside a 200 was retried once). The
-client only names a task; prompts, JSON schemas and token limits live in the Worker. Tasks:
-`ping` (deployment check), `review` (the column dossier and cleaning rules in one request,
-from the target picker or the Quality tab) and `leakage` (Target Signal tab). The analysis
-itself still runs entirely in the browser.
-
-- **Models** — `AI_MODELS` in `wrangler.jsonc`, comma-separated, tried in order by
-  OpenRouter's fallback. An empty value switches the endpoint off. It currently holds a
-  single model, chosen on measured accuracy: the alternatives either returned no findings
-  on datasets with documented leakage or were never available on the free tier.
-- **Key in production** — Cloudflare dashboard → the `vecto` Worker → Settings → Variables
-  and Secrets → Add, type **Secret**, name `OPENROUTER_API_KEY`. Or
-  `npx wrangler secret put OPENROUTER_API_KEY`. Never a build variable, never `VITE_*`.
-- **Key locally** — a `.dev.vars` file in the repository root (gitignored) containing
-  `OPENROUTER_API_KEY=...`. Run `npx wrangler dev` (needs one `npm run build` so `dist/`
-  exists) beside `npm run dev`; the Vite dev server proxies `/api` to wrangler on port 8787.
-
-| Response | Meaning |
-| --- | --- |
-| `503 ai_disabled` | no key or no models configured |
-| `400 unknown_task` / `invalid_body`, `413 payload_too_large` | rejected before any model call |
-| `429 rate_limited` | every model in the list is rate-limited, or the daily quota is spent |
-| `502 upstream_error` / `empty_response` / `invalid_json` | OpenRouter failed, or the model's reply was not valid JSON after one repair attempt |
-
-### AI eval
-
-`tools/ai-eval.mjs` runs an AI task through the real `/api/ai` endpoint over the local test
-corpus and scores each answer against known answers written before the first run:
-`--task=review` (default) against both `tools/ai-eval/expectations.mjs` (targets, roles,
-subtypes) and `tools/ai-eval/cleaning-expectations.mjs` (rules and factors, rules that must
-be declined), with the two scores reported apart as "B checks" and "D checks"; and
-`--task=leakage` against `tools/ai-eval/leakage-expectations.mjs` (known leaks, legitimate
-predictors that must not be flagged, split strategy).
-Answers are verified exactly as the page verifies them, cached by payload hash in
-`reports/ai-eval-review/`, and summarised in that directory's `summary.md`, including the
-engine's own target guess for comparison.
-
-`--set=validation`, `--set=test` and `--set=final` score held-out files from new domains
-instead, against `tools/ai-eval/<set>-expectations.mjs` (written from each file's published
-dictionary before any request), into `reports/ai-eval-<task>-<set>/`. They are never used to
-tune a prompt, and the test and final sets are run once. The final set's engine half —
-no crash, no silently dropped column, a diagnostic verdict that matches the documentation —
-runs with no request at all:
-
-```bash
-node --max-old-space-size=8192 tools/engine-check.mjs --set=final
-```
-
-```bash
-npx wrangler dev                                   # terminal 1, reads .dev.vars
-node --max-old-space-size=8192 tools/ai-eval.mjs   # [--task=leakage] [--set=validation] [--only=titanic] [--fresh] [--rescore]
-```
-
-One request per file, or one per 25 columns for a wider file (the same parts the page sends);
-a rate-limit response stops the run and finished files stay cached. The cache is keyed on the
-payload and on the task's prompt and schema files, so a prompt change re-asks every file.
-`--rescore` makes no requests.
-
-The eval's known answers were written by the same author as the prompts, so a second check
-tests the eval itself: `tools/blind-sample.mjs` writes a labelling sheet
-(`forTesting/blind/sheet.html`) for a seeded, stratified sample of columns, with no engine
-role, model answer or expectation shown. A person fills it in and saves `labels.json`, and
-`tools/blind-agreement.mjs` reports Cohen's κ against the model and against the expectations,
-with every disagreement listed. Neither script makes a request.
-
-## Tests
-
-The analysis engine has a dependency-free regression suite that runs on plain Node:
-
-```bash
-npm test
-```
-
-This runs nine files:
-
-- **`tests/phase0.test.mjs`** — statistical correctness. Results are asserted against a
-  Python reference (pandas/scipy) rather than hand-written expectations.
-  `tests/reference/generate_reference.py` produces `tests/reference/expected.json` from the
-  fixture CSVs in `tests/reference/datasets/`; the JS implementation is checked against it
-  to a 1e-6 tolerance. Role detection, which has no Python equivalent, is asserted against
-  intended-role maps declared in the test file itself.
-- **`tests/engine-contract.test.mjs`** — the **output shape** of `analyzeDataset()`: the
-  exact key set of the top-level result and of every nested object/array-element (`meta`,
-  `quality`, `statistics[]`, `visualizations[]`, `relationships`, `classBalance`,
-  `insights[]`, `healthScore`, `recommendations[]`). This is the contract a UI is built
-  against — it exists so a frontend rewrite (or any new consumer) can trust the engine's
-  shape without re-deriving it from source, and so a future change to the engine that
-  breaks that shape fails here instead of silently.
-- **`tests/hardening.test.mjs`** — proves the engine survives real input: very large
-  columns, malformed CSVs, an identifier picked as the target, and cancelling a running
-  analysis. Known defects can be pinned before they are fixed, and a pinned defect that
-  starts passing fails the suite so it cannot become untested.
-
-- **`tests/ai-worker.test.mjs`** — the `/api/ai` Worker handler with OpenRouter replaced by a
-  scripted `fetch`: request validation, that client-sent prompts are ignored, the
-  rate-limit response, and the single repair round for invalid JSON. No key or network.
-- **`tests/ai-dossier.test.mjs`** — what the column dossier sends (no rows, no free-text
-  values, bounded examples, deterministic), how a wide file is split into parts and merged,
-  and how a model's answer is verified against the data before it is shown.
-- **`tests/ai-leakage.test.mjs`** — what the leakage review sends (no cell values) and how
-  each claim becomes a measurement: formula evaluation including fixed offsets, group
-  measurement, the engine's own association, and timing claims as questions.
-- **`tests/ai-cleaning.test.mjs`** — cleaning candidates, rule application (never in place),
-  rule verification and measurement, and the pandas export.
-- **`tests/ai-eval-score.test.mjs`** — the eval's scoring rules on hand-built answers.
-- **`tests/prep.test.mjs`** — the preparation pipeline: deterministic, stratified and grouped
-  folds, nothing learned from held-out rows, the plan's agreement with the report's advice,
-  and the exported script's decisions.
-- **`tests/diagnostic.test.mjs`** — the baseline model's solver against scikit-learn, and its
-  verdicts on data whose answer is known (no signal, clear signal, a hidden U-shaped leak).
-
-Run `npm test` after any change under `src/components/utils/core/`.
+That runs the whole product except the optional review. For that half, copy
+`.dev.vars.example` to `.dev.vars`, fill it in, and run `npx wrangler dev` alongside the
+dev server, which proxies `/api` to it.
 
 ## Project structure
 
 ```text
-worker/
-  index.js                    /api/ai + the route table; the session/quota gate
-  auth.js                     GitHub OAuth, sessions, logout, account deletion
-  usage.js                    free-analysis metering and the global daily budget
-  http.js                     JSON replies, cookies, origin check, random tokens
-migrations/
-  0001_init.sql               users, sessions, analyses, budget
-  0002_history.sql            row and column counts on `analyses`, for the account menu
-
 src/
-  App.jsx                     routes: / (upload), /analyze (processing → report, with the
-                              target picker reachable from it), /methodology, /about,
-                              /privacy, /terms, and a 404 for the rest
-  lib/
-    datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
-    csvIntake.js              upload rules: size/format, encoding, ragged rows, headerless files
-    prep/                     preparation plan, folds, train-only fitting, scikit-learn
-                              script export, and the cross-validated baseline model
-    ai/                       AI client (requestAi) and its browser answer cache; per
-                              feature a payload builder, a verifier
-                              and a schema shared with the Worker (dossier, leakage,
-                              cleaning)
-  content/
-    methodology.js            copy for /methodology — thresholds quoted from the engine,
-                              AI figures quoted from held-out eval runs
-    pages.js                  copy for /about (its own shape) and for /privacy, /terms
-  pages/
-    Home.jsx                  intro + the functional CSV dropzone
-    Analyze.jsx               a dropped file starts analysing on mount; steps are
-                              processing → results, with target → back to results when
-                              the report's "Change target" opens the picker
-    Methodology.jsx           engine stages as a spec sheet: contents, sticky stage
-                              headers, rules, measured AI accuracy, limits
-    About.jsx                 what the tool does, set against what it is not
-    TextPage.jsx              Privacy and Terms, over content/pages.js
-    NotFound.jsx              any unknown path
-  components/
-    layout/Header.jsx         fixed, full-width, shared by every page
-    layout/Footer.jsx         page links and the repository
-    layout/DocPage.jsx        the legal-page frame: title, lead, sticky "On this page"
-    layout/ReferencePage.jsx  the frame for /methodology and /about: masthead, colophon
-    auth/                     SessionProvider + the context read by the header and the
-                              AI panels; sign-in is a popup, never a redirect
-    analyze/shared/AiGate.jsx sign in / out of quota / the panel's own button
-    common/SpecRows.jsx       the label/definition ledger both reference pages use
-    common/                   shared primitives (ErrorBoundary, SectionLabel)
-    analyze/
-      shared/                 primitives used across steps/tabs (RolePill, StatTile,
-                               SectionCard, StatusBadge, correlationColor) and the AI
-                               frame (AiBadge, AiPanel, AiPayloadPreview)
-      TargetStep/              target-column picker
-      ResultsDashboard/        the report: an identity bar that hides on scroll and a
-                               section rail (Overview/Quality/Statistics/
-                                Visualizations/Target signal/Relationships/
-                                Class balance/Preparation)
-    utils/core/                the analysis engine (pure functions, no side effects)
-      roles.constants.js      ROLE enum — the single source of truth for role strings
-      index.js                analyzeDataset() orchestrator
-      detectors/              column-role classification, target guessing
-      analyzers/              quality, statistics, relationships
-      scoring/                health score
-      intelligence/           insights and recommendations
-      helpers.js              shared numeric utilities
-tests/                        engine regression suite, output-shape contract, Worker tests
-worker/index.js               Cloudflare Worker entry: the route table, /api/ai and
-                              its gate (origin -> session -> budget -> quota)
-worker/auth.js                GitHub OAuth, sessions, logout, account deletion
-worker/usage.js               free-analysis metering and the global daily AI budget
-worker/http.js                JSON replies, cookies, origin check, random tokens
-migrations/0001_init.sql      users, sessions, analyses, budget
-worker/leakagePrompt.js       the leakage-review prompt
-worker/reviewPrompt.js        the column-review prompt (dossier + cleaning in one request)
-tools/ai-eval.mjs, ai-eval/   AI evals over the test corpus, known answers, scoring
-tools/engine-check.mjs        a test set's engine half: crash, silent drop, diagnostic verdict
-tools/blind-*.mjs             blind labelling sheet and agreement (checks the eval itself)
-wrangler.jsonc                Worker + static-assets config, AI model list
+├── components/utils/core/   the analysis engine (pure functions)
+├── lib/                     CSV intake, worker wrapper, prep plan, AI client
+├── components/analyze/      target picker and the report
+├── pages/                   routes
+└── content/                 copy for the documentation pages
+worker/                      Cloudflare Worker: auth, quotas, AI tasks
+tests/                       plain-Node test suites
 ```
 
-## Tech stack
+## Built by Ashraf
 
-React 19 · Vite 8 · React Router 7 · Tailwind CSS 4 (CSS-first config, no
-`tailwind.config.js`) · Framer Motion · PapaParse · lucide-react
+A personal project focused on full-stack engineering, data analysis and AI-assisted
+workflows — [live](https://vecto.aannaelj.workers.dev) ·
+[source](https://github.com/ashrafjr-n/Vecto).
 
-Routes are code-split with `React.lazy`, and the results dashboard loads as its own
-chunk only once an analysis finishes.
-
-## Privacy
-
-CSV parsing and every statistic are computed client-side in JavaScript; the file is never
-uploaded. Three things do leave the browser, all listed on the in-app `/privacy` page:
-the optional deeper review (column summaries, never rows, sent through the Worker to
-OpenRouter, and only after the user asks), Google Analytics page views, and ordinary
-requests to the host and to Google Fonts. The only browser storage is the AI answer
-cache in `localStorage`.
-
-## License
-
-Private project. All rights reserved.
-
-<!-- vn -->
+Private project; all rights reserved.
