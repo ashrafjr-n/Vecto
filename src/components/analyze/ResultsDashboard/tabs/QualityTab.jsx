@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { CircleCheckBig, CircleSlash, Hash, Layers, Minus } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
-import StatTile     from "../../shared/StatTile.jsx";
 import AiCleaningProposals from "./AiCleaningProposals.jsx";
 
 const ISSUE_ICON = { high_cardinality: Layers, constant: Minus, mixed_numeric: CircleSlash, possible_code: Hash };
@@ -108,17 +107,10 @@ function QualityTab({ result, ai }) {
 
   return (
     <div className="space-y-4">
-      {ai?.originalData && <AiCleaningProposals result={result} ai={ai} />}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatTile label="Missing cells" value={quality.missingCells.toLocaleString()} tone={quality.missingCells > 0 ? "warning" : "success"} />
-        <StatTile
-          label="Duplicate rows"
-          value={quality.duplicatesComputed ? quality.duplicateRows.toLocaleString() : "Skipped"}
-          tone={!quality.duplicatesComputed ? "ink" : quality.duplicateRows > 0 ? "warning" : "success"}
-        />
-        <StatTile label="Missing %" value={`${quality.missingPct}%`} tone={quality.missingPct > 5 ? "warning" : "success"} />
-      </div>
-
+      {/* Missing cells and duplicate rows used to have tiles here. They are in the
+          report's pinned bar at every scroll position now, and a figure printed
+          twice on one screen is not emphasis, it is noise. `missingPct` survives as
+          the score's own detail line, where it explains a deduction. */}
       <SectionCard title="Quality score">
         <div className="flex items-center justify-between">
           <div className={`font-mono text-3xl font-semibold ${SCORE_TEXT[tone]}`}>
@@ -164,6 +156,11 @@ function QualityTab({ result, ai }) {
 
       <MissingRanking cols={missingCols} />
       <OtherIssues items={otherIssues} />
+
+      {/* The optional panel sits AFTER the measurements, not above them: what the
+          engine measured is the tab, and an offer to ask a model about it is an
+          addition to that, whatever order it was built in. */}
+      {ai?.originalData && <AiCleaningProposals result={result} ai={ai} />}
 
       {quality.columnsWithIssues.length === 0 && (
         <SectionCard>
