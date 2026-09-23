@@ -139,18 +139,19 @@ export async function recordUsage(env, userId, analysisId, meta = {}) {
    see migrations/0002_history.sql for what is deliberately absent. */
 export async function historyFor(env, userId, limit = 20) {
   const { results } = await env.DB
-    .prepare(`SELECT analysis_id, created_at, rows, columns, requests
+    .prepare(`SELECT analysis_id, created_at, rows, columns
               FROM analyses WHERE user_id = ?
               ORDER BY created_at DESC LIMIT ?`)
     .bind(userId, limit)
     .all();
+  /* No "reviewed" flag: a row exists only because `recordUsage` ran, and that only
+     runs after a successful answer, so every row here IS a deeper review. A field
+     that is true on every row tells the reader nothing. */
   return (results ?? []).map((r) => ({
     analysisId: r.analysis_id,
     createdAt:  r.created_at,
     rows:       r.rows,
     columns:    r.columns,
-    // Whether the deeper review actually ran, rather than how many calls it took.
-    reviewed:   (r.requests ?? 0) > 0,
   }));
 }
 

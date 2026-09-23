@@ -208,9 +208,9 @@ globalThis.fetch = async () => {
      column would be a real change to what Vecto retains about someone's data, so
      the shape is pinned rather than left to a reviewer to notice. */
   check("a history entry carries counts and dates only",
-    Object.keys(first).join() === "analysisId,createdAt,rows,columns,reviewed");
+    Object.keys(first).join() === "analysisId,createdAt,rows,columns");
   check("the counts come back as stored", first.rows === 891 && first.columns === 12);
-  check("requests are reported as a yes/no, not a number", first.reviewed === true && second.reviewed === false);
+  check("the request count never leaves the server", first.requests === undefined);
   check("a leakage-only analysis has no counts, and says so with nulls", second.rows === null);
   check("history reads only the caller's own rows", env.DB.statements[0].args[0] === 1);
 }
