@@ -32,6 +32,8 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
   // classBalance is null for a regression target — there are no classes to show.
   const tabs = BASE_TABS.filter((t) => (!t.requiresTarget || !!meta.target)
                                     && (!t.requiresClasses || !!result.classBalance));
+  // A constant or identifier target: there is no task, and several sections say so.
+  const unusableTarget = Boolean(meta.target) && (meta.targetIsConstant || meta.targetIsIdentifier);
   const healthTone = healthScore
     ? healthScore.score >= 80 ? "success" : healthScore.score >= 60 ? "warning" : "critical"
     : "ink";
@@ -86,9 +88,18 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 pt-3 sm:pt-5">
           <div className="min-w-0">
             <p className="hidden text-[11.5px] uppercase tracking-[0.08em] text-ink-faint sm:block">Dataset report</p>
-            <h1 className="truncate sm:mt-1 text-[1.25rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[1.5rem]">
-              {meta.target ? <>Target: <span className="break-all font-mono text-accent-ink">{meta.target}</span></> : "No target — exploratory report"}
-            </h1>
+            <div className="flex items-baseline gap-3">
+              <h1 className="truncate sm:mt-1 text-[1.25rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[1.5rem]">
+                {meta.target ? <>Target: <span className="break-all font-mono text-accent-ink">{meta.target}</span></> : "No target — exploratory report"}
+              </h1>
+              {/* The task type is a fact about the whole report, so it belongs beside
+                  the target rather than in a sentence repeated above all eight tabs. */}
+              {meta.target && !unusableTarget && (
+                <span className="hidden shrink-0 rounded-md bg-accent-tint px-2 py-0.5 text-[11.5px] text-ink-soft sm:inline">
+                  {meta.datasetType}
+                </span>
+              )}
+            </div>
           </div>
           {/* The target is chosen by the engine when a file is dropped, so the choice
               has to stay visible and reversible from the report itself — otherwise a
@@ -156,14 +167,21 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
         </nav>
       </div>
 
-      {/* What the report is of — prose, so it scrolls with the section it introduces. */}
-      <p className="mt-6 max-w-3xl text-[14px] leading-relaxed text-ink-soft">
-        {meta.target && (meta.targetIsConstant || meta.targetIsIdentifier)
-          ? <>No task type can be read: <span className="font-mono text-ink">{meta.target}</span> {meta.targetIsConstant ? "has the same value on every row" : "is unique per row — an identifier, not a label"}. Pick a different target; the sections below describe the data, not a model problem.</>
-          : meta.target
-          ? <>{meta.datasetType} task. Every figure in this report is computed in your browser and comes with the reasoning behind it.</>
-          : <>Class balance, target signal and preparation need a target and are omitted. Every other section is computed normally.</>}
-      </p>
+      {/* A defect in the target is a problem with the whole report, so it is stated
+          on every section. The descriptive sentence is not: it said the same thing
+          above all eight tabs, which is how a sentence stops being read. */}
+      {unusableTarget && (
+        <p className="mt-6 max-w-3xl text-[14px] leading-relaxed text-warning">
+          No task type can be read: <span className="font-mono">{meta.target}</span> {meta.targetIsConstant ? "has the same value on every row" : "is unique per row — an identifier, not a label"}. Pick a different target; the sections below describe the data, not a model problem.
+        </p>
+      )}
+      {!unusableTarget && activeTab === "overview" && (
+        <p className="mt-6 max-w-3xl text-[14px] leading-relaxed text-ink-soft">
+          {meta.target
+            ? <>{meta.datasetType} task. Every figure in this report is computed in your browser and comes with the reasoning behind it.</>
+            : <>Class balance, target signal and preparation need a target and are omitted. Every other section is computed normally.</>}
+        </p>
+      )}
       {/* Provenance: a report built from cleaned rows must say so where the report starts. */}
       {ai?.cleaningRules?.length > 0 && (
         <p className="mt-3 flex max-w-3xl flex-wrap items-center gap-2 text-[13px] text-ink-soft">

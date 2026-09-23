@@ -369,7 +369,10 @@ function Analyze() {
 
         </AnimatePresence>
       </main>
-      <Footer />
+      {/* No footer on the report. About / Privacy / Terms under a dashboard is a
+          marketing tail on a working screen, and on a short tab it lands halfway
+          up the viewport. Every other route keeps it. */}
+      {step !== "results" && <Footer />}
     </div>
   );
 }

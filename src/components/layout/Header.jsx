@@ -12,7 +12,7 @@ import { useSession } from "../auth/sessionContext.js";
    (px-6 / sm:px-10, OUTSIDE the 1400px box, as the page sections do), so the
    logo sits on the same left edge as the content at every width. */
 /* About is the one link that gives way on a phone: it is also in the footer, and
-   the bar has to fit the wordmark, Methodology and Log in at 375px. */
+   the bar has to fit the wordmark, Methodology and Sign in at 375px. */
 const NAV = [
   { to: "/methodology", label: "Methodology" },
   { to: "/about",       label: "About", wide: true },
@@ -72,7 +72,7 @@ function AccountMenu() {
   const navigate = useNavigate();
   const { user, usage, loading, signIn, signOut, deleteAccount } = useSession();
 
-  // Nothing during the first load, so the bar does not flash "Log in" at someone
+  // Nothing during the first load, so the bar does not flash "Sign in" at someone
   // who is already signed in.
   if (loading) return <div className="h-9 w-20" aria-hidden />;
 
@@ -83,7 +83,7 @@ function AccountMenu() {
         onClick={signIn}
         className="rounded-lg bg-ink px-4 py-2 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
       >
-        Log in
+        Sign in
       </button>
     );
   }

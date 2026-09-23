@@ -381,11 +381,14 @@ function OverviewTab({ result, ai }) {
 
   return (
     <div className="space-y-4">
-      <AiNudgeCard ai={ai} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
         <HealthScoreCard healthScore={healthScore} />
         <ColumnRolesCard meta={meta} />
       </div>
+      {/* Below the score, not above it: the report opens with the report. The
+          notice is framing, and framing that pushes the finding off the first
+          screen has taken the finding's place. */}
+      <AiNudgeCard ai={ai} />
       <DatasetSnapshot snapshot={snapshot} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <InsightsCard insights={insights} />
