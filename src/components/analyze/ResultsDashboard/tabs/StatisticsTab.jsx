@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
@@ -66,13 +66,17 @@ function StatisticsTab({ result }) {
         tab names them. Open a row for its quartiles, shape and outlier fences.
       </p>
 
+      {/* A real table: one <td> per figure, so the header and the values are laid
+          out by the same thing. An earlier pass put a CSS grid inside a colSpan
+          cell and the columns silently drifted one place from their headings —
+          caught by looking at it, which is the only way that one shows up. */}
       <div className="-mx-1 overflow-x-auto px-1">
-        <table className="w-full min-w-[640px] border-collapse text-left">
+        <table className="w-full min-w-[680px] border-collapse text-left">
           <thead>
             <tr className="border-b border-line">
-              <th className="py-2 pr-4 text-[11.5px] font-medium text-ink-faint">Column</th>
+              <th scope="col" className="py-2 pr-4 text-[11.5px] font-medium text-ink-faint">Column</th>
               {COLUMNS.map((c) => (
-                <th key={c.key} className="py-2 pl-4 text-right text-[11.5px] font-medium text-ink-faint">
+                <th key={c.key} scope="col" className="py-2 pl-4 text-right text-[11.5px] font-medium text-ink-faint">
                   {c.label}
                 </th>
               ))}
@@ -82,54 +86,63 @@ function StatisticsTab({ result }) {
           <tbody>
             {statistics.map((s) => {
               const isOpen = open === s.col;
+              const toggle = () => { if (!s.empty) setOpen(isOpen ? null : s.col); };
               return (
-                <tr key={s.col} className="border-b border-line align-top">
-                  <td colSpan={COLUMNS.length + 2} className="p-0">
-                    <button
-                      type="button"
-                      onClick={() => setOpen(isOpen ? null : s.col)}
-                      disabled={s.empty}
-                      aria-expanded={isOpen}
-                      className={`grid w-full grid-cols-[minmax(0,1fr)_repeat(7,minmax(56px,auto))_28px] items-center gap-x-4 py-2.5 text-left transition-colors ${
-                        s.empty ? "cursor-default" : "hover:bg-paper"
-                      } ${isOpen ? "bg-paper" : ""}`}
-                    >
-                      <span className="truncate font-mono text-[12.5px] text-ink">{s.col}</span>
-                      {s.empty
-                        ? <span className="col-span-7 text-right text-[12px] text-ink-faint">no numeric values</span>
-                        : COLUMNS.map((c) => (
-                            <span
-                              key={c.key}
-                              className={`text-right font-mono text-[12.5px] ${
-                                c.key === "outlierCount" && s.outlierCount > 0 ? "text-warning" : "text-ink-soft"
-                              }`}
-                            >
-                              {num(s[c.key])}
-                            </span>
-                          ))}
-                      <ChevronDown
-                        size={14}
-                        className={`justify-self-end text-ink-faint transition-transform ${isOpen ? "rotate-180" : ""} ${s.empty ? "opacity-0" : ""}`}
-                      />
-                    </button>
-
-                    {isOpen && !s.empty && (
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-2 border-t border-line bg-paper px-1 py-3 sm:grid-cols-4">
-                        {detailRows(s).map((row) => (
-                          <div key={row.label} className="flex items-baseline justify-between gap-3">
-                            <span className="text-[12px] text-ink-soft">{row.label}</span>
-                            <span className="font-mono text-[12.5px] text-ink">{num(row.value)}</span>
-                          </div>
+                <Fragment key={s.col}>
+                  <tr
+                    onClick={toggle}
+                    className={`border-b border-line ${s.empty ? "" : "cursor-pointer hover:bg-paper"} ${isOpen ? "bg-paper" : ""}`}
+                  >
+                    <th scope="row" className="max-w-[220px] truncate py-2.5 pr-4 font-mono text-[12.5px] font-normal text-ink">
+                      {s.col}
+                    </th>
+                    {s.empty
+                      ? <td colSpan={COLUMNS.length} className="py-2.5 pl-4 text-right text-[12px] text-ink-faint">no numeric values</td>
+                      : COLUMNS.map((c) => (
+                          <td
+                            key={c.key}
+                            className={`py-2.5 pl-4 text-right font-mono text-[12.5px] ${
+                              c.key === "outlierCount" && s.outlierCount > 0 ? "text-warning" : "text-ink-soft"
+                            }`}
+                          >
+                            {num(s[c.key])}
+                          </td>
                         ))}
-                        {s.isConstant && (
-                          <p className="col-span-2 text-[12px] text-ink-faint sm:col-span-4">
-                            Every value is the same — this column carries no information for a model.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                    <td className="py-2.5 pl-2">
+                      {!s.empty && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggle(); }}
+                          aria-expanded={isOpen}
+                          aria-label={`${isOpen ? "Hide" : "Show"} the rest of ${s.col}`}
+                          className="block rounded-md p-1 text-ink-faint transition-colors hover:text-ink"
+                        >
+                          <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+
+                  {isOpen && !s.empty && (
+                    <tr className="border-b border-line bg-paper">
+                      <td colSpan={COLUMNS.length + 2} className="px-1 py-3">
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 sm:grid-cols-4">
+                          {detailRows(s).map((row) => (
+                            <div key={row.label} className="flex items-baseline justify-between gap-3">
+                              <span className="text-[12px] text-ink-soft">{row.label}</span>
+                              <span className="font-mono text-[12.5px] text-ink">{num(row.value)}</span>
+                            </div>
+                          ))}
+                          {s.isConstant && (
+                            <p className="col-span-2 text-[12px] text-ink-faint sm:col-span-4">
+                              Every value is the same — this column carries no information for a model.
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
