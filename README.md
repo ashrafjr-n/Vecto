@@ -113,8 +113,10 @@ npm install
 npm run dev
 ```
 
-The dev server prints a local URL. No environment variables and no backend service are
-required — the app is fully static.
+The dev server prints a local URL. **The whole local product — upload, analysis, the
+report, the preparation plan and the script export — runs with no backend and no
+account.** Only the optional AI review needs the Worker and a signed-in user; to work on
+that half, see "Accounts and the AI endpoint" below.
 
 ### Scripts
 
@@ -124,7 +126,7 @@ required — the app is fully static.
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve the built output locally |
 | `npm run lint` | Run ESLint over the project |
-| `npm test` | Engine and Worker regression suites (plain Node) |
+| `npm test` | Engine, Worker, account and quota regression suites (plain Node) |
 
 Ad-hoc dataset reports (no npm script — it takes file arguments):
 
@@ -156,6 +158,37 @@ routes such as `/methodology` and `/analyze`. Only `/api/*` requests run the Wor
 everything else is served straight from `dist`. Server-side code lives in `worker/index.js`,
 not in a `functions/` directory, which is a Cloudflare Pages feature and does not run on
 Workers.
+
+### Accounts and the AI endpoint
+
+The AI review is the only part of Vecto behind a sign-in. A free account may run
+**3 AI analyses a month** — one dataset is one analysis however many requests it needs
+internally — and a **global daily budget** caps AI requests across all users, because the
+upstream free tier is account-wide. Both limits are enforced in the Worker; what the page
+shows is informational.
+
+Sign-in is GitHub OAuth in a **popup**: the parsed dataset and the built report live in
+the page's memory, and a full-page redirect would destroy them.
+
+One-time setup:
+
+```bash
+# 1. Two GitHub OAuth apps (one callback URL each):
+#      prod  https://<your-worker>.workers.dev/api/auth/callback
+#      dev   http://localhost:3001/api/auth/callback
+# 2. The database, then the schema, locally and remotely:
+npx wrangler d1 create vecto-db          # paste database_id into wrangler.jsonc
+npx wrangler d1 execute vecto-db --local  --file=migrations/0001_init.sql
+npx wrangler d1 execute vecto-db --remote --file=migrations/0001_init.sql
+# 3. Production secrets:
+npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler secret put EVAL_TOKEN
+# 4. Locally: cp .dev.vars.example .dev.vars and fill it in.
+```
+
+`GITHUB_CLIENT_ID`, `ALLOWED_ORIGINS`, `FREE_ANALYSES_PER_MONTH` and `DAILY_AI_BUDGET`
+are plain vars in `wrangler.jsonc`. `GITHUB_CLIENT_SECRET`, `EVAL_TOKEN` and
+`OPENROUTER_API_KEY` are Worker **secrets** and never appear in the repo or the bundle.
 
 ### AI endpoint
 
@@ -277,6 +310,14 @@ Run `npm test` after any change under `src/components/utils/core/`.
 ## Project structure
 
 ```text
+worker/
+  index.js                    /api/ai + the route table; the session/quota gate
+  auth.js                     GitHub OAuth, sessions, logout, account deletion
+  usage.js                    free-analysis metering and the global daily budget
+  http.js                     JSON replies, cookies, origin check, random tokens
+migrations/
+  0001_init.sql               users, sessions, analyses, budget
+
 src/
   App.jsx                     routes: / (upload), /analyze (target → processing → results),
                               /methodology, /about, /privacy, /terms, and a 404 for the rest
@@ -306,6 +347,9 @@ src/
     layout/Footer.jsx         page links and the repository
     layout/DocPage.jsx        the legal-page frame: title, lead, sticky "On this page"
     layout/ReferencePage.jsx  the frame for /methodology and /about: masthead, colophon
+    auth/                     SessionProvider + the context read by the header and the
+                              AI panels; sign-in is a popup, never a redirect
+    analyze/shared/AiGate.jsx sign in / out of quota / the panel's own button
     common/SpecRows.jsx       the label/definition ledger both reference pages use
     common/                   shared primitives (ErrorBoundary, SectionLabel)
     analyze/
@@ -325,7 +369,12 @@ src/
       intelligence/           insights and recommendations
       helpers.js              shared numeric utilities
 tests/                        engine regression suite, output-shape contract, Worker tests
-worker/index.js               Cloudflare Worker entry: POST /api/ai (OpenRouter proxy)
+worker/index.js               Cloudflare Worker entry: the route table, /api/ai and
+                              its gate (origin -> session -> budget -> quota)
+worker/auth.js                GitHub OAuth, sessions, logout, account deletion
+worker/usage.js               free-analysis metering and the global daily AI budget
+worker/http.js                JSON replies, cookies, origin check, random tokens
+migrations/0001_init.sql      users, sessions, analyses, budget
 worker/leakagePrompt.js       the leakage-review prompt
 worker/reviewPrompt.js        the column-review prompt (dossier + cleaning in one request)
 tools/ai-eval.mjs, ai-eval/   AI evals over the test corpus, known answers, scoring
