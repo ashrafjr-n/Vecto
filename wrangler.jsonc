@@ -12,7 +12,32 @@
     // Only API routes reach the script; everything else is served as an asset.
     "run_worker_first": ["/api/*"]
   },
+  // Accounts, sessions and AI usage (migrations/0001_init.sql). Created with
+  // `npx wrangler d1 create vecto-db` — paste the id it prints into database_id.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vecto-db",
+      "database_id": "PASTE_DATABASE_ID_FROM_WRANGLER_D1_CREATE"
+    }
+  ],
   "vars": {
+    // Public by design — the client id is not a secret. GITHUB_CLIENT_SECRET and
+    // EVAL_TOKEN are Worker SECRETS and never appear in this file.
+    "GITHUB_CLIENT_ID": "PASTE_GITHUB_OAUTH_CLIENT_ID",
+
+    // Every origin this deployment answers to. The browser sends Origin on any
+    // POST, so this is the CSRF guard beside the SameSite=Lax cookie. In dev,
+    // .dev.vars overrides it with http://localhost:3001.
+    "ALLOWED_ORIGINS": "https://vecto.aannaelj.workers.dev",
+
+    // Free tier: 3 ANALYSES per user per month (one dataset = one analysis, however
+    // many AI requests it needs), and 30 AI requests a day across all users — the
+    // global figure is what actually bounds the upstream quota of 50/day, leaving
+    // ~20 for the owner's eval runs.
+    "FREE_ANALYSES_PER_MONTH": "3",
+    "DAILY_AI_BUDGET": "30",
+
     // Tried in order by OpenRouter's `models` fallback. Each is the free variant of a
     // paid model, so dropping ":free" later changes billing, not behaviour.
     // Empty string = AI switched off (the endpoint answers 503 ai_disabled).

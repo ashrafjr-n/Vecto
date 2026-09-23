@@ -1,19 +1,29 @@
 /* Vecto's Worker entry. Static files are served by the ASSETS binding without
    running this script — wrangler.jsonc's run_worker_first sends only /api/* here.
 
-   POST /api/ai  { task, payload }  →  200 { task, model, result, retried? }
-                                    →  4xx/5xx { error, message?, retried? }
+   POST /api/ai  { task, payload, analysisId }  →  200 { task, model, result, usage?, retried? }
+                                                →  4xx/5xx { error, message?, retried? }
    `retried: true` only when a provider failed inside a 200 and the one retry ran.
+
+   GET  /api/auth/github    GET /api/auth/callback   GET  /api/auth/me
+   POST /api/auth/logout    POST /api/auth/delete                  (worker/auth.js)
 
    The client names a TASK and never sends a prompt. If it could, this endpoint
    would be a general-purpose LLM proxy on the account's quota for anyone who finds
-   the URL. Every prompt, schema and token limit lives in TASKS below. */
+   the URL. Every prompt, schema and token limit lives in TASKS below.
+
+   The LOCAL analysis needs none of this: the engine runs in the browser and the
+   report, the preparation plan and the script export never touch the Worker. Only
+   the AI layer is behind a session. */
 
 import { DOSSIER_MAX_COLUMNS } from "../src/lib/ai/dossierSchema.js";
 import { LEAKAGE_SCHEMA, LEAKAGE_MAX_COLUMNS } from "../src/lib/ai/leakageSchema.js";
 import { leakageMessages } from "./leakagePrompt.js";
 import { REVIEW_SCHEMA } from "../src/lib/ai/reviewSchema.js";
 import { reviewMessages } from "./reviewPrompt.js";
+import { json, originAllowed } from "./http.js";
+import * as auth from "./auth.js";
+import { checkQuota, recordUsage, recordBudget, budgetAvailable, usageFor, validAnalysisId } from "./usage.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BODY_CHARS = 256_000;
@@ -74,19 +84,55 @@ const TASKS = {
   },
 };
 
-const json = (body, status = 200) => Response.json(body, { status });
+const ROUTES = {
+  "GET /api/auth/github":   auth.startOAuth,
+  "GET /api/auth/callback": auth.oauthCallback,
+  "GET /api/auth/me":       auth.me,
+  "POST /api/auth/logout":  auth.logout,
+  "POST /api/auth/delete":  auth.deleteAccount,
+  "POST /api/ai":           handleAi,
+};
 
 export default {
   async fetch(request, env) {
-    if (new URL(request.url).pathname !== "/api/ai") return json({ error: "not_found" }, 404);
-    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-    return handleAi(request, env);
+    const { pathname } = new URL(request.url);
+    // hasOwn for the same reason TASKS uses it: "constructor" must not resolve.
+    const key = `${request.method} ${pathname}`;
+    if (Object.hasOwn(ROUTES, key)) return ROUTES[key](request, env);
+    // A known path with the wrong verb is 405, an unknown path is 404.
+    const known = Object.keys(ROUTES).some((r) => r.endsWith(` ${pathname}`));
+    return json({ error: known ? "method_not_allowed" : "not_found" }, known ? 405 : 404);
   },
 };
+
+/* The eval harness (tools/ai-eval.mjs) and the Worker tests drive this endpoint
+   directly, with no browser, no cookie and no Origin header. They present
+   EVAL_TOKEN instead, which is a Worker SECRET read from env — it is never
+   imported by anything under src/, so it cannot reach the client bundle.
+   Eval traffic skips the session, the origin check and the per-user quota, but
+   still records into the global budget so that counter matches reality. */
+const isEvalRequest = (request, env) =>
+  Boolean(env.EVAL_TOKEN) && request.headers.get("Authorization") === `Bearer ${env.EVAL_TOKEN}`;
 
 async function handleAi(request, env) {
   const models = (env.AI_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
   if (!env.OPENROUTER_API_KEY || models.length === 0) return json({ error: "ai_disabled" }, 503);
+
+  /* Order matters: the eval bypass is checked before the origin, because a Node
+     client sends no Origin at all and would otherwise be rejected here. */
+  const fromEval = isEvalRequest(request, env);
+  let user = null;
+
+  if (!fromEval) {
+    if (!originAllowed(request, env)) return json({ error: "bad_origin" }, 403);
+
+    user = await auth.sessionUser(env, request);
+    if (!user) return json({ error: "unauthenticated" }, 401);
+
+    /* The global guard, before the per-user one: the upstream account quota is
+       shared by everyone, so this is the limit that actually bounds the bill. */
+    if (!(await budgetAvailable(env))) return json({ error: "budget_exhausted" }, 503);
+  }
 
   const text = await request.text();
   if (text.length > MAX_BODY_CHARS) return json({ error: "payload_too_large" }, 413);
@@ -102,6 +148,18 @@ async function handleAi(request, env) {
   if (typeof name !== "string" || !Object.hasOwn(TASKS, name)) return json({ error: "unknown_task" }, 400);
   const task = TASKS[name];
   if (task.validate && !task.validate(body.payload)) return json({ error: "invalid_payload" }, 400);
+
+  /* One analysis id per dataset. Every request carrying an id this user has
+     already paid for is free (up to a ceiling no real file reaches), so a wide
+     file sent in six parts still costs one of the three monthly analyses. */
+  const analysisId = body?.analysisId;
+  if (!fromEval) {
+    if (!validAnalysisId(analysisId)) return json({ error: "invalid_analysis_id" }, 400);
+    const allowed = await checkQuota(env, user.id, analysisId);
+    if (!allowed.ok) {
+      return json({ error: allowed.error, usage: await usageFor(env, user.id) }, allowed.status);
+    }
+  }
 
   const messages = task.messages(body.payload);
   /* A provider failing inside a 200 ends the request for OpenRouter, so its `models`
@@ -137,7 +195,24 @@ async function handleAi(request, env) {
     if (parsed.error) return json({ error: "invalid_json", message: parsed.error, ...(retried && { retried }) }, 502);
   }
 
-  return json({ task: name, model: reply.model, result: parsed.value, ...(retried && { retried }) });
+  /* Charged only here, on a successful answer. A provider failure costs nothing
+     upstream and must never cost a user one of their three analyses. */
+  let usage;
+  if (env.DB) {
+    if (fromEval) await recordBudget(env);
+    else {
+      await recordUsage(env, user.id, analysisId);
+      usage = await usageFor(env, user.id);
+    }
+  }
+
+  return json({
+    task: name,
+    model: reply.model,
+    result: parsed.value,
+    ...(usage && { usage }),        // lets the page update its counter without a second call
+    ...(retried && { retried }),
+  });
 }
 
 async function complete(apiKey, models, name, task, messages) {
