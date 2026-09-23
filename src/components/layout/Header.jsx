@@ -107,7 +107,7 @@ function AccountMenu() {
       <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-line bg-paper-sunken p-3 shadow-lg">
         <p className="px-1 text-[12.5px] leading-relaxed text-ink-soft">
           {usage
-            ? <>{Math.max(0, usage.limit - usage.used)} of {usage.limit} AI analyses left this month. Resets {usage.resets}.</>
+            ? <>{Math.max(0, usage.limit - usage.used)} of {usage.limit} deeper reviews left today. Resets {usage.resets}.</>
             : "Signed in."}
         </p>
         <div className="mt-3 border-t border-line pt-2">

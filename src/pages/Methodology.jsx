@@ -73,7 +73,7 @@ function Methodology() {
       <section id="ai" className="scroll-mt-24 pt-20">
         <div className="grid gap-x-16 gap-y-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-end">
           <h2 className="max-w-[16ch] text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[2rem]">
-            The AI review, measured
+            The deeper review, measured
           </h2>
           <p className="text-[14px] leading-[1.75] text-ink-soft">
             Scored against answers written before the files were ever sent, on files the

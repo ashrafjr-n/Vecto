@@ -56,7 +56,7 @@ const TALKING_POINTS = [
   },
   {
     title: "Your file stays in the browser",
-    text: "Parsing and every computation run in this tab, and the file is never uploaded. The optional AI review sends column summaries only, and only when you ask for it.",
+    text: "Parsing and every computation run in this tab, and the file is never uploaded. The optional deeper review sends column summaries only, and only when you ask for it.",
   },
   {
     title: "Every number comes with its reason",
@@ -448,7 +448,7 @@ function Home() {
               </p>
               <p className="max-w-2xl text-[16px] leading-[1.7] text-ink-soft">
                 The analysis runs in this tab and your file is never uploaded. An optional
-                AI review sends column summaries — never rows — and only when you ask.
+                deeper review sends column summaries — never rows — and only when you ask.
               </p>
             </div>
 

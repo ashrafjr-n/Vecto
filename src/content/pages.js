@@ -69,7 +69,7 @@ export const PRIVACY = {
     },
     {
       id: "ai",
-      title: "The optional AI review",
+      title: "The optional deeper review",
       body: [
         "Nothing is sent to a language model until you press a review button. When you do, Vecto's server (a Cloudflare Worker, which does not store the request) forwards a summary of the file to OpenRouter, which passes it to a model provider. The request never contains rows.",
         { list: [
@@ -105,7 +105,7 @@ export const PRIVACY = {
       id: "accounts",
       title: "Accounts",
       body: [
-        "An account is needed only to use the AI review. Uploading a file, the analysis, the report, the preparation plan and the script export need no account and are not affected by signing in.",
+        "An account is needed only to use the deeper review. Uploading a file, the analysis, the report, the preparation plan and the script export need no account and are not affected by signing in.",
         "Signing in is done through GitHub. Vecto asks GitHub for no permissions beyond your public profile, and stores only:",
         { list: [
           "your GitHub numeric id, username and avatar image address — no email address is requested or stored",
@@ -113,7 +113,7 @@ export const PRIVACY = {
           "one row per AI analysis you run: an identifier the browser generated for that dataset, the month, and how many AI requests it needed — never the file, its column names or anything from the report",
         ] },
         "The sign-in cookie holds a random value and nothing else — no name, no identifier. It is marked HttpOnly, so no script on the page can read it, and Secure, so it is never sent over an unencrypted connection. The token GitHub issues during sign-in is used once to read your profile and is not stored.",
-        "Free accounts may run 3 AI analyses a month. The count exists to keep the shared AI budget from being spent by one visitor; it is enforced on the server.",
+        "An account may run 3 deeper reviews a day. The count exists to keep a shared, limited budget from being spent by one visitor; it is enforced on the server.",
         "Deleting your account removes your user row, every session and your whole usage history immediately and permanently. The button is in the account menu in the site header.",
       ],
     },
@@ -146,10 +146,10 @@ export const TERMS = {
     },
     {
       id: "accounts",
-      title: "Accounts and the AI review",
+      title: "Accounts and the deeper review",
       body: [
-        "The optional AI review needs an account, which is created by signing in with GitHub. You are responsible for what happens under your account, and you should not share access to it.",
-        "A free account may run 3 AI analyses a month. One dataset counts as one analysis however many requests it needs internally. The limit protects a shared, limited AI budget: it may change, and the AI review may be unavailable at times for the same reason.",
+        "The optional deeper review needs an account, which is created by signing in with GitHub. You are responsible for what happens under your account, and you should not share access to it.",
+        "An account may run 3 deeper reviews a day. One dataset counts as one review however many requests it needs internally. The limit protects a shared, limited budget for the model behind it: it may change, and the deeper review may be unavailable at times for the same reason.",
         "You can delete your account at any time from the account menu, which removes your sign-in and your usage history immediately. Accounts may be suspended for attempts to work around the limits or to abuse the endpoint.",
       ],
     },
@@ -157,7 +157,7 @@ export const TERMS = {
       id: "data",
       title: "Your data",
       body: [
-        "Your file stays in your browser (see Privacy). You are responsible for what you choose to send through the optional AI review.",
+        "Your file stays in your browser (see Privacy). You are responsible for what you choose to send through the optional deeper review.",
       ],
     },
     {

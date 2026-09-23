@@ -16,7 +16,7 @@ export const METHODOLOGY_FACTS = [
 export const METHODOLOGY_INTRO = {
   headline: "How Vecto reads a dataset.",
   lead: [
-    "Every figure in a Vecto report comes from a deterministic JavaScript engine that runs in your browser tab. No model computes any of it and no server is behind it — the same file and the same target produce the same report, every time. An optional AI assistant can suggest what columns mean, which columns leak the target and how dirty values should be cleaned; everything it says is labelled, checked against the file, and changes the report only when you accept it.",
+    "Every figure in a Vecto report comes from a deterministic JavaScript engine that runs in your browser tab. No model computes any of it and no server is behind it — the same file and the same target produce the same report, every time. An optional deeper review, answered by a language model, can suggest what columns mean, which columns leak the target and how dirty values should be cleaned; everything it says is labelled, checked against the file, and changes the report only when you accept it.",
     "This page documents that engine: the order it works in, the rule behind each decision, the thresholds it uses, and — just as important — what it cannot decide and hands back to you.",
   ],
 };
@@ -170,11 +170,11 @@ export const PRINCIPLES = [
   },
   {
     title: "Deterministic and local",
-    text: "Parsing and analysis run in this browser tab, in a background worker. No file is uploaded — the optional AI assistant sends only summaries of the file, never its rows, and never before you have asked for it once; after that, the leakage review of a new report runs by itself. Sampling is deterministic, so the same file and target always produce the same report.",
+    text: "Parsing and analysis run in this browser tab, in a background worker. No file is uploaded — the optional deeper review sends only summaries of the file, never its rows, and never before you have asked for it once; after that, the leakage review of a new report runs by itself. Sampling is deterministic, so the same file and target always produce the same report.",
   },
 ];
 
-/* How well the optional AI assistant actually does, measured. Every figure here is
+/* How well the optional deeper review actually does, measured. Every figure here is
    from vecto-plan items 19 (validation and test sets, expectations committed before
    any request), 40 (the final test set, same rules) and 17 (the owner's blind labels) — NOT from the corpus the prompts
    were tuned on, which scores higher and would flatter the assistant. Update these
