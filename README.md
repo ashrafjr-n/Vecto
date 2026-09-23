@@ -115,8 +115,9 @@ npm run dev
 
 The dev server prints a local URL. **The whole local product — upload, analysis, the
 report, the preparation plan and the script export — runs with no backend and no
-account.** Only the optional AI review needs the Worker and a signed-in user; to work on
-that half, see "Accounts and the AI endpoint" below.
+account.** Only the optional deeper review (column review, leakage review, cleaning
+proposals) needs the Worker and a signed-in user; to work on that half, see "Accounts and
+the AI endpoint" below.
 
 ### Scripts
 
@@ -161,11 +162,13 @@ Workers.
 
 ### Accounts and the AI endpoint
 
-The AI review is the only part of Vecto behind a sign-in. A free account may run
-**3 AI analyses a month** — one dataset is one analysis however many requests it needs
-internally — and a **global daily budget** caps AI requests across all users, because the
-upstream free tier is account-wide. Both limits are enforced in the Worker; what the page
-shows is informational.
+The deeper review is the only part of Vecto behind a sign-in. A free account may run
+**3 analyses a day** — one dataset is one analysis however many requests it needs
+internally — behind a per-user **monthly ceiling**, and a **global daily budget** caps
+requests across all users, because the upstream free tier is account-wide. Every limit is
+enforced in the Worker; what the page shows is informational. A signed-in user's own runs
+are listed at `/history`, as counts and dates only — no file, filename, schema or target
+is stored.
 
 Sign-in is GitHub OAuth in a **popup**: the parsed dataset and the built report live in
 the page's memory, and a full-page redirect would destroy them.
@@ -180,13 +183,16 @@ One-time setup:
 npx wrangler d1 create vecto-db          # paste database_id into wrangler.jsonc
 npx wrangler d1 execute vecto-db --local  --file=migrations/0001_init.sql
 npx wrangler d1 execute vecto-db --remote --file=migrations/0001_init.sql
+npx wrangler d1 execute vecto-db --local  --file=migrations/0002_history.sql
+npx wrangler d1 execute vecto-db --remote --file=migrations/0002_history.sql
 # 3. Production secrets:
 npx wrangler secret put GITHUB_CLIENT_SECRET
 npx wrangler secret put EVAL_TOKEN
 # 4. Locally: cp .dev.vars.example .dev.vars and fill it in.
 ```
 
-`GITHUB_CLIENT_ID`, `ALLOWED_ORIGINS`, `FREE_ANALYSES_PER_MONTH` and `DAILY_AI_BUDGET`
+`GITHUB_CLIENT_ID`, `ALLOWED_ORIGINS`, `FREE_ANALYSES_PER_DAY`, `MONTHLY_ANALYSIS_CEILING`
+and `DAILY_AI_BUDGET`
 are plain vars in `wrangler.jsonc`. `GITHUB_CLIENT_SECRET`, `EVAL_TOKEN` and
 `OPENROUTER_API_KEY` are Worker **secrets** and never appear in the repo or the bundle.
 
@@ -317,10 +323,12 @@ worker/
   http.js                     JSON replies, cookies, origin check, random tokens
 migrations/
   0001_init.sql               users, sessions, analyses, budget
+  0002_history.sql            row and column counts on `analyses`, for /history
 
 src/
-  App.jsx                     routes: / (upload), /analyze (target → processing → results),
-                              /methodology, /about, /privacy, /terms, and a 404 for the rest
+  App.jsx                     routes: / (upload), /analyze (processing → report, with the
+                              target picker reachable from it), /history, /methodology,
+                              /about, /privacy, /terms, and a 404 for the rest
   lib/
     datasetHandoff.js         Home -> Analyze handoff (module singleton, not router state)
     csvIntake.js              upload rules: size/format, encoding, ragged rows, headerless files
@@ -336,7 +344,10 @@ src/
     pages.js                  copy for /about (its own shape) and for /privacy, /terms
   pages/
     Home.jsx                  intro + the functional CSV dropzone
-    Analyze.jsx                3-step machine: Target → Processing → Results
+    Analyze.jsx               a dropped file starts analysing on mount; steps are
+                              processing → results, with target → back to results when
+                              the report's "Change target" opens the picker
+    History.jsx               a signed-in account's past analyses: counts and dates only
     Methodology.jsx           engine stages as a spec sheet: contents, sticky stage
                               headers, rules, measured AI accuracy, limits
     About.jsx                 what the tool does, set against what it is not
@@ -395,7 +406,7 @@ chunk only once an analysis finishes.
 
 CSV parsing and every statistic are computed client-side in JavaScript; the file is never
 uploaded. Three things do leave the browser, all listed on the in-app `/privacy` page:
-the optional AI review (column summaries, never rows, sent through the Worker to
+the optional deeper review (column summaries, never rows, sent through the Worker to
 OpenRouter, and only after the user asks), Google Analytics page views, and ordinary
 requests to the host and to Google Fonts. The only browser storage is the AI answer
 cache in `localStorage`.

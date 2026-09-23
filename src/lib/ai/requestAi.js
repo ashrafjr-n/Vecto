@@ -21,7 +21,7 @@ const MESSAGES = {
   payload_too_large: "This dataset's profile is too large to send in one request.",
   /* The account gate. `unauthenticated` is not an error the user caused — the
      panels turn it into a sign-in button rather than printing it. */
-  unauthenticated:   "Sign in to run the AI review. The rest of the report needs no account.",
+  unauthenticated:   "Sign in to run the deeper review. The rest of the report needs no account.",
   quota_exhausted:   "You have used today's deeper reviews. More become available tomorrow — everything else in the report still works.",
   monthly_ceiling:   "You have reached this month's limit for deeper reviews. Everything else in the report still works.",
   budget_exhausted:  "Vecto's shared AI budget for today is spent. Nothing else is affected — try again tomorrow.",
