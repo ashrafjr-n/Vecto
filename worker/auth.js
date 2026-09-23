@@ -70,7 +70,9 @@ export async function sessionUser(env, request) {
 /* ── routes ─────────────────────────────────────────────────────────────── */
 
 export async function startOAuth(request, env) {
-  if (!configured(env)) return json({ error: "auth_disabled" }, 503);
+  /* Shown IN the popup, so it has to be a page that closes itself — a JSON body
+     here would leave the user looking at raw text in a window that never shuts. */
+  if (!configured(env)) return popupPage("Sign-in is not configured on this deployment.");
 
   const state = randomToken();
   const url = new URL(GITHUB_AUTHORIZE);
@@ -91,7 +93,7 @@ export async function startOAuth(request, env) {
 }
 
 export async function oauthCallback(request, env) {
-  if (!configured(env)) return popupPage("Sign-in is not configured on this deployment.", null);
+  if (!configured(env)) return popupPage("Sign-in is not configured on this deployment.");
 
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -102,14 +104,14 @@ export async function oauthCallback(request, env) {
      callback URL carrying the ATTACKER's code and silently log the victim into
      the attacker's account. The value must match the one this browser was given. */
   if (!code || !state || !expected || state !== expected) {
-    return popupPage("Sign-in could not be verified. Please try again.", env, request);
+    return popupPage("Sign-in could not be verified. Please try again.");
   }
 
   const token = await exchangeCode(env, code, `${selfOrigin(request, env)}/api/auth/callback`);
-  if (!token) return popupPage("GitHub did not complete the sign-in.", env, request);
+  if (!token) return popupPage("GitHub did not complete the sign-in.");
 
   const profile = await githubUser(token);
-  if (!profile?.id) return popupPage("GitHub did not return a profile.", env, request);
+  if (!profile?.id) return popupPage("GitHub did not return a profile.");
 
   const user = await upsertUser(env, profile);
   const session = await createSession(env, user.id);
@@ -118,7 +120,7 @@ export async function oauthCallback(request, env) {
   await env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND expires_at <= ?")
     .bind(user.id, Date.now()).run();
 
-  return popupPage(null, env, request, [
+  return popupPage(null, [
     clearCookie(STATE_COOKIE, "/api/auth"),
     cookie(SESSION_COOKIE, session, SESSION_DAYS * 86_400),
   ]);
@@ -208,14 +210,20 @@ async function upsertUser(env, profile) {
    (someone pasted the URL), it falls back to sending them to the app. No user
    input is interpolated — the only variable is our own origin and a fixed
    message string, so there is nothing here to escape. */
-function popupPage(error, env, request, cookies = []) {
-  const origin = env && request ? selfOrigin(request, env) : "";
+function popupPage(error, cookies = []) {
+  /* The target origin is read in the PAGE, not computed on the server. This page
+     is always served from the app's own origin — the popup navigated to
+     /api/auth/callback there and GitHub redirected back to it — so
+     location.origin is right by construction, while a server-side guess can be
+     wrong: behind the Vite dev proxy the Worker sees 127.0.0.1:8787, and an empty
+     or foreign targetOrigin makes postMessage THROW, leaving the popup open
+     forever with the opener still waiting. */
   const body = `<!doctype html><meta charset="utf-8"><title>Vecto</title>
 <body style="background:#08090C;color:#F2F3F5;font:14px system-ui;padding:24px">
 ${error ? error.replace(/[<>&]/g, "") : "Signed in. You can close this window."}
 <script>
   var payload = { source: "vecto-auth", ok: ${error ? "false" : "true"} };
-  if (window.opener) { window.opener.postMessage(payload, ${JSON.stringify(origin)}); window.close(); }
+  if (window.opener) { window.opener.postMessage(payload, window.location.origin); window.close(); }
   else { location.replace("/"); }
 </script>`;
 
