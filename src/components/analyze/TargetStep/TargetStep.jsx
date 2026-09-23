@@ -144,7 +144,30 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
           </p>
         )}
 
-        <div className="mt-8 rounded-2xl border border-line bg-paper-sunken p-5 sm:p-6">
+        {/* The AI column review sits ABOVE the picker and its Start analysis button
+            on purpose (2026-09-23): it used to render below both, so a user could
+            click through to the report without ever scrolling far enough to learn
+            AI review exists. Moving it here costs nothing — Start analysis reads
+            `effectiveTarget`, computed above regardless of where either panel is
+            drawn — and it fixes the actual bug, rather than gating anything. */}
+        <AiDossier
+          data={csvData}
+          columns={columns}
+          roles={colTypes}
+          dossier={dossier}
+          onDossier={onDossier}
+          overrides={roleOverrides}
+          onOverridesChange={onRoleOverridesChange}
+          currentTarget={effectiveTarget}
+          onUseTarget={pickTarget}
+          cleaning={cleaning}
+          onCleaning={onCleaning}
+          acceptedRules={acceptedRules}
+          onAcceptedRulesChange={onAcceptedRulesChange}
+          onOptIn={onOptIn}
+        />
+
+        <div className="mt-6 rounded-2xl border border-line bg-paper-sunken p-5 sm:p-6">
 
           {/* Segmented control. The active segment wears the accent wash rather
               than a raised `bg-paper` tile: on a dark surface the page color
@@ -205,23 +228,6 @@ function TargetStep({ columns, csvData, encoding, initialTarget, onConfirm, onBa
             </button>
           </div>
         </div>
-
-        <AiDossier
-          data={csvData}
-          columns={columns}
-          roles={colTypes}
-          dossier={dossier}
-          onDossier={onDossier}
-          overrides={roleOverrides}
-          onOverridesChange={onRoleOverridesChange}
-          currentTarget={effectiveTarget}
-          onUseTarget={pickTarget}
-          cleaning={cleaning}
-          onCleaning={onCleaning}
-          acceptedRules={acceptedRules}
-          onAcceptedRulesChange={onAcceptedRulesChange}
-          onOptIn={onOptIn}
-        />
 
         <div className="mt-6 rounded-2xl border border-line bg-paper-sunken p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
