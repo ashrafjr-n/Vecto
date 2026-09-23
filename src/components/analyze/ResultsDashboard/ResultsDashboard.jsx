@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { SlidersHorizontal } from "lucide-react";
 
 import OverviewTab       from "./tabs/OverviewTab.jsx";
@@ -23,13 +23,11 @@ const BASE_TABS = [
   { id: "preparation",    label: "Preparation",   requiresTarget: true },
 ];
 
-/* The identity bar's height, and how far the rail travels when it hides. Measured
-   in the browser at `lg` (2026-09-23), not guessed: the bar is 162px, the site
-   header above it 64. A fixed number rather than a ref and a resize listener — the
-   bar's two rows are fixed height by design, and this is a layout offset, not a
-   measurement anyone reads. `SECTION_RAIL_TOP` (14.25rem = 228px) must stay
-   BAR_HEIGHT + 64, or the rail and the bar overlap when the bar is shown. */
-const BAR_HEIGHT = 164;
+/* The rail sits below the identity bar, at `top-[14.25rem]` = 228px = the bar's
+   measured 164px plus the 64px site header. Measured in the browser at `lg`
+   (2026-09-23), not guessed, and a fixed offset rather than a ref and a resize
+   listener: the bar's two rows are fixed height by design. Change the bar's
+   contents and that offset has to be re-measured, or the rail slides under it. */
 
 /* The eight sections, drawn as a vertical rail on `lg` and as a scrolling row
    inside the bar below it. One component, two placements: the list, its states and
@@ -72,24 +70,6 @@ function SectionNav({ tabs, activeTab, onSelect, vertical }) {
 
 function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
   const [activeTab, setActiveTab] = useState("overview");
-  /* The identity bar gets out of the way going down and comes back coming up —
-     the pattern every dashboard uses, because the target and the six figures are
-     what you check between sections, not what you read continuously. Reading is
-     downward, so downward is when the screen is worth more than the bar.
-
-     A motion value, not a scroll effect of our own: framer-motion already owns the
-     listener and its cleanup. `animate` (not a motion-value style) because
-     framer-motion 12 freezes motion-value opacity at its mount value — transforms
-     driven by `animate` are unaffected, and this one is measured working. */
-  const [barHidden, setBarHidden] = useState(false);
-  const { scrollY } = useScroll();
-  useMotionValueEvent(scrollY, "change", (y) => {
-    const previous = scrollY.getPrevious() ?? 0;
-    // Past the bar's own height only, or a short page would flicker at the top.
-    if (y > previous && y > BAR_HEIGHT + 64) setBarHidden(true);
-    else if (y < previous) setBarHidden(false);
-  });
-
   if (!result) return null;
 
   const { meta, quality, healthScore } = result;
@@ -135,14 +115,12 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
     <div className="mx-auto max-w-[1400px] px-6 pb-24 sm:px-10">
 
       {/* ── THE IDENTITY BAR — which report this is, and the two things you can do
-          to it. Pinned under the site header, and it slides up out of the way when
-          the reader is moving down the page. Below `lg` it also carries the section
-          list, because there is no room for a rail on a phone. ── */}
-      <motion.div
-        animate={{ y: barHidden ? -(BAR_HEIGHT + 64) : 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-        className="sticky top-16 z-30 -mx-6 border-b border-line bg-paper/95 px-6 pb-2 backdrop-blur sm:-mx-10 sm:px-10 lg:pb-3"
-      >
+          to it. Pinned under the site header and STAYING there at every scroll
+          position (the owner's call, 2026-09-23: it briefly slid away on scroll
+          down, and a target and a row count that come and go are worse than the
+          space they cost). Below `lg` it also carries the section list, because
+          there is no room for a rail on a phone. ── */}
+      <div className="sticky top-16 z-30 -mx-6 border-b border-line bg-paper/95 px-6 pb-2 backdrop-blur sm:-mx-10 sm:px-10 lg:pb-3">
 
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 pt-3 sm:pt-5">
           <div className="min-w-0">
@@ -204,7 +182,7 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
         <div className="mt-1.5 lg:hidden">
           <SectionNav tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} />
         </div>
-      </motion.div>
+      </div>
 
       {/* A defect in the target is a problem with the whole report, so it is stated
           on every section. The descriptive sentence is not: it said the same thing
@@ -231,17 +209,11 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
 
       <div className="mt-6 flex gap-8 lg:gap-10">
 
-        {/* The rail. It travels with the bar so the two never overlap and no space
-            is left behind when the bar goes: sticky under the bar when it is there,
-            sticky under the site header when it is not. */}
-        <motion.aside
-          animate={{ y: barHidden ? -BAR_HEIGHT : 0 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
-          className="sticky top-[14.25rem] hidden w-[188px] shrink-0 self-start lg:block"
-        >
+        {/* The rail, pinned just below the bar — see the offset note at the top. */}
+        <aside className="sticky top-[14.25rem] hidden w-[188px] shrink-0 self-start lg:block">
           <p className="px-3 pb-2 text-[11px] uppercase tracking-[0.08em] text-ink-faint">Sections</p>
           <SectionNav tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} vertical />
-        </motion.aside>
+        </aside>
 
         <div className="min-w-0 flex-1">
           <AnimatePresence mode="wait">
