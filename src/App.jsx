@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import ErrorBoundary from "./components/common/ErrorBoundary.jsx";
+import { SessionProvider } from "./components/auth/SessionProvider.jsx";
 import { PRIVACY, TERMS } from "./content/pages.js";
 
 /* Route-level code splitting: the landing page, the analyzer (PapaParse + the whole
@@ -21,6 +22,9 @@ function RouteFallback() {
 function App() {
   return (
     <BrowserRouter>
+      {/* Who is signed in and how much free AI is left — read by the header and the
+          AI panels. Inside the router because signing in never navigates. */}
+      <SessionProvider>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/"        element={<Home />} />
@@ -43,6 +47,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      </SessionProvider>
     </BrowserRouter>
   );
 }
