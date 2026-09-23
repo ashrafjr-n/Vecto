@@ -154,8 +154,6 @@ function Analyze() {
   const runRef = useRef(null);
   // The same, for the leakage request, which outlives the click that started it.
   const leakRunRef = useRef(null);
-  // Set the instant the first automatic run is kicked off — see the effect below.
-  const autoStartedRef = useRef(false);
 
   /* STILL exactly one effect, and it still does not watch `step` — that pattern
      stays forbidden (see CLAUDE.md). It does two things, both of which are
@@ -170,14 +168,14 @@ function Analyze() {
      2. On unmount, abort whatever is running, so leaving mid-analysis does not
         leave the worker computing a report nobody will see.
 
-     The ref guard is load-bearing: React 19 StrictMode runs this effect twice in
-     dev, and without it a dropped file would start two analyses. It cannot be a
-     `runRef` check — the dev cleanup aborts that controller but leaves it set. */
+     There is deliberately NO "have I started already" ref. React 19 StrictMode
+     mounts, cleans up and mounts again in dev, so a guard like that leaves the
+     run its own cleanup just aborted and nothing restarts it — the spinner then
+     turns for ever, in dev only. Start-on-mount / abort-on-cleanup is the pair
+     that survives both: the second mount starts a fresh run, and the aborted
+     first one returns at its own `run.signal.aborted` check. */
   useEffect(() => {
-    if (entry?.step === "target" && !autoStartedRef.current) {
-      autoStartedRef.current = true;
-      startAnalysis(entry.target, []);
-    }
+    if (entry?.step === "target") startAnalysis(entry.target, []);
     return () => { runRef.current?.abort(); leakRunRef.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
