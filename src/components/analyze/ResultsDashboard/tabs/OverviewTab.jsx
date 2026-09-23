@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
 import AiBadge      from "../../shared/AiBadge.jsx";
 import StatusBadge  from "../../shared/StatusBadge.jsx";
+import { useSession } from "../../../auth/sessionContext.js";
 import { ROLE }      from "../../../utils/core/roles.constants.js";
 
 /* ─────────────────────────────────────────────
@@ -307,13 +308,68 @@ function RecommendationsCard({ recommendations }) {
 }
 
 /* ─────────────────────────────────────────────
+   AI NUDGE — the deterministic/AI framing this tab did not previously state
+   anywhere. Everything above and below this card is the engine's own work;
+   nothing here changes that. It renders once, the first time a report is seen,
+   and only until the report already has an AI answer on it (a column review or
+   a leakage review) or the visitor dismisses it — asking again on every visit
+   would read as nagging, not information.
+
+   Deliberately no benchmark numbers (19/19 vs 8/19): real, but not yet decided
+   as a public claim (vecto-plan). If that's exposed later, it belongs here. */
+function AiNudgeCard({ ai }) {
+  const [dismissed, setDismissed] = useState(false);
+  const { user, signIn } = useSession();
+  const alreadyUsed = Boolean(ai?.dossier) || Boolean(ai?.leakageReview);
+  if (dismissed || alreadyUsed) return null;
+
+  return (
+    <SectionCard
+      title={<span className="inline-flex items-center gap-2">About this report<AiBadge>separate layer</AiBadge></span>}
+      action={
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          aria-label="Dismiss"
+          className="rounded-md p-1 text-ink-faint transition-colors hover:bg-paper hover:text-ink"
+        >
+          <X size={14} />
+        </button>
+      }
+    >
+      <p className="text-[13px] leading-relaxed text-ink-soft">
+        Everything on this page — the score, the roles, the findings and the recommendations
+        — is the deterministic engine reading your file locally. Vecto's AI review is a
+        separate, optional layer on top of it: it can explain what a column likely means,
+        check whether a strong signal is real leakage or a legitimate predictor, and help
+        with picking the target column. Nothing it says changes the report unless you accept it.
+      </p>
+      {user ? (
+        <p className="mt-3 text-[12.5px] text-ink-faint">
+          You&apos;re signed in — open the Quality or Target Signal tab to ask.
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={signIn}
+          className="mt-4 inline-flex items-center rounded-xl bg-ink px-4 py-2.5 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
+        >
+          Sign in with GitHub to use AI
+        </button>
+      )}
+    </SectionCard>
+  );
+}
+
+/* ─────────────────────────────────────────────
    OVERVIEW TAB
 ───────────────────────────────────────────── */
-function OverviewTab({ result }) {
+function OverviewTab({ result, ai }) {
   const { meta, snapshot, healthScore, insights, recommendations } = result;
 
   return (
     <div className="space-y-4">
+      <AiNudgeCard ai={ai} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
         <HealthScoreCard healthScore={healthScore} />
         <ColumnRolesCard meta={meta} />
