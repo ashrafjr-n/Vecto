@@ -367,7 +367,8 @@ src/
                                SectionCard, StatusBadge, correlationColor) and the AI
                                frame (AiBadge, AiPanel, AiPayloadPreview)
       TargetStep/              target-column picker
-      ResultsDashboard/        tabbed report (Overview/Quality/Statistics/
+      ResultsDashboard/        the report: an identity bar that hides on scroll and a
+                               section rail (Overview/Quality/Statistics/
                                 Visualizations/Target signal/Relationships/
                                 Class balance/Preparation)
     utils/core/                the analysis engine (pure functions, no side effects)
