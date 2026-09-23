@@ -110,8 +110,9 @@ export const PRIVACY = {
         { list: [
           "your GitHub numeric id, username and avatar image address — no email address is requested or stored",
           "one row per browser you are signed in on, holding a one-way hash of the session value, when it was created and when it expires (30 days)",
-          "one row per AI analysis you run: an identifier the browser generated for that dataset, the month, and how many AI requests it needed — never the file, its column names or anything from the report",
+          "one row per deeper review you run: an identifier the browser generated for that dataset, the day, how many requests it needed, and how many rows and columns the file had — never the file, its filename, its column names or anything else from the report",
         ] },
+        "Those rows are what the History page shows back to you: two counts and a date per analysis. Two integers identify no file, which is why a filename or a target column is not kept.",
         "The sign-in cookie holds a random value and nothing else — no name, no identifier. It is marked HttpOnly, so no script on the page can read it, and Secure, so it is never sent over an unencrypted connection. The token GitHub issues during sign-in is used once to read your profile and is not stored.",
         "An account may run 3 deeper reviews a day. The count exists to keep a shared, limited budget from being spent by one visitor; it is enforced on the server.",
         "Deleting your account removes your user row, every session and your whole usage history immediately and permanently. The button is in the account menu in the site header.",
