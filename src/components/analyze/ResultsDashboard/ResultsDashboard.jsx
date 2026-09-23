@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
 import { SlidersHorizontal } from "lucide-react";
 
 import OverviewTab       from "./tabs/OverviewTab.jsx";
@@ -23,8 +23,72 @@ const BASE_TABS = [
   { id: "preparation",    label: "Preparation",   requiresTarget: true },
 ];
 
+/* The identity bar's height, and how far the rail travels when it hides. Measured
+   in the browser at `lg` (2026-09-23), not guessed: the bar is 162px, the site
+   header above it 64. A fixed number rather than a ref and a resize listener — the
+   bar's two rows are fixed height by design, and this is a layout offset, not a
+   measurement anyone reads. `SECTION_RAIL_TOP` (14.25rem = 228px) must stay
+   BAR_HEIGHT + 64, or the rail and the bar overlap when the bar is shown. */
+const BAR_HEIGHT = 164;
+
+/* The eight sections, drawn as a vertical rail on `lg` and as a scrolling row
+   inside the bar below it. One component, two placements: the list, its states and
+   its keyboard behaviour are written once. */
+function SectionNav({ tabs, activeTab, onSelect, vertical }) {
+  return (
+    <nav
+      aria-label="Report sections"
+      className={vertical
+        ? "flex flex-col"
+        : "flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"}
+    >
+      {tabs.map((tab) => {
+        const isActive = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            aria-current={isActive ? "page" : undefined}
+            onClick={() => onSelect(tab.id)}
+            className={vertical
+              ? `border-l-2 px-3 py-2 text-left text-[13.5px] transition-colors ${
+                  isActive
+                    ? "border-accent-ink bg-accent-tint font-medium text-ink"
+                    : "border-transparent text-ink-soft hover:bg-paper-sunken hover:text-ink"
+                }`
+              : `shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13.5px] transition-colors sm:py-2.5 ${
+                  isActive
+                    ? "border-accent-ink font-medium text-ink"
+                    : "border-transparent text-ink-soft hover:text-ink"
+                }`}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
   const [activeTab, setActiveTab] = useState("overview");
+  /* The identity bar gets out of the way going down and comes back coming up —
+     the pattern every dashboard uses, because the target and the six figures are
+     what you check between sections, not what you read continuously. Reading is
+     downward, so downward is when the screen is worth more than the bar.
+
+     A motion value, not a scroll effect of our own: framer-motion already owns the
+     listener and its cleanup. `animate` (not a motion-value style) because
+     framer-motion 12 freezes motion-value opacity at its mount value — transforms
+     driven by `animate` are unaffected, and this one is measured working. */
+  const [barHidden, setBarHidden] = useState(false);
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, "change", (y) => {
+    const previous = scrollY.getPrevious() ?? 0;
+    // Past the bar's own height only, or a short page would flicker at the top.
+    if (y > previous && y > BAR_HEIGHT + 64) setBarHidden(true);
+    else if (y < previous) setBarHidden(false);
+  });
 
   if (!result) return null;
 
@@ -70,20 +134,15 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
   return (
     <div className="mx-auto max-w-[1400px] px-6 pb-24 sm:px-10">
 
-      {/* ── THE CONTROL BAR — pinned under the site header, at every width.
-
-          Everything that says WHICH report this is (the target, the six figures
-          that have no section of their own) and everything that moves around it
-          (the section list, Change target, New analysis) stays on screen at every
-          scroll position. A dense report is read by comparing a number in one
-          section against a number in another, and a header that scrolls away
-          makes the reader hold the target and the row count in their head.
-
-          One bar at all widths, and one section list inside it — the tabs used to
-          be a vertical rail on `lg` and a scrolling row below it, which was two
-          layouts and two sets of classes for one control. The content is full
-          width now, which is what a table of forty columns actually wants. ── */}
-      <div className="sticky top-16 z-30 -mx-6 border-b border-line bg-paper/90 px-6 backdrop-blur sm:-mx-10 sm:px-10">
+      {/* ── THE IDENTITY BAR — which report this is, and the two things you can do
+          to it. Pinned under the site header, and it slides up out of the way when
+          the reader is moving down the page. Below `lg` it also carries the section
+          list, because there is no room for a rail on a phone. ── */}
+      <motion.div
+        animate={{ y: barHidden ? -(BAR_HEIGHT + 64) : 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="sticky top-16 z-30 -mx-6 border-b border-line bg-paper/95 px-6 pb-2 backdrop-blur sm:-mx-10 sm:px-10 lg:pb-3"
+      >
 
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 pt-3 sm:pt-5">
           <div className="min-w-0">
@@ -142,30 +201,10 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
           ))}
         </dl>
 
-        <nav
-          aria-label="Report sections"
-          className="mt-1.5 flex gap-1 overflow-x-auto sm:mt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                aria-current={isActive ? "page" : undefined}
-                onClick={() => setActiveTab(tab.id)}
-                className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13.5px] sm:py-2.5 transition-colors ${
-                  isActive
-                    ? "border-accent-ink font-medium text-ink"
-                    : "border-transparent text-ink-soft hover:text-ink"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+        <div className="mt-1.5 lg:hidden">
+          <SectionNav tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} />
+        </div>
+      </motion.div>
 
       {/* A defect in the target is a problem with the whole report, so it is stated
           on every section. The descriptive sentence is not: it said the same thing
@@ -190,25 +229,40 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
         </p>
       )}
 
-      <div className="mt-6">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-          >
-            {activeTab === "overview"       && <OverviewTab       result={result} ai={ai} />}
-            {activeTab === "quality"        && <QualityTab        result={result} ai={ai} />}
-            {activeTab === "statistics"     && <StatisticsTab     result={result} />}
-            {activeTab === "visualizations" && <VisualizationsTab result={result} />}
-            {activeTab === "targetsignal"   && <TargetSignalTab   result={result} ai={ai} />}
-            {activeTab === "relationships"  && <RelationshipsTab  result={result} ai={ai} />}
-            {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
-            {activeTab === "preparation"    && <PreparationTab    result={result} ai={ai} />}
-          </motion.div>
-        </AnimatePresence>
+      <div className="mt-6 flex gap-8 lg:gap-10">
+
+        {/* The rail. It travels with the bar so the two never overlap and no space
+            is left behind when the bar goes: sticky under the bar when it is there,
+            sticky under the site header when it is not. */}
+        <motion.aside
+          animate={{ y: barHidden ? -BAR_HEIGHT : 0 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          className="sticky top-[14.25rem] hidden w-[188px] shrink-0 self-start lg:block"
+        >
+          <p className="px-3 pb-2 text-[11px] uppercase tracking-[0.08em] text-ink-faint">Sections</p>
+          <SectionNav tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} vertical />
+        </motion.aside>
+
+        <div className="min-w-0 flex-1">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              {activeTab === "overview"       && <OverviewTab       result={result} ai={ai} />}
+              {activeTab === "quality"        && <QualityTab        result={result} ai={ai} />}
+              {activeTab === "statistics"     && <StatisticsTab     result={result} />}
+              {activeTab === "visualizations" && <VisualizationsTab result={result} />}
+              {activeTab === "targetsignal"   && <TargetSignalTab   result={result} ai={ai} />}
+              {activeTab === "relationships"  && <RelationshipsTab  result={result} ai={ai} />}
+              {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
+              {activeTab === "preparation"    && <PreparationTab    result={result} ai={ai} />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
