@@ -1,0 +1,19 @@
+# Local Worker secrets and vars for `npx wrangler dev`.
+# Copy to `.dev.vars` (gitignored) and fill in. NEVER commit the real file, and
+# never move any of these into wrangler.jsonc or a VITE_ variable — everything
+# here except GITHUB_CLIENT_ID is a secret, and VITE_ vars are shipped to the browser.
+
+# Existing: the OpenRouter key the AI endpoint proxies with.
+OPENROUTER_API_KEY = "sk-or-..."
+
+# From the DEV GitHub OAuth app (callback http://localhost:3001/api/auth/callback).
+GITHUB_CLIENT_ID = ""
+GITHUB_CLIENT_SECRET = ""
+
+# Any random string. Lets tools/ai-eval.mjs and the Worker tests reach /api/ai
+# without a browser session. Export the same value in the shell before an eval run:
+#   EVAL_TOKEN=... node --max-old-space-size=8192 tools/ai-eval.mjs
+EVAL_TOKEN = ""
+
+# The Vite dev origin. In production this is set in wrangler.jsonc instead.
+ALLOWED_ORIGINS = "http://localhost:3001"
