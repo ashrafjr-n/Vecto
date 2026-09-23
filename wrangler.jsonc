@@ -31,11 +31,13 @@
 		// POST, so this is the CSRF guard beside the SameSite=Lax cookie. In dev,
 		// .dev.vars overrides it with http://localhost:3001.
 		"ALLOWED_ORIGINS": "https://vecto.aannaelj.workers.dev",
-		// Free tier: 3 ANALYSES per user per month (one dataset = one analysis, however
-		// many AI requests it needs), and 30 AI requests a day across all users — the
-		// global figure is what actually bounds the upstream quota of 50/day, leaving
-		// ~20 for the owner's eval runs.
-		"FREE_ANALYSES_PER_MONTH": "3",
+		// 3 deeper reviews per user per DAY (one dataset = one review, however many
+		// model requests it needs internally), with a per-user monthly ceiling behind
+		// it so a daily reset cannot compound to ~90/month. DAILY_AI_BUDGET is the one
+		// that actually bounds cost: 30 requests a day across ALL users, against an
+		// upstream free tier of 50/day, leaving ~20 for the owner's eval runs.
+		"FREE_ANALYSES_PER_DAY": "3",
+		"MONTHLY_ANALYSIS_CEILING": "25",
 		"DAILY_AI_BUDGET": "30",
 		// Tried in order by OpenRouter's `models` fallback. Each is the free variant of a
 		// paid model, so dropping ":free" later changes billing, not behaviour.

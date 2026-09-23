@@ -15,5 +15,8 @@ GITHUB_CLIENT_SECRET = ""
 #   EVAL_TOKEN=... node --max-old-space-size=8192 tools/ai-eval.mjs
 EVAL_TOKEN = ""
 
+# Quota knobs live in wrangler.jsonc (FREE_ANALYSES_PER_DAY, MONTHLY_ANALYSIS_CEILING,
+# DAILY_AI_BUDGET) and apply in dev too — override here only to test a limit.
+
 # The Vite dev origin. In production this is set in wrangler.jsonc instead.
 ALLOWED_ORIGINS = "http://localhost:3001"

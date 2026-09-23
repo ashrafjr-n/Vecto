@@ -21,29 +21,42 @@
    after an error and still caps what one analysis id can ever be worth. */
 export const MAX_REQUESTS_PER_ANALYSIS = 10;
 
-const DEFAULT_FREE_ANALYSES = 3;
-const DEFAULT_DAILY_BUDGET = 30;
+const DEFAULT_FREE_ANALYSES = 3;      // per DAY, per user
+const DEFAULT_MONTHLY_CEILING = 25;   // per user, a safety net rather than a UX number
+const DEFAULT_DAILY_BUDGET = 30;      // all users together — the real cost bound
 
 const num = (value, fallback) => {
   const n = Number.parseInt(value, 10);
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 };
 
-export const freeAnalyses = (env) => num(env.FREE_ANALYSES_PER_MONTH, DEFAULT_FREE_ANALYSES);
-export const dailyBudget  = (env) => num(env.DAILY_AI_BUDGET, DEFAULT_DAILY_BUDGET);
+export const freeAnalyses   = (env) => num(env.FREE_ANALYSES_PER_DAY, DEFAULT_FREE_ANALYSES);
+export const monthlyCeiling = (env) => num(env.MONTHLY_ANALYSIS_CEILING, DEFAULT_MONTHLY_CEILING);
+export const dailyBudget    = (env) => num(env.DAILY_AI_BUDGET, DEFAULT_DAILY_BUDGET);
 
-/* 'YYYY-MM' and 'YYYY-MM-DD' in UTC. The period is a KEY, not a countdown: a new
-   month simply has no rows yet, so nothing has to run to "reset" anything. */
-export const periodOf = (now = new Date()) => now.toISOString().slice(0, 7);
+/* 'YYYY-MM-DD' in UTC. The period is a KEY, not a countdown: a new day simply has
+   no rows yet, so nothing has to run to "reset" anything.
+
+   `periodOf` was month-granularity until 2026-09-23. Only the string it produces
+   changed — the rule that an EXISTING analysis id stays free is keyed on
+   (user_id, analysis_id) and never looks at the period, so a review begun at
+   23:58 and continued at 00:02 is still the same analysis and is still free. */
+export const periodOf = (now = new Date()) => now.toISOString().slice(0, 10);
 export const dayOf    = (now = new Date()) => now.toISOString().slice(0, 10);
 
-/* First day of the month after this one, as 'YYYY-MM-DD' — shown to the user as
-   when their free analyses come back. Derived, never stored. */
+/* The day after this one, as 'YYYY-MM-DD' — when the allowance comes back.
+   Derived, never stored. Date handles month and year ends. */
 export function resetsOn(period) {
-  const [year, month] = period.split("-").map(Number);
-  return month === 12
-    ? `${year + 1}-01-01`
-    : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const next = new Date(`${period}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
+/* Start of the current UTC month as a millisecond timestamp, for the monthly
+   ceiling. `analyses.created_at` already holds a timestamp, so the ceiling needs
+   no new column and no second counter that could drift from the first. */
+export function monthStart(now = new Date()) {
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
 }
 
 /* The client generates this (crypto.randomUUID). It is only ever used as a key
@@ -82,6 +95,18 @@ export async function checkQuota(env, userId, analysisId) {
 
   const { used, limit } = await usageFor(env, userId);
   if (used >= limit) return { ok: false, error: "quota_exhausted", status: 402 };
+
+  /* A safety net behind the daily allowance, not a number the UI leads with: a
+     daily reset alone would let one account draw 3 × 30 a month for ever. Counted
+     off `created_at`, so it needs no column of its own and cannot drift from the
+     daily count — they read the same rows. */
+  const ceiling = monthlyCeiling(env);
+  const month = await env.DB
+    .prepare("SELECT COUNT(*) AS used FROM analyses WHERE user_id = ? AND created_at >= ?")
+    .bind(userId, monthStart())
+    .first();
+  if ((month?.used ?? 0) >= ceiling) return { ok: false, error: "monthly_ceiling", status: 402 };
+
   return { ok: true };
 }
 

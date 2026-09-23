@@ -22,7 +22,8 @@ const MESSAGES = {
   /* The account gate. `unauthenticated` is not an error the user caused — the
      panels turn it into a sign-in button rather than printing it. */
   unauthenticated:   "Sign in to run the AI review. The rest of the report needs no account.",
-  quota_exhausted:   "You have used all of your free AI analyses this month. Everything else in the report still works.",
+  quota_exhausted:   "You have used today's deeper reviews. More become available tomorrow — everything else in the report still works.",
+  monthly_ceiling:   "You have reached this month's limit for deeper reviews. Everything else in the report still works.",
   budget_exhausted:  "Vecto's shared AI budget for today is spent. Nothing else is affected — try again tomorrow.",
   analysis_request_limit: "This analysis has already made the maximum number of AI requests.",
   invalid_analysis_id:    "The request was rejected as malformed.",

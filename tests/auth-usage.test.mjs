@@ -18,7 +18,7 @@
 import worker from "../worker/index.js";
 import {
   checkQuota, recordUsage, usageFor, resetsOn, periodOf, validAnalysisId,
-  budgetAvailable, MAX_REQUESTS_PER_ANALYSIS,
+  budgetAvailable, monthStart, MAX_REQUESTS_PER_ANALYSIS,
 } from "../worker/usage.js";
 
 let failures = 0;
@@ -54,7 +54,8 @@ const ENV = () => ({
   AI_MODELS: "a/one:free",
   EVAL_TOKEN: "test-eval-token",
   ALLOWED_ORIGINS: "https://vecto.test",
-  FREE_ANALYSES_PER_MONTH: "3",
+  FREE_ANALYSES_PER_DAY: "3",
+  MONTHLY_ANALYSIS_CEILING: "25",
   DAILY_AI_BUDGET: "30",
 });
 
@@ -125,24 +126,41 @@ globalThis.fetch = async () => {
 /* ── the quota rules ──────────────────────────────────────────────────────── */
 
 {
-  // A fresh analysis for a user who has used 2 of 3.
-  const env = { ...ENV(), DB: stubDb([null, { used: 2 }]) };
-  check("a new analysis is allowed under the limit", (await checkQuota(env, 1, ID)).ok === true);
+  // A fresh analysis for a user who has used 2 of 3 today, well under the month.
+  const env = { ...ENV(), DB: stubDb([null, { used: 2 }, { used: 4 }]) };
+  check("a new analysis is allowed under the daily limit", (await checkQuota(env, 1, ID)).ok === true);
+}
+
+{
+  // Under the day, but the month's safety net is full.
+  const env = { ...ENV(), DB: stubDb([null, { used: 0 }, { used: 25 }]) };
+  const verdict = await checkQuota(env, 1, ID);
+  check("the monthly ceiling blocks even on a fresh day", verdict.ok === false && verdict.error === "monthly_ceiling");
+  check("the ceiling answers 402, like the daily limit", verdict.status === 402);
+  check("hitting the ceiling writes nothing", env.DB.writes === 0);
+}
+
+{
+  const env = { ...ENV(), DB: stubDb([null, { used: 0 }, { used: 24 }]) };
+  check("one below the ceiling still passes", (await checkQuota(env, 1, ID)).ok === true);
 }
 
 {
   const env = { ...ENV(), DB: stubDb([null, { used: 3 }]) };
   const verdict = await checkQuota(env, 1, ID);
-  check("the fourth analysis of a month is refused", verdict.ok === false && verdict.error === "quota_exhausted");
+  check("the fourth analysis of a day is refused", verdict.ok === false && verdict.error === "quota_exhausted");
   check("quota_exhausted is 402, not 401 or 500", verdict.status === 402);
   check("refusing to allow writes nothing", env.DB.writes === 0);
 }
 
 {
   /* The rule that makes "one dataset = one analysis" true: a wide file's later
-     parts find their own id and are free, even though the month is full. */
+     parts find their own id and are free, even though the day is full. The
+     lookup is by (user_id, analysis_id) and never reads the period, which is
+     also why a review begun before midnight stays free after it. */
   const env = { ...ENV(), DB: stubDb([{ requests: 4 }]) };
   check("a later part of a paid analysis is free", (await checkQuota(env, 1, ID)).ok === true);
+  check("continuing an analysis never runs the day or month query", env.DB.statements.length === 1);
 }
 
 {
@@ -162,6 +180,7 @@ globalThis.fetch = async () => {
   const env = { ...ENV(), DB: stubDb([{ used: 1 }]) };
   const usage = await usageFor(env, 1);
   check("usage reports used, limit and reset date", usage.used === 1 && usage.limit === 3 && usage.resets === resetsOn(usage.period));
+  check("the period the UI sees is a DAY, not a month", /^\d{4}-\d{2}-\d{2}$/.test(usage.period));
 }
 
 /* ── the global budget ────────────────────────────────────────────────────── */
@@ -178,8 +197,12 @@ globalThis.fetch = async () => {
 
 /* ── small rules worth pinning ────────────────────────────────────────────── */
 
-check("a month rolls into the next year correctly", resetsOn("2026-12") === "2027-01-01");
-check("a mid-year month rolls forward", resetsOn("2026-09") === "2026-10-01");
+check("the allowance resets the next day", resetsOn("2026-09-23") === "2026-09-24");
+check("a month end rolls into the next month", resetsOn("2026-09-30") === "2026-10-01");
+check("a year end rolls into the next year", resetsOn("2026-12-31") === "2027-01-01");
+check("a leap day is handled", resetsOn("2028-02-28") === "2028-02-29");
+check("periodOf is day-granular", /^\d{4}-\d{2}-\d{2}$/.test(periodOf()));
+check("monthStart is the 1st of this UTC month", new Date(monthStart()).toISOString().slice(8, 10) === "01");
 check("a real uuid is a valid analysis id", validAnalysisId(ID));
 check("an empty analysis id is refused", !validAnalysisId(""));
 check("an injection-shaped analysis id is refused", !validAnalysisId("' OR 1=1 --"));
