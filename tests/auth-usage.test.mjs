@@ -18,7 +18,7 @@
 import worker from "../worker/index.js";
 import {
   checkQuota, recordUsage, usageFor, resetsOn, periodOf, validAnalysisId,
-  budgetAvailable, monthStart, MAX_REQUESTS_PER_ANALYSIS,
+  budgetAvailable, monthStart, historyFor, MAX_REQUESTS_PER_ANALYSIS,
 } from "../worker/usage.js";
 
 let failures = 0;
@@ -41,6 +41,7 @@ function stubDb(rows = []) {
         bind: (...args) => { stmt.args = args; db.statements.push({ sql, args }); return stmt; },
         first: async () => (queue.length ? queue.shift() : null),
         run: async () => { db.writes++; return { success: true }; },
+        all: async () => ({ results: queue.length ? queue.shift() : [] }),
       };
       return stmt;
     },
@@ -193,6 +194,25 @@ globalThis.fetch = async () => {
 {
   const env = { ...ENV(), DB: stubDb([{ requests: 30 }]) };
   check("at the daily budget the endpoint is closed to everyone", (await budgetAvailable(env)) === false);
+}
+
+/* ── history: counts only ─────────────────────────────────────────────────── */
+
+{
+  const env = { ...ENV(), DB: stubDb([[
+    { analysis_id: ID, created_at: 1700000000000, rows: 891, columns: 12, requests: 2 },
+    { analysis_id: "b".repeat(20), created_at: 1600000000000, rows: null, columns: null, requests: 0 },
+  ]]) };
+  const [first, second] = await historyFor(env, 1);
+  /* The privacy promise of this feature is what is ABSENT. A filename or a target
+     column would be a real change to what Vecto retains about someone's data, so
+     the shape is pinned rather than left to a reviewer to notice. */
+  check("a history entry carries counts and dates only",
+    Object.keys(first).join() === "analysisId,createdAt,rows,columns,reviewed");
+  check("the counts come back as stored", first.rows === 891 && first.columns === 12);
+  check("requests are reported as a yes/no, not a number", first.reviewed === true && second.reviewed === false);
+  check("a leakage-only analysis has no counts, and says so with nulls", second.rows === null);
+  check("history reads only the caller's own rows", env.DB.statements[0].args[0] === 1);
 }
 
 /* ── small rules worth pinning ────────────────────────────────────────────── */
