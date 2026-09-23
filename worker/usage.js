@@ -1,11 +1,13 @@
 /* Free-tier accounting for the AI endpoint. Two limits, both server-side, because
    the number the page shows is decoration and the browser can say anything.
 
-   1. PER USER — a free account gets FREE_ANALYSES_PER_MONTH *analyses*, not
-      requests. One dataset is one analysis whatever it costs: the column review of
-      a 150-column file is 6 parts plus a leakage call, and charging a user six
-      times for one file would be indefensible. The client sends one analysis id
-      per dataset and every request carrying it after the first is free.
+   1. PER USER — an account gets FREE_ANALYSES_PER_DAY *analyses*, not requests,
+      with MONTHLY_ANALYSIS_CEILING behind it as a safety net. One dataset is one
+      analysis whatever it costs: the column review of a 150-column file is 6 parts
+      plus a leakage call, and charging a user six times for one file would be
+      indefensible. The client sends one analysis id per dataset and every request
+      carrying it after the first is free — including across midnight, because the
+      lookup is by id and never reads the period.
 
    2. GLOBALLY — DAILY_AI_BUDGET requests a day across every user. This is the one
       that actually bounds the upstream bill: accounts are free to create, so a
@@ -14,7 +16,7 @@
       his own measurements.
 
    Usage is recorded only after a SUCCESSFUL answer. A provider failure costs
-   nothing upstream and must never cost a user one of their three. */
+   nothing upstream and must never cost a user one of their allowance. */
 
 /* The largest legitimate analysis is 6 review parts (DOSSIER_MAX_COLUMNS 150 /
    DOSSIER_PART_COLUMNS 25) plus one leakage call = 7. Ten leaves room for a retry
@@ -114,15 +116,42 @@ export async function checkQuota(env, userId, analysisId) {
    count the request globally. Two statements, not a transaction — the worst case
    if the second fails is that the global counter runs one behind, which is not
    worth a transaction on D1's free tier. */
-export async function recordUsage(env, userId, analysisId) {
+export async function recordUsage(env, userId, analysisId, meta = {}) {
   const now = Date.now();
+  /* `rows` and `columns` are for History and are read out of the payload the
+     request already carried — nothing new is sent for them. The upsert writes
+     them once, on the row's creation: a later part of the same analysis must not
+     overwrite the first writer's counts (a split part profiles 25 columns, not
+     the file's real width), which is what COALESCE on the existing value does. */
   await env.DB
-    .prepare(`INSERT INTO analyses (user_id, analysis_id, period, requests, created_at)
-              VALUES (?, ?, ?, 1, ?)
-              ON CONFLICT(user_id, analysis_id) DO UPDATE SET requests = requests + 1`)
-    .bind(userId, analysisId, periodOf(), now)
+    .prepare(`INSERT INTO analyses (user_id, analysis_id, period, requests, created_at, rows, columns)
+              VALUES (?, ?, ?, 1, ?, ?, ?)
+              ON CONFLICT(user_id, analysis_id) DO UPDATE SET
+                requests = requests + 1,
+                rows     = COALESCE(analyses.rows, excluded.rows),
+                columns  = COALESCE(analyses.columns, excluded.columns)`)
+    .bind(userId, analysisId, periodOf(), now, meta.rows ?? null, meta.columns ?? null)
     .run();
   await recordBudget(env);
+}
+
+/* The signed-in user's own analyses, newest first. Counts and timestamps only —
+   see migrations/0002_history.sql for what is deliberately absent. */
+export async function historyFor(env, userId, limit = 20) {
+  const { results } = await env.DB
+    .prepare(`SELECT analysis_id, created_at, rows, columns, requests
+              FROM analyses WHERE user_id = ?
+              ORDER BY created_at DESC LIMIT ?`)
+    .bind(userId, limit)
+    .all();
+  return (results ?? []).map((r) => ({
+    analysisId: r.analysis_id,
+    createdAt:  r.created_at,
+    rows:       r.rows,
+    columns:    r.columns,
+    // Whether the deeper review actually ran, rather than how many calls it took.
+    reviewed:   (r.requests ?? 0) > 0,
+  }));
 }
 
 export async function budgetSpent(env) {

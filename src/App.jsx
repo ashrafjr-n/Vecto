@@ -11,6 +11,7 @@ const Home    = lazy(() => import("./pages/Home"));
 const Analyze = lazy(() => import("./pages/Analyze"));
 const Methodology = lazy(() => import("./pages/Methodology"));
 const About       = lazy(() => import("./pages/About"));
+const History     = lazy(() => import("./pages/History"));
 const TextPage    = lazy(() => import("./pages/TextPage"));
 const NotFound    = lazy(() => import("./pages/NotFound"));
 
@@ -30,6 +31,7 @@ function App() {
           <Route path="/"        element={<Home />} />
           <Route path="/methodology" element={<Methodology />} />
           <Route path="/about"   element={<About />} />
+          <Route path="/history" element={<History />} />
           <Route path="/privacy" element={<TextPage page={PRIVACY} />} />
           <Route path="/terms"   element={<TextPage page={TERMS} />} />
           <Route path="/home"    element={<Navigate to="/" replace />} />

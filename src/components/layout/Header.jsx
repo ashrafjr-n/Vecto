@@ -69,6 +69,7 @@ function Header() {
    without a line of state. It stays open until clicked again, which is the one
    thing a hand-rolled dropdown would do better and not worth the code. */
 function AccountMenu() {
+  const navigate = useNavigate();
   const { user, usage, loading, signIn, signOut, deleteAccount } = useSession();
 
   // Nothing during the first load, so the bar does not flash "Log in" at someone
@@ -111,6 +112,13 @@ function AccountMenu() {
             : "Signed in."}
         </p>
         <div className="mt-3 border-t border-line pt-2">
+          <button
+            type="button"
+            onClick={() => { window.scrollTo(0, 0); navigate("/history"); }}
+            className="w-full rounded-lg px-1 py-1.5 text-left text-[13px] text-ink transition-colors hover:bg-paper"
+          >
+            History
+          </button>
           <button type="button" onClick={signOut} className="w-full rounded-lg px-1 py-1.5 text-left text-[13px] text-ink transition-colors hover:bg-paper">
             Sign out
           </button>

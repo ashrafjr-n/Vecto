@@ -23,7 +23,7 @@ import { REVIEW_SCHEMA } from "../src/lib/ai/reviewSchema.js";
 import { reviewMessages } from "./reviewPrompt.js";
 import { json, originAllowed } from "./http.js";
 import * as auth from "./auth.js";
-import { checkQuota, recordUsage, recordBudget, budgetAvailable, usageFor, validAnalysisId } from "./usage.js";
+import { checkQuota, recordUsage, recordBudget, budgetAvailable, usageFor, validAnalysisId, historyFor } from "./usage.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BODY_CHARS = 256_000;
@@ -88,6 +88,7 @@ const ROUTES = {
   "GET /api/auth/github":   auth.startOAuth,
   "GET /api/auth/callback": auth.oauthCallback,
   "GET /api/auth/me":       auth.me,
+  "GET /api/history":       history,
   "POST /api/auth/logout":  auth.logout,
   "POST /api/auth/delete":  auth.deleteAccount,
   "POST /api/ai":           handleAi,
@@ -113,6 +114,27 @@ export default {
    still records into the global budget so that counter matches reality. */
 const isEvalRequest = (request, env) =>
   Boolean(env.EVAL_TOKEN) && request.headers.get("Authorization") === `Bearer ${env.EVAL_TOKEN}`;
+
+/* The signed-in user's own analyses. A GET that returns only this account's rows:
+   no Origin check, exactly like /api/auth/me — a cross-site page cannot read the
+   response without CORS headers, which this endpoint does not send. */
+async function history(request, env) {
+  const user = await auth.sessionUser(env, request);
+  if (!user) return json({ error: "unauthenticated" }, 401);
+  return json({ analyses: await historyFor(env, user.id) });
+}
+
+/* What History records, taken from the payload the request already carried rather
+   than from anything new the client sends. The review payload states the file's
+   row count and, on a split part, the full column list; the leakage payload has
+   no row count, so a leakage-only analysis stores nulls and History shows a dash. */
+function datasetMeta(name, payload) {
+  if (name !== "review") return {};
+  return {
+    rows:    Number.isFinite(payload?.rows) ? payload.rows : null,
+    columns: payload?.allColumnNames?.length ?? payload?.columns?.length ?? null,
+  };
+}
 
 async function handleAi(request, env) {
   const models = (env.AI_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
@@ -201,7 +223,7 @@ async function handleAi(request, env) {
   if (env.DB) {
     if (fromEval) await recordBudget(env);
     else {
-      await recordUsage(env, user.id, analysisId);
+      await recordUsage(env, user.id, analysisId, datasetMeta(name, body.payload));
       usage = await usageFor(env, user.id);
     }
   }
