@@ -8,6 +8,7 @@ import { buildReviewPayload, verifyReview } from "../../../../lib/ai/review.js";
 import { requestAi } from "../../../../lib/ai/requestAi.js";
 import { askDossier } from "../../../../lib/ai/askDossier.js";
 import AiPanel          from "../../shared/AiPanel.jsx";
+import AiGate           from "../../shared/AiGate.jsx";
 import AiPayloadPreview from "../../shared/AiPayloadPreview.jsx";
 import AiBadge          from "../../shared/AiBadge.jsx";
 import CleaningRuleList from "../../shared/CleaningRuleList.jsx";
@@ -31,7 +32,7 @@ import { TYPE_LABEL, ruleKey, describeRule } from "../../shared/cleaningRuleText
    again starts from what was uploaded, not from an already-cleaned copy. */
 
 function AiCleaningProposals({ result, ai }) {
-  const { originalData, dossier, onDossier, cleaningRules, onApplyCleaning, cleaning, onCleaning } = ai;
+  const { originalData, dossier, onDossier, cleaningRules, onApplyCleaning, cleaning, onCleaning, analysisId, onUsage } = ai;
   const [status, setStatus]   = useState("idle");   // idle | scanning | loading | error
   const [failure, setFailure] = useState(null);
   const [picked, setPicked]   = useState(() => new Set(cleaningRules.map(ruleKey)));
@@ -65,11 +66,12 @@ function AiCleaningProposals({ result, ai }) {
     runRef.current = run;
     setStatus("loading");
     setFailure(null);
-    const { result: answer, model, error, detail, aborted } = await askDossier(
+    const { result: answer, model, error, detail, aborted, usage } = await askDossier(
       payload(),
-      (part) => requestAi("review", part, run.signal),
+      (part) => requestAi("review", part, run.signal, analysisId),
     );
     if (aborted) return;
+    onUsage?.(usage);
     const verified = error ? null : verifyReview(answer, { data: originalData, columns, roles: rolesOf(), candidates });
     if (error || verified.error) {
       setFailure({ error: error ?? verified.error, detail });
@@ -131,9 +133,11 @@ function AiCleaningProposals({ result, ai }) {
                 build={payload}
                 sent={<>Sends a summary of every column with these values, never rows, to OpenRouter&apos;s free models, which may log requests. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
               />
-              <button type="button" onClick={handleAsk} className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
-                {status === "error" ? "Try again" : "Propose cleaning rules"}
-              </button>
+              <AiGate>
+                <button type="button" onClick={handleAsk} className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
+                  {status === "error" ? "Try again" : "Propose cleaning rules"}
+                </button>
+              </AiGate>
             </>
           )}
         </>

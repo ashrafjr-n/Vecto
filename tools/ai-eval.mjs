@@ -183,7 +183,15 @@ async function send(task, payload) {
   try {
     const res = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      /* The eval is a Node client: no cookie, no Origin. EVAL_TOKEN is how the
+         Worker tells it from a browser, so eval traffic skips the session and the
+         per-user quota while still counting against the global daily budget. It is
+         read from the environment and lives only here and in the Worker — nothing
+         under src/ imports it, so it cannot reach the client bundle. */
+      headers: {
+        "Content-Type": "application/json",
+        ...(process.env.EVAL_TOKEN ? { Authorization: `Bearer ${process.env.EVAL_TOKEN}` } : {}),
+      },
       body: JSON.stringify({ task, payload }),
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     });

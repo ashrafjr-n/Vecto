@@ -3,6 +3,7 @@ import { RotateCcw } from "lucide-react";
 
 import { buildLeakagePayload } from "../../../../lib/ai/leakage.js";
 import AiPanel          from "../../shared/AiPanel.jsx";
+import AiGate           from "../../shared/AiGate.jsx";
 import AiPayloadPreview from "../../shared/AiPayloadPreview.jsx";
 import StatusBadge      from "../../shared/StatusBadge.jsx";
 import { RELEVANCE_CATEGORIES } from "../../../../lib/ai/leakageSchema.js";
@@ -82,13 +83,15 @@ function AiLeakageReview({ result, dossier, review, status, failure, onAsk, onCa
             build={payload}
             sent={<>Sends column names, roles and the engine&apos;s measurements{dossier ? ", plus the column meanings from the review" : ""}, never cell values, to OpenRouter&apos;s free models, which may log requests. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
           />
-          <button
-            type="button"
-            onClick={onAsk}
-            className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
-          >
-            {status === "error" ? "Try again" : "Review for leakage"}
-          </button>
+          <AiGate>
+            <button
+              type="button"
+              onClick={onAsk}
+              className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
+            >
+              {status === "error" ? "Try again" : "Review for leakage"}
+            </button>
+          </AiGate>
         </>
       )}
 

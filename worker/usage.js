@@ -68,8 +68,6 @@ export async function usageFor(env, userId) {
    Nothing is written here: a request that is allowed but then fails upstream must
    leave no trace. */
 export async function checkQuota(env, userId, analysisId) {
-  const period = periodOf();
-
   const existing = await env.DB
     .prepare("SELECT requests FROM analyses WHERE user_id = ? AND analysis_id = ?")
     .bind(userId, analysisId)

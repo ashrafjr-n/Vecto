@@ -10,6 +10,7 @@ import AiPanel  from "../shared/AiPanel.jsx";
 import AiBadge  from "../shared/AiBadge.jsx";
 import { SENSITIVE_LABEL } from "../shared/sensitive.js";
 import AiPayloadPreview from "../shared/AiPayloadPreview.jsx";
+import AiGate from "../shared/AiGate.jsx";
 import RolePill from "../shared/RolePill.jsx";
 import CleaningRuleList from "../shared/CleaningRuleList.jsx";
 import { ruleKey } from "../shared/cleaningRuleText.js";
@@ -24,7 +25,7 @@ import { ruleKey } from "../shared/cleaningRuleText.js";
    The verified answer, the accepted overrides and the accepted rules are owned by
    Analyze.jsx, not here: Cancel on the processing step unmounts this component,
    and a finished answer costs a request from a small daily quota. */
-function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOverridesChange, onUseTarget, currentTarget, cleaning, onCleaning, acceptedRules, onAcceptedRulesChange, onOptIn }) {
+function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOverridesChange, onUseTarget, currentTarget, cleaning, onCleaning, acceptedRules, onAcceptedRulesChange, onOptIn, analysisId, onUsage }) {
   const [status, setStatus]   = useState("idle");   // idle | loading | error
   const [failure, setFailure] = useState(null);
   const runRef = useRef(null);
@@ -47,11 +48,12 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
     setFailure(null);
 
     const candidates = scan();
-    const { result, model, error, detail, aborted } = await askDossier(
+    const { result, model, error, detail, aborted, usage } = await askDossier(
       buildReviewPayload(data, columns, roles, candidates),
-      (part) => requestAi("review", part, run.signal),
+      (part) => requestAi("review", part, run.signal, analysisId),
     );
     if (aborted) return;
+    onUsage?.(usage);
     const verified = error ? null : verifyReview(result, { data, columns, roles, candidates });
     if (error || verified.error) {
       setFailure({ error: error ?? verified.error, detail });
@@ -106,13 +108,15 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
             build={payload}
             sent={<>Sends column names and summaries, never rows, to OpenRouter&apos;s free models, which may log requests. Asking also turns on the leakage review for your report. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
           />
-          <button
-            type="button"
-            onClick={handleAsk}
-            className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
-          >
-            {status === "error" ? "Try again" : "Review columns"}
-          </button>
+          <AiGate>
+            <button
+              type="button"
+              onClick={handleAsk}
+              className="mt-5 inline-flex items-center rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint"
+            >
+              {status === "error" ? "Try again" : "Review columns"}
+            </button>
+          </AiGate>
         </>
       )}
 

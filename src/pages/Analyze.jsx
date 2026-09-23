@@ -16,6 +16,7 @@ import { runAnalysis, runAnalysisSync } from "../lib/runAnalysis.js";
 import { applyCleaningRules } from "../lib/ai/cleaning.js";
 import { buildLeakagePayload, verifyLeakage } from "../lib/ai/leakage.js";
 import { requestAi } from "../lib/ai/requestAi.js";
+import { useSession, hasQuota } from "../components/auth/sessionContext.js";
 
 const stepVariants = {
   initial:  { opacity: 0, y: 16 },
@@ -69,9 +70,21 @@ function ProcessingStep({ phase, onCancel }) {
   );
 }
 
+/* One id per dataset, for the whole of its life on this page — the column review
+   (which may be several parts) and the leakage review share it, so the server
+   charges ONE of the user's free analyses for the file however many requests it
+   takes. Re-running with cleaning rules keeps it: still the same dataset. */
+function newAnalysisId() {
+  if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function Analyze() {
   const location = useLocation();
   const navigate = useNavigate();
+  const session = useSession();
+  const { applyUsage } = session;
 
   /* Single entry point for how this page can be reached, computed once on first
      render (no effect, no flash): either `?sample=1` (generated demo data, skips
@@ -125,6 +138,7 @@ function Analyze() {
      third party for someone who never opted in. Cleared by nothing — leaving the
      page is what ends the session. */
   const [aiOptedIn,      setAiOptedIn]      = useState(false);
+  const [analysisId] = useState(newAnalysisId);
   /* Cleaning (AI phase D). `cleaningRules` are the rules the CURRENT report was built
      with, and `analysisData` the rows it was built from — both set only when an
      analysis completes, so a cancelled re-run leaves the report and its provenance
@@ -174,8 +188,9 @@ function Analyze() {
     setLeakageStatus("loading");
     setLeakageFailure(null);
 
-    requestAi("leakage", buildLeakagePayload(result, dossier), run.signal).then((reply) => {
+    requestAi("leakage", buildLeakagePayload(result, dossier), run.signal, analysisId).then((reply) => {
       if (reply.aborted) return;
+      applyUsage(reply.usage);
       const verified = reply.error ? null : verifyLeakage(reply.result, { data: rows, result });
       if (reply.error || verified.error) {
         setLeakageFailure({ error: reply.error ?? verified.error, detail: reply.detail });
@@ -218,8 +233,11 @@ function Analyze() {
         setCleaningRules(rules);
         setStep("results");
         /* Started here, in the same handler that produced the report, rather than in
-           an effect watching `step` — see the note on the one useEffect above. */
-        if (aiOptedIn) runLeakageReview(result, rows);
+           an effect watching `step` — see the note on the one useEffect above.
+           Only for a signed-in user with quota left: an automatic request that can
+           only come back 401 or 402 would put an error on a report nobody asked to
+           spend anything on. The server decides for real either way. */
+        if (aiOptedIn && hasQuota(session)) runLeakageReview(result, rows);
       }, remaining);
     });
   };
@@ -263,6 +281,7 @@ function Analyze() {
                   cleaning, onCleaning: setCleaning,
                   acceptedRules, onAcceptedRulesChange: setAcceptedRules,
                   onOptIn: () => setAiOptedIn(true),
+                  analysisId, onUsage: applyUsage,
                 }}
               />
             </motion.div>
@@ -317,6 +336,7 @@ function Analyze() {
                     onCancelLeakage: () => { leakRunRef.current?.abort(); setLeakageStatus("idle"); },
                     cleaning, onCleaning: setCleaning, cleaningRules, onApplyCleaning: handleApplyCleaning,
                     onOptIn: () => setAiOptedIn(true),
+                    analysisId, onUsage: applyUsage,
                   }}
                 />
               </Suspense>

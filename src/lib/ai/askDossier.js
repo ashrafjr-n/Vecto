@@ -52,9 +52,14 @@ export function mergeDossierAnswers(answers) {
 export async function askDossier(payload, send) {
   const answers = [];
   const models = new Set();
+  /* The free-tier count the server reported last. Every part of one file shares
+     one analysis id, so this moves at most once per file — it is carried out so
+     the page can show the new number without asking for it again. */
+  let usage = null;
   for (const part of splitDossierPayload(payload)) {
     const reply = await send(part);
-    if (reply.error || reply.aborted) return reply;
+    usage = reply.usage ?? usage;
+    if (reply.error || reply.aborted) return { ...reply, usage };
     answers.push(reply.result);
     if (reply.model) models.add(reply.model);
   }
@@ -65,5 +70,6 @@ export async function askDossier(payload, send) {
     detail: null,
     aborted: false,
     parts: answers.length,
+    usage,
   };
 }

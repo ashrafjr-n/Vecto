@@ -13,10 +13,18 @@ function check(name, ok) {
   console.log(`${ok ? "PASS" : "FAIL"} ${name}`);
 }
 
-const ENV = { OPENROUTER_API_KEY: "test-key", AI_MODELS: "a/one:free, b/two:free" };
+/* The endpoint is behind a session and a monthly quota (worker/auth.js,
+   worker/usage.js). These tests are about the TASK layer, so they present
+   EVAL_TOKEN — the same bypass tools/ai-eval.mjs uses — which skips the session,
+   the origin check and the per-user quota. `env.DB` is deliberately absent: the
+   bypass must not touch the database, and this proves it does not. The gate
+   itself is tested separately below and in tests/auth-usage.test.mjs. */
+const EVAL_TOKEN = "test-eval-token";
+const ENV = { OPENROUTER_API_KEY: "test-key", AI_MODELS: "a/one:free, b/two:free", EVAL_TOKEN };
 const post = (body, env = ENV) =>
   worker.fetch(new Request("https://vecto.test/api/ai", {
     method: "POST",
+    headers: { Authorization: `Bearer ${EVAL_TOKEN}` },
     body: typeof body === "string" ? body : JSON.stringify(body),
   }), env);
 
