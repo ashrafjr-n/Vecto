@@ -349,7 +349,9 @@ function AiNudgeCard({ ai }) {
       </p>
       {user ? (
         <p className="mt-3 text-[12.5px] text-ink-faint">
-          Open Quality or Target Signal to run it.
+          Target Signal asks about leakage; Quality proposes cleaning rules where the
+          engine found something to clean. The column review sits with the target, under
+          &ldquo;Change target&rdquo; above.
         </p>
       ) : (
         <button
