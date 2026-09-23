@@ -1,54 +1,53 @@
 {
-  // Cloudflare Worker with static assets (NOT Pages). Workers Builds runs
-  // `npm run build` then `npx wrangler deploy` on every push, which reads this file.
-  "name": "vecto",
-  "main": "worker/index.js",
-  "compatibility_date": "2026-09-01",
-  "assets": {
-    "directory": "./dist/",
-    "binding": "ASSETS",
-    // Deep links (/methodology, /analyze) get index.html instead of a 404.
-    "not_found_handling": "single-page-application",
-    // Only API routes reach the script; everything else is served as an asset.
-    "run_worker_first": ["/api/*"]
-  },
-  // Accounts, sessions and AI usage (migrations/0001_init.sql). Created with
-  // `npx wrangler d1 create vecto-db` — paste the id it prints into database_id.
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "vecto-db",
-      "database_id": "PASTE_DATABASE_ID_FROM_WRANGLER_D1_CREATE"
-    }
-  ],
-  "vars": {
-    // Public by design — the client id is not a secret. GITHUB_CLIENT_SECRET and
-    // EVAL_TOKEN are Worker SECRETS and never appear in this file.
-    "GITHUB_CLIENT_ID": "PASTE_GITHUB_OAUTH_CLIENT_ID",
-
-    // Every origin this deployment answers to. The browser sends Origin on any
-    // POST, so this is the CSRF guard beside the SameSite=Lax cookie. In dev,
-    // .dev.vars overrides it with http://localhost:3001.
-    "ALLOWED_ORIGINS": "https://vecto.aannaelj.workers.dev",
-
-    // Free tier: 3 ANALYSES per user per month (one dataset = one analysis, however
-    // many AI requests it needs), and 30 AI requests a day across all users — the
-    // global figure is what actually bounds the upstream quota of 50/day, leaving
-    // ~20 for the owner's eval runs.
-    "FREE_ANALYSES_PER_MONTH": "3",
-    "DAILY_AI_BUDGET": "30",
-
-    // Tried in order by OpenRouter's `models` fallback. Each is the free variant of a
-    // paid model, so dropping ":free" later changes billing, not behaviour.
-    // Empty string = AI switched off (the endpoint answers 503 ai_disabled).
-    //
-    // ONE model since 2026-09-18 (vecto-plan item 20). super answered leakage files in
-    // 1-7 s with ZERO findings on documented leaks (corpus, validation and test all show
-    // it) and gemma has never answered a single request (overloaded, then 429). Measured:
-    // leakage 87% -> 92% on ultra alone. The cost is latency (median 70-95 s) and no
-    // fallback: an overloaded ultra is now an upstream_error, which is free and retryable.
-    "AI_MODELS": "nvidia/nemotron-3-ultra-550b-a55b:free"
-  }
-  // OPENROUTER_API_KEY is a Worker SECRET (dashboard or `wrangler secret put`), and
-  // `.dev.vars` locally — never a var here, never VITE_*.
+	// Cloudflare Worker with static assets (NOT Pages). Workers Builds runs
+	// `npm run build` then `npx wrangler deploy` on every push, which reads this file.
+	"name": "vecto",
+	"main": "worker/index.js",
+	"compatibility_date": "2026-09-01",
+	"assets": {
+		"directory": "./dist/",
+		"binding": "ASSETS",
+		// Deep links (/methodology, /analyze) get index.html instead of a 404.
+		"not_found_handling": "single-page-application",
+		// Only API routes reach the script; everything else is served as an asset.
+		"run_worker_first": [
+			"/api/*"
+		]
+	},
+	// Accounts, sessions and AI usage (migrations/0001_init.sql). Created with
+	// `npx wrangler d1 create vecto-db` — paste the id it prints into database_id.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "vecto-db",
+			"database_id": "b239a7b3-0005-4e21-ae4e-5a96e29007d1"
+		}
+	],
+	"vars": {
+		// Public by design — the client id is not a secret. GITHUB_CLIENT_SECRET and
+		// EVAL_TOKEN are Worker SECRETS and never appear in this file.
+		"GITHUB_CLIENT_ID": "Ov23liG7ih99YVhgZ0GG",
+		// Every origin this deployment answers to. The browser sends Origin on any
+		// POST, so this is the CSRF guard beside the SameSite=Lax cookie. In dev,
+		// .dev.vars overrides it with http://localhost:3001.
+		"ALLOWED_ORIGINS": "https://vecto.aannaelj.workers.dev",
+		// Free tier: 3 ANALYSES per user per month (one dataset = one analysis, however
+		// many AI requests it needs), and 30 AI requests a day across all users — the
+		// global figure is what actually bounds the upstream quota of 50/day, leaving
+		// ~20 for the owner's eval runs.
+		"FREE_ANALYSES_PER_MONTH": "3",
+		"DAILY_AI_BUDGET": "30",
+		// Tried in order by OpenRouter's `models` fallback. Each is the free variant of a
+		// paid model, so dropping ":free" later changes billing, not behaviour.
+		// Empty string = AI switched off (the endpoint answers 503 ai_disabled).
+		//
+		// ONE model since 2026-09-18 (vecto-plan item 20). super answered leakage files in
+		// 1-7 s with ZERO findings on documented leaks (corpus, validation and test all show
+		// it) and gemma has never answered a single request (overloaded, then 429). Measured:
+		// leakage 87% -> 92% on ultra alone. The cost is latency (median 70-95 s) and no
+		// fallback: an overloaded ultra is now an upstream_error, which is free and retryable.
+		"AI_MODELS": "nvidia/nemotron-3-ultra-550b-a55b:free"
+	}
+	// OPENROUTER_API_KEY is a Worker SECRET (dashboard or `wrangler secret put`), and
+	// `.dev.vars` locally — never a var here, never VITE_*.
 }
