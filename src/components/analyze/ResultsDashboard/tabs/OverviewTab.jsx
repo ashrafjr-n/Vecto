@@ -308,12 +308,15 @@ function RecommendationsCard({ recommendations }) {
 }
 
 /* ─────────────────────────────────────────────
-   AI NUDGE — the deterministic/AI framing this tab did not previously state
-   anywhere. Everything above and below this card is the engine's own work;
-   nothing here changes that. It renders once, the first time a report is seen,
-   and only until the report already has an AI answer on it (a column review or
-   a leakage review) or the visitor dismisses it — asking again on every visit
-   would read as nagging, not information.
+   DEEPER REVIEW POINTER — the framing this tab did not previously state anywhere.
+   Everything above and below this card is the engine's own work; nothing here
+   changes that. It renders once, the first time a report is seen, and only until
+   the report already carries a review answer (columns or leakage) or the visitor
+   dismisses it — asking again on every visit would read as nagging.
+
+   The prose deliberately never says "AI": the badge is the disclosure, and each
+   panel states what it sends at the point of asking. Naming the technology in
+   body copy is what made the product read as a wrapper around one.
 
    Deliberately no benchmark numbers (19/19 vs 8/19): real, but not yet decided
    as a public claim (vecto-plan). If that's exposed later, it belongs here. */
@@ -325,7 +328,7 @@ function AiNudgeCard({ ai }) {
 
   return (
     <SectionCard
-      title={<span className="inline-flex items-center gap-2">About this report<AiBadge>separate layer</AiBadge></span>}
+      title={<span className="inline-flex items-center gap-2">About this report<AiBadge>optional</AiBadge></span>}
       action={
         <button
           type="button"
@@ -339,14 +342,14 @@ function AiNudgeCard({ ai }) {
     >
       <p className="text-[13px] leading-relaxed text-ink-soft">
         Everything on this page — the score, the roles, the findings and the recommendations
-        — is the deterministic engine reading your file locally. Vecto's AI review is a
-        separate, optional layer on top of it: it can explain what a column likely means,
-        check whether a strong signal is real leakage or a legitimate predictor, and help
-        with picking the target column. Nothing it says changes the report unless you accept it.
+        — is measured by Vecto&apos;s engine, reading your file in this browser tab. A deeper
+        review is available separately: it can explain what a column likely means, judge
+        whether a strong signal is real leakage or a legitimate predictor, and suggest the
+        target column. Nothing it returns changes the report unless you accept it.
       </p>
       {user ? (
         <p className="mt-3 text-[12.5px] text-ink-faint">
-          You&apos;re signed in — open the Quality or Target Signal tab to ask.
+          Open Quality or Target Signal to run it.
         </p>
       ) : (
         <button
@@ -354,7 +357,7 @@ function AiNudgeCard({ ai }) {
           onClick={signIn}
           className="mt-4 inline-flex items-center rounded-xl bg-ink px-4 py-2.5 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
         >
-          Sign in with GitHub to use AI
+          Sign in for the deeper review
         </button>
       )}
     </SectionCard>
