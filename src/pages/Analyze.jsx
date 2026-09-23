@@ -154,12 +154,33 @@ function Analyze() {
   const runRef = useRef(null);
   // The same, for the leakage request, which outlives the click that started it.
   const leakRunRef = useRef(null);
+  // Set the instant the first automatic run is kicked off — see the effect below.
+  const autoStartedRef = useRef(false);
 
-  /* Leaving the page mid-analysis (back button, header link) would otherwise
-     leave the worker computing a report nobody will see. This is a cleanup on
-     unmount — synchronising with the worker outside React — not an effect
-     watching `step`, which stays forbidden (see CLAUDE.md). */
-  useEffect(() => () => { runRef.current?.abort(); leakRunRef.current?.abort(); }, []);
+  /* STILL exactly one effect, and it still does not watch `step` — that pattern
+     stays forbidden (see CLAUDE.md). It does two things, both of which are
+     "synchronise with something outside React" (reactjs-principles.md §6):
+
+     1. On mount, for a fresh upload, START the analysis. A dropped file goes
+        straight to its report now; the target picker is no longer a gate in front
+        of it, it is a thing you open when you want to change the target. The
+        engine's own detectTarget guess is the starting target, exactly as it was
+        the pre-selected default in the picker before — no AI is involved in
+        getting a report, and none is needed.
+     2. On unmount, abort whatever is running, so leaving mid-analysis does not
+        leave the worker computing a report nobody will see.
+
+     The ref guard is load-bearing: React 19 StrictMode runs this effect twice in
+     dev, and without it a dropped file would start two analyses. It cannot be a
+     `runRef` check — the dev cleanup aborts that controller but leaves it set. */
+  useEffect(() => {
+    if (entry?.step === "target" && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      startAnalysis(entry.target, []);
+    }
+    return () => { runRef.current?.abort(); leakRunRef.current?.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!entry) return <Navigate to="/" replace />;
 
@@ -202,7 +223,10 @@ function Analyze() {
     });
   };
 
-  const startAnalysis = (selectedTarget, rules) => {
+  /* A function declaration, not a const arrow: the one effect above calls it on
+     mount to auto-start a dropped file, and a declaration is hoisted, so that
+     reference is valid rather than a temporal-dead-zone read. */
+  function startAnalysis(selectedTarget, rules) {
     setTarget(selectedTarget);
     // A review of the previous report, and any request still fetching one, are both stale.
     leakRunRef.current?.abort();
@@ -240,7 +264,7 @@ function Analyze() {
         if (aiOptedIn && hasQuota(session)) runLeakageReview(result, rows);
       }, remaining);
     });
-  };
+  }
 
   const handleTargetConfirmed = (selectedTarget) => startAnalysis(selectedTarget, acceptedRules);
   const handleApplyCleaning   = (rules) => {
@@ -274,7 +298,7 @@ function Analyze() {
                 encoding={entry?.encoding}
                 initialTarget={target}
                 onConfirm={handleTargetConfirmed}
-                onBack={handleReset}
+                onBack={analysisResult ? () => setStep("results") : handleReset}
                 ai={{
                   dossier, onDossier: setDossier,
                   roleOverrides, onRoleOverridesChange: setRoleOverrides,
@@ -329,6 +353,7 @@ function Analyze() {
                 <ResultsDashboard
                   result={analysisResult}
                   onReset={handleReset}
+                  onChangeTarget={() => setStep("target")}
                   ai={{
                     data: analysisData, originalData: csvData, dossier, onDossier: setDossier,
                     leakageReview, leakageStatus, leakageFailure,

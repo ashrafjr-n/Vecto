@@ -22,7 +22,7 @@ const BASE_TABS = [
   { id: "preparation",    label: "Preparation",   requiresTarget: true },
 ];
 
-function ResultsDashboard({ result, onReset, ai }) {
+function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
   const [activeTab, setActiveTab] = useState("overview");
 
   if (!result) return null;
@@ -75,6 +75,19 @@ function ResultsDashboard({ result, onReset, ai }) {
           <h1 className="mt-1.5 text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-3xl">
             {meta.target ? <>Target: <span className="break-all font-mono text-accent-ink">{meta.target}</span></> : "No target — exploratory report"}
           </h1>
+          {/* The target is chosen by the engine when a file is dropped, so the choice
+              has to stay visible and reversible from the report itself — otherwise a
+              guessed target would be a decision made silently on the user's behalf.
+              This opens the same picker that used to block the way in. */}
+          {onChangeTarget && (
+            <button
+              type="button"
+              onClick={onChangeTarget}
+              className="mt-2 text-[12.5px] font-medium text-ink-soft underline decoration-line-strong underline-offset-4 transition-colors hover:text-ink"
+            >
+              {meta.target ? "Change target" : "Choose a target"}
+            </button>
+          )}
         </div>
         <button
           type="button"
