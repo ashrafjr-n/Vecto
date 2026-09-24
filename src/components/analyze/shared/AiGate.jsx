@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { useSession, hasQuota } from "../../auth/sessionContext.js";
+import LimitNotice from "./LimitNotice.jsx";
 
 /* What stands between a review panel's explanation and its button.
 
@@ -62,14 +63,7 @@ function AiGate({ ctaLabel, onAfterSignIn, children }) {
     );
   }
 
-  if (!hasQuota(session)) {
-    return (
-      <p className="mt-5 rounded-xl border border-line bg-paper px-4 py-3.5 text-[13px] leading-relaxed text-ink-soft">
-        You have used today&apos;s deeper reviews. More become available tomorrow —
-        everything else in this report still works.
-      </p>
-    );
-  }
+  if (!hasQuota(session)) return <LimitNotice code="quota_exhausted" />;
 
   return children;
 }

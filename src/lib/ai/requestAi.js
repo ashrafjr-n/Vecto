@@ -30,6 +30,10 @@ const MESSAGES = {
   bad_origin:        "The request was rejected as malformed.",
 };
 
+/* A used-up allowance, not a failure — panels draw LimitNotice for these. */
+export const isLimitCode = (code) =>
+  code === "quota_exhausted" || code === "monthly_ceiling" || code === "budget_exhausted";
+
 /* → { result, model, error, code, detail, aborted, cached, usage } — `error` is a
    sentence for the user, `code` the Worker's machine-readable reason (so a panel can
    tell "sign in" from "the model failed"), `detail` the provider's own message.
