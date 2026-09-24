@@ -174,4 +174,4 @@ A personal project focused on full-stack engineering, data analysis and AI-assis
 workflows — [live](https://vecto.aannaelj.workers.dev) ·
 [source](https://github.com/ashrafjr-n/Vecto).
 
-Private project; all rights reserved.
+[MIT License](LICENSE)
