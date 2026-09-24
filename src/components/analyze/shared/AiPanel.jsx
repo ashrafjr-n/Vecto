@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { LoaderCircle, TriangleAlert, X } from "lucide-react";
 import AiBadge from "./AiBadge.jsx";
+import LimitNotice from "./LimitNotice.jsx";
 import { cachedCount, clearCache } from "../../../lib/ai/answerCache.js";
+import { isLimitCode } from "../../../lib/ai/requestAi.js";
 
 /* The frame every AI feature sits in: the report's own panel surface, a title
    with the AI label, and the loading and error states — so a slow or failed model
@@ -26,7 +28,9 @@ function AiPanel({ title, status, failure, loadingText, onCancel, className = ""
         </div>
       )}
 
-      {status === "error" && (
+      {status === "error" && isLimitCode(failure?.code) && <LimitNotice code={failure.code} />}
+
+      {status === "error" && !isLimitCode(failure?.code) && (
         <div className="mt-5 rounded-xl border border-line bg-paper px-4 py-3.5">
           <div className="flex items-start gap-2.5 text-[13px] leading-relaxed text-ink">
             <TriangleAlert size={14} className="mt-0.5 shrink-0 text-warning" />

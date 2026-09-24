@@ -48,7 +48,7 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
     setFailure(null);
 
     const candidates = scan();
-    const { result, model, error, detail, aborted, usage } = await askDossier(
+    const { result, model, error, code, detail, aborted, usage } = await askDossier(
       buildReviewPayload(data, columns, roles, candidates),
       (part) => requestAi("review", part, run.signal, analysisId),
     );
@@ -56,7 +56,7 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
     onUsage?.(usage);
     const verified = error ? null : verifyReview(result, { data, columns, roles, candidates });
     if (error || verified.error) {
-      setFailure({ error: error ?? verified.error, detail });
+      setFailure({ error: error ?? verified.error, detail, code });
       setStatus("error");
       return;
     }

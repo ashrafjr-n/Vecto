@@ -66,7 +66,7 @@ function AiCleaningProposals({ result, ai }) {
     runRef.current = run;
     setStatus("loading");
     setFailure(null);
-    const { result: answer, model, error, detail, aborted, usage } = await askDossier(
+    const { result: answer, model, error, code, detail, aborted, usage } = await askDossier(
       payload(),
       (part) => requestAi("review", part, run.signal, analysisId),
     );
@@ -74,7 +74,7 @@ function AiCleaningProposals({ result, ai }) {
     onUsage?.(usage);
     const verified = error ? null : verifyReview(answer, { data: originalData, columns, roles: rolesOf(), candidates });
     if (error || verified.error) {
-      setFailure({ error: error ?? verified.error, detail });
+      setFailure({ error: error ?? verified.error, detail, code });
       setStatus("error");
       return;
     }

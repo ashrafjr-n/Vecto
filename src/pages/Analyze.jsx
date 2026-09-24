@@ -212,7 +212,7 @@ function Analyze() {
       applyUsage(reply.usage);
       const verified = reply.error ? null : verifyLeakage(reply.result, { data: rows, result });
       if (reply.error || verified.error) {
-        setLeakageFailure({ error: reply.error ?? verified.error, detail: reply.detail });
+        setLeakageFailure({ error: reply.error ?? verified.error, detail: reply.detail, code: reply.code });
         setLeakageStatus("error");
         return;
       }
