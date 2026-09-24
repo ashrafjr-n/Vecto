@@ -11,6 +11,9 @@ import { isLimitCode } from "../../../lib/ai/requestAi.js";
    that nothing else depends on it. The feature renders its own idle and result
    content as children. */
 function AiPanel({ title, status, failure, loadingText, onCancel, className = "", children }) {
+  /* A refused ask for a used-up allowance: the notice replaces the panel's body,
+     or its "Try again" button would sit under a line saying there is nothing to try. */
+  const limited = status === "error" && isLimitCode(failure?.code);
   return (
     <div className={`rounded-2xl border border-line bg-paper-sunken p-5 sm:p-6 ${className}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -28,9 +31,9 @@ function AiPanel({ title, status, failure, loadingText, onCancel, className = ""
         </div>
       )}
 
-      {status === "error" && isLimitCode(failure?.code) && <LimitNotice code={failure.code} />}
+      {limited && <LimitNotice code={failure.code} />}
 
-      {status === "error" && !isLimitCode(failure?.code) && (
+      {status === "error" && !limited && (
         <div className="mt-5 rounded-xl border border-line bg-paper px-4 py-3.5">
           <div className="flex items-start gap-2.5 text-[13px] leading-relaxed text-ink">
             <TriangleAlert size={14} className="mt-0.5 shrink-0 text-warning" />
@@ -43,7 +46,7 @@ function AiPanel({ title, status, failure, loadingText, onCancel, className = ""
         </div>
       )}
 
-      {status !== "loading" && children}
+      {status !== "loading" && !limited && children}
 
       <CacheNote />
     </div>
