@@ -21,6 +21,9 @@ function RouteFallback() {
 
 function App() {
   return (
+    /* The last line of defence for every page, a lazy chunk that fails to load
+       included — without it any crash outside /analyze is a blank screen. */
+    <ErrorBoundary>
     <BrowserRouter>
       {/* Who is signed in and how much free AI is left — read by the header and the
           AI panels. Inside the router because signing in never navigates. */}
@@ -49,6 +52,7 @@ function App() {
       </Suspense>
       </SessionProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
