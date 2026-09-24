@@ -1,4 +1,4 @@
-<img src="docs/vecto-logo.png" alt="Vecto" width="480">
+![Vecto](docs/vecto-logo.png)
 
 ### Know your dataset before you train on it.
 
