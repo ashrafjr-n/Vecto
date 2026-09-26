@@ -131,7 +131,7 @@ function AiCleaningProposals({ result, ai }) {
               </p>
               <AiPayloadPreview
                 build={payload}
-                sent={<>Sends a summary of every column with these values, never rows, to OpenRouter&apos;s free models, which may log requests. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
+                sent={<>Sends a summary of every column with these values, never rows, to free AI models (Google Gemini, or OpenRouter as a fallback), whose providers may log requests and use them to improve their products. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
               />
               {/* The scan above is local and ungated; only this ask needs an account. */}
               <AiGate ctaLabel="Sign in to propose cleaning rules" onAfterSignIn={handleAsk}>

@@ -71,12 +71,12 @@ export const PRIVACY = {
       id: "ai",
       title: "The optional deeper review",
       body: [
-        "Nothing is sent to a language model until you press a review button. When you do, Vecto's server (a Cloudflare Worker, which does not store the request) forwards a summary of the file to OpenRouter, which passes it to a model provider. The request never contains rows.",
+        "Nothing is sent to a language model until you press a review button. When you do, Vecto's server (a Cloudflare Worker, which does not store the request) forwards a summary of the file to Google's Gemini API — or, when Gemini is busy or today's allowance is spent, to OpenRouter, which passes it to another model provider. The request never contains rows.",
         { list: [
           "Column review: column names; per-column counts, share missing and summary statistics; up to 8 frequent values and 5 example values per column, each cut to 60 characters; and for values the engine flags as dirty, the unit, spelling or placeholder with its count and up to 3 examples. Free-text columns send only their average length.",
           "Leakage review: column names and roles, the engine's measured associations with the target and column means — no cell values. If you asked for a column review first, its column meanings are included.",
         ] },
-        "The models in use are free endpoints, whose providers may log requests and use them for training. Do not ask for a review of a file whose column names or example values you cannot share on those terms.",
+        "The models in use are free tiers. On Gemini's free tier Google may use what is sent to improve its products, and people may read it; OpenRouter's free models' providers may log requests and train on them. Do not ask for a review of a file whose column names or example values you cannot share on those terms.",
         "After your first review request, the leakage review of each new report in the same visit is requested automatically. Leaving the page ends that. Every panel has a “See exactly what is sent” link that shows the request before you make it.",
       ],
     },

@@ -106,7 +106,7 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
               not in the leakage panel, which by then has already sent its request. */}
           <AiPayloadPreview
             build={payload}
-            sent={<>Sends column names and summaries, never rows, to OpenRouter&apos;s free models, which may log requests. Asking also turns on the leakage review for your report. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
+            sent={<>Sends column names and summaries, never rows, to free AI models (Google Gemini, or OpenRouter as a fallback), whose providers may log requests and use them to improve their products. Asking also turns on the leakage review for your report. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
           />
           {/* `onAfterSignIn` is this panel's own ask: signing in from here runs the
               review the user asked for, instead of returning them to a button they
