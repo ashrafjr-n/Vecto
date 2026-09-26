@@ -30,10 +30,13 @@ const post = (body, env = ENV) =>
 
 // Each call to OpenRouter takes the next scripted reply and records what was sent.
 let sent = [];
+let urls = [];
 function script(...replies) {
   sent = [];
+  urls = [];
   globalThis.fetch = async (url, init) => {
     sent.push(JSON.parse(init.body));
+    urls.push({ url: String(url), key: new Headers(init.headers).get("x-goog-api-key") });
     const [status, body] = replies.shift();
     return new Response(JSON.stringify(body), { status });
   };
@@ -175,6 +178,69 @@ check("a part names itself in the prompt and asks for its own column count",
 script(answer(reviewAnswer));
 await post({ task: "review", payload: { rows: 3, columns: [{ name: "b" }] } });
 check("a single-request file carries no part note", !/part \d+ of/.test(sent[0].messages[1].content));
+
+// --- Gemini first, OpenRouter behind it ---
+const GENV = { ...ENV, GEMINI_API_KEY: "g-key", GEMINI_MODELS: "gemini-a, gemini-b" };
+const gemini = (text, finishReason = "STOP") =>
+  [200, { modelVersion: "gemini-a-001", candidates: [{ finishReason, content: { parts: [{ text }] } }] }];
+
+script(gemini('{"ok": true}'));
+res = await post({ task: "ping" }, GENV);
+out = await res.json();
+check("with a Gemini key, Gemini answers first and says so",
+  res.status === 200 && out.result.ok === true && out.provider === "gemini" && out.model === "gemini-a-001" && !("retried" in out));
+check("the Gemini call goes to the native API for the first model, keyed by header",
+  /\/models\/gemini-a:generateContent$/.test(urls[0].url) && urls[0].key === "g-key");
+check("the task's schema is sent as responseJsonSchema with temperature 0",
+  sent[0].generationConfig.responseJsonSchema.required[0] === "ok"
+  && sent[0].generationConfig.temperature === 0 && sent[0].generationConfig.responseMimeType === "application/json");
+
+script(gemini('{"findings":[],"split":{"strategy":"random","column":null,"reason":"x"}}'));
+await post({ task: "leakage", payload: { target: { name: "fare" }, columns: [{ name: "total" }] } }, GENV);
+check("the system prompt becomes systemInstruction and the rest user turns",
+  /leakage reviewer/.test(sent[0].systemInstruction.parts[0].text)
+  && sent[0].contents.length === 1 && sent[0].contents[0].role === "user" && /target "fare"/.test(sent[0].contents[0].parts[0].text));
+
+script([429, { error: { code: 429, message: "quota" } }], gemini('{"ok": true}'));
+res = await post({ task: "ping" }, GENV);
+out = await res.json();
+check("a rate-limited Gemini model moves on to the next Gemini model",
+  res.status === 200 && /gemini-b:generateContent$/.test(urls[1].url) && out.provider === "gemini" && out.retried === true);
+
+script([429, { error: { code: 429 } }], [503, { error: { code: 503, message: "overloaded" } }], answer('{"ok": true}', "a/one:free"));
+res = await post({ task: "ping" }, GENV);
+out = await res.json();
+check("when every Gemini model fails, OpenRouter answers",
+  res.status === 200 && out.provider === "openrouter" && out.model === "a/one:free" && out.retried === true
+  && urls.length === 3 && JSON.stringify(sent[2].models) === '["a/one:free","b/two:free"]');
+
+script([400, { error: { code: 400, message: "Invalid JSON payload: unknown field in response_json_schema" } }], gemini('{"ok": true}'));
+res = await post({ task: "ping" }, { ...GENV, GEMINI_MODELS: "gemini-a" });
+check("a refused schema is asked once more as plain JSON, on the same model",
+  res.status === 200 && urls.length === 2 && /gemini-a/.test(urls[1].url)
+  && !("responseJsonSchema" in sent[1].generationConfig) && sent[1].generationConfig.responseMimeType === "application/json");
+
+script(gemini('{"ok": tr', "MAX_TOKENS"), answer('{"ok": true}'));
+res = await post({ task: "ping" }, { ...GENV, GEMINI_MODELS: "gemini-a" });
+check("an answer cut off by Gemini falls back rather than being repaired", res.status === 200 && (await res.json()).provider === "openrouter" && urls.length === 2);
+
+script(gemini("not json"), gemini('{"ok": true}'));
+res = await post({ task: "ping" }, GENV);
+check("the JSON repair round goes to Gemini with the bad reply as a model turn",
+  res.status === 200 && sent[1].contents.some((c) => c.role === "model" && c.parts[0].text === "not json"));
+
+script([429, { error: { code: 429 } }], [429, { error: { code: 429 } }], [429, { error: { code: 429, message: "per-day" } }]);
+res = await post({ task: "ping" }, GENV);
+out = await res.json();
+check("when everything fails, the last provider's error is what comes back", res.status === 429 && out.error === "rate_limited" && out.retried === true);
+
+script(answer('{"ok": true}'));
+res = await post({ task: "ping" }, { ...ENV, GEMINI_MODELS: "gemini-a" });
+check("Gemini models without a key are skipped, OpenRouter alone still works", res.status === 200 && (await res.json()).provider === "openrouter" && urls.length === 1);
+
+script(gemini('{"ok": true}'));
+res = await post({ task: "ping" }, { GEMINI_API_KEY: "g", GEMINI_MODELS: "gemini-a", EVAL_TOKEN });
+check("Gemini alone, with no OpenRouter key, works", res.status === 200);
 
 // --- removed tasks stay removed ---
 script();
