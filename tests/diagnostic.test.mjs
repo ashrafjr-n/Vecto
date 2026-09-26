@@ -6,6 +6,7 @@ import {
   ridgeFit, ridgePredict, balancedAccuracy, r2, runDiagnostic, withDiagnostic, SUSPICIOUS_SCORE,
 } from "../src/lib/prep/diagnostic.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
+import { withDiagnosticLimits, LEAKAGE_CAP, NO_SIGNAL_CAP } from "../src/components/utils/core/scoring/health.js";
 
 let failed = 0;
 const check = (label, ok) => {
@@ -113,6 +114,35 @@ const broken = withDiagnostic(report, null);
 check("a failing diagnostic is reported as unavailable and the report survives intact",
   broken.diagnostic.status === "unavailable" && /failed/.test(broken.diagnostic.reason) && broken.healthScore === report.healthScore);
 check("no report, no diagnostic", withDiagnostic(null, signal) === null);
+
+/* ── the health score reads the diagnostic ───────────────────────────────────
+   The score is computed before the model runs, so without this a report could say
+   "Excellent" beside "No reliable signal". Caps only ever lower it. */
+const excellent = { score: 91, grade: "Excellent", breakdown: {}, limits: [], hasTarget: true };
+const noSignal = withDiagnosticLimits(excellent, { status: "ok", signal: false, suspicious: [], nearPerfect: false });
+check("no signal holds an Excellent score below Good, and says why",
+  noSignal.score === NO_SIGNAL_CAP && noSignal.grade === "Fair" && noSignal.limits.length === 1 && /know-nothing/.test(noSignal.limits[0].reason));
+const leaky = withDiagnosticLimits(excellent, { status: "ok", signal: true, suspicious: ["refund_amount"], nearPerfect: true });
+check("a column that alone predicts the target caps the score as a leak, naming it",
+  leaky.score === LEAKAGE_CAP && leaky.limits.length === 1 && leaky.limits[0].reason.includes('"refund_amount"'));
+check("an unavailable diagnostic leaves the score untouched",
+  withDiagnosticLimits(excellent, { status: "unavailable", reason: "x" }) === excellent);
+check("a clean diagnostic leaves the score untouched",
+  withDiagnosticLimits(excellent, { status: "ok", signal: true, suspicious: [], nearPerfect: false }) === excellent);
+const low = { ...excellent, score: 40, grade: "Poor" };
+check("a cap never raises a score that is already lower",
+  withDiagnosticLimits(low, { status: "ok", signal: false, suspicious: [], nearPerfect: false }).score === 40);
+
+/* The engine's own leak suspects cap the score too: "leak" is y under another name. */
+const leakRows = Array.from({ length: 400 }, (_, i) => {
+  const y = i % 3 === 0 ? "yes" : "no";
+  return { a: String((i * 37) % 100), b: ["x", "y", "z"][(i * 7) % 3], leak: y === "yes" ? "1" : "0", y };
+});
+const leakReport = analyzeDataset(leakRows, ["a", "b", "leak", "y"], "y");
+check("an engine leak suspect holds the score to the leakage cap, naming the column",
+  leakReport.relationships.leakageSuspects.some(l => l.col === "leak")
+  && leakReport.healthScore.score <= LEAKAGE_CAP
+  && leakReport.healthScore.limits.some(l => l.reason.includes('"leak"')));
 
 console.log(failed === 0 ? "all diagnostic checks passed" : `${failed} diagnostic check(s) FAILED`);
 process.exit(failed === 0 ? 0 : 1);

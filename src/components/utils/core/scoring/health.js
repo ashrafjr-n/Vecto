@@ -1,3 +1,20 @@
+/* Ceilings for findings that make the rest of the report optimistic. Both sit below
+   "Good" (75): a file that may leak its label, or whose columns do not beat a
+   know-nothing guess, is not ready to train on however clean it looks. */
+export const LEAKAGE_CAP   = 70;
+export const NO_SIGNAL_CAP = 74;
+
+export const gradeOf = (score) =>
+  score >= 90 ? "Excellent" :
+  score >= 75 ? "Good"      :
+  score >= 60 ? "Fair"      :
+  score >= 40 ? "Poor"      : "Critical";
+
+const quoteList = (cols) => {
+  const shown = cols.slice(0, 3).map(c => `"${c}"`).join(", ");
+  return cols.length > 3 ? `${shown} and ${cols.length - 3} more` : shown;
+};
+
 export function getHealthScore({ meta, quality, relationships, classBalance }) {
 
   const hasTarget = !!meta.target;
@@ -152,6 +169,14 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
     caps.push({ max, reason: `"${worst.col}" is ${missingPctText(worst.pct)}% missing — that has to be dealt with before this dataset is "Excellent", so the score is held to ${max}.` });
   }
 
+  /* A suspected leak is the one finding that makes every other figure optimistic: a
+     column that carries the label makes the target look easy and the data look ready.
+     The report named the leak and still graded the file "Good" or "Excellent" beside it. */
+  const leaks = relationships.leakageSuspects ?? [];
+  if (leaks.length > 0) {
+    caps.push({ max: LEAKAGE_CAP, reason: `${quoteList(leaks.map(l => l.col))} may carry the target itself — until that is ruled out, the score is held to ${LEAKAGE_CAP}.` });
+  }
+
   const ceiling = caps.reduce((lowest, c) => Math.min(lowest, c.max), 100);
 
   /* ── Final weighted score ── */
@@ -165,15 +190,9 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
 
   const finalScore = Math.round(Math.max(0, Math.min(100, score, ceiling)));
 
-  const grade =
-    finalScore >= 90 ? "Excellent" :
-    finalScore >= 75 ? "Good"      :
-    finalScore >= 60 ? "Fair"      :
-    finalScore >= 40 ? "Poor"      : "Critical";
-
   return {
     score: finalScore,
-    grade,
+    grade: gradeOf(finalScore),
     breakdown: {
       quality:        Math.round(qualityDim),
       structure:      Math.round(structureDim),
@@ -186,4 +205,28 @@ export function getHealthScore({ meta, quality, relationships, classBalance }) {
     limits: caps,
     hasTarget,
   };
+}
+
+/* The baseline model runs after the engine (src/lib/prep/diagnostic.js), so the score
+   above cannot see it. Measured on the sample report before this existed: 91
+   "Excellent" beside "No reliable signal" from the model on the same page. This adds
+   the diagnostic's two findings as caps — ceilings only, each with its reason — and
+   returns the score unchanged when the diagnostic is unavailable or finds nothing. */
+export function withDiagnosticLimits(healthScore, diagnostic) {
+  if (!healthScore || diagnostic?.status !== "ok") return healthScore;
+  const added = [];
+
+  if (diagnostic.signal === false) {
+    added.push({ max: NO_SIGNAL_CAP, reason: `The baseline model does not beat a know-nothing guess — the columns may not carry enough signal to predict the target, so the score is held to ${NO_SIGNAL_CAP}.` });
+  }
+  const suspicious = diagnostic.suspicious ?? [];
+  if (suspicious.length > 0) {
+    added.push({ max: LEAKAGE_CAP, reason: `${quoteList(suspicious)} alone predict${suspicious.length === 1 ? "s" : ""} the target almost perfectly — check ${suspicious.length === 1 ? "it is" : "they are"} known before the outcome. Until then, the score is held to ${LEAKAGE_CAP}.` });
+  } else if (diagnostic.nearPerfect) {
+    added.push({ max: LEAKAGE_CAP, reason: `The baseline model predicts the target almost perfectly — that is more often a leak than an easy problem, so the score is held to ${LEAKAGE_CAP}.` });
+  }
+
+  if (added.length === 0) return healthScore;
+  const score = Math.min(healthScore.score, ...added.map(c => c.max));
+  return { ...healthScore, score, grade: gradeOf(score), limits: [...healthScore.limits, ...added] };
 }

@@ -18,6 +18,7 @@
 
 import { isMissing, normalizeValue, sampleIndices } from "../../components/utils/core/helpers.js";
 import { analyzeDataset, ANALYSIS_PHASES } from "../../components/utils/core/index.js";
+import { withDiagnosticLimits } from "../../components/utils/core/scoring/health.js";
 import { buildPrepPlan } from "./plan.js";
 import { findSameTargetValues } from "./sameTarget.js";
 import { assignFolds } from "./folds.js";
@@ -291,7 +292,7 @@ export function withDiagnostic(result, rows) {
   } catch (err) {
     diagnostic = { status: "unavailable", reason: `The diagnostic model failed: ${err?.message ?? err}` };
   }
-  return { ...result, diagnostic };
+  return { ...result, diagnostic, healthScore: withDiagnosticLimits(result.healthScore, diagnostic) };
 }
 
 /* The engine's run, then the diagnostic as one more announced phase, so the
