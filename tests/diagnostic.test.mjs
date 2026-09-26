@@ -32,6 +32,29 @@ check("one-vs-rest ±1 decision values match scikit-learn's RidgeClassifier",
   [0.985897435897, -1.176923076923, -0.808974358974, -1.239743589744, -0.007692307692,
    0.247435897436, -0.414102564103, -0.376923076923, -0.208974358974].every((v, i) => Math.abs(decision[i] - v) < 1e-11));
 
+/* Balanced class weights, against scikit-learn 1.9:
+     RidgeClassifier(alpha=1.0, class_weight="balanced").fit(X, y).decision_function(X[:k])
+   with the weights passed as scikit-learn computes them, n / (classes · nᶜ). */
+const balanced = (ys) => {
+  const counts = new Map();
+  for (const v of ys) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return Float64Array.from(ys, v => ys.length / (counts.size * counts.get(v)));
+};
+const yBin = [1, 0, 0, 1, 0, 0, 0, 0];
+const decisionBin = ridgePredict(
+  ridgeFit(X, 8, 3, Float64Array.from(yBin, v => (v === 1 ? 1 : -1)), 1, 1, balanced(yBin)), X, 4);
+check("a class-weighted binary fit matches scikit-learn's RidgeClassifier(class_weight=\"balanced\")",
+  [0.751330746248, -1.368934372746, -0.882653937292, 0.921528898657].every((v, i) => Math.abs(decisionBin[i] - v) < 1e-9));
+const y3 = [0, 1, 2, 0, 0, 0, 0, 2];
+const Y3 = new Float64Array(24);
+y3.forEach((k, r) => { for (let j = 0; j < 3; j++) Y3[r * 3 + j] = k === j ? 1 : -1; });
+const decision3 = ridgePredict(ridgeFit(X, 8, 3, Y3, 3, 1, balanced(y3)), X, 3);
+check("a class-weighted one-vs-rest fit matches scikit-learn's RidgeClassifier(class_weight=\"balanced\")",
+  [0.908575455155, -1.657214246848, -0.251361208307, -0.869372622396, 0.312389814282,
+   -0.443017191885, -0.233033044462, -0.505700715994, -0.261266239544].every((v, i) => Math.abs(decision3[i] - v) < 1e-9));
+check("unit weights give exactly the unweighted fit",
+  ridgeFit(X, 8, 3, Y, 3, 1, new Float64Array(8).fill(1)).W.every((w, i) => close(w, ridgeFit(X, 8, 3, Y, 3).W[i])));
+
 /* ── scores ─────────────────────────────────────────────────────────────────── */
 check("a majority-class guess scores 1 / classes in balanced accuracy, whatever the imbalance",
   close(balancedAccuracy([0, 0, 0, 0, 0, 0, 0, 0, 0, 1], new Array(10).fill(0)), 0.5)
