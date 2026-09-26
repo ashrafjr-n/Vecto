@@ -430,7 +430,10 @@ const cleanRows = Array.from({ length: 2000 }, (_, i) => ({
   measure: String((i * 7919) % 100000),
   price:   String((i % 997) / 7),
   grp:     ["a", "b", "c"][i % 3],
-  code:    String(i % 4),
+  /* Was i % 4, which determines y = i % 2 exactly (Cramér's V 1.00): the engine
+     flagged it as leakage and the score still read Excellent. With the leakage cap
+     that fixture stopped being clean, so the code now pairs each yes with a no. */
+  code:    String(Math.floor(i / 2) % 4),
   y:       i % 2 ? "yes" : "no",
 }));
 const clean = analyzeDataset(cleanRows, ["measure", "price", "grp", "code", "y"], "y");

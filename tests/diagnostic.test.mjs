@@ -6,6 +6,7 @@ import {
   ridgeFit, ridgePredict, balancedAccuracy, r2, runDiagnostic, withDiagnostic, SUSPICIOUS_SCORE,
 } from "../src/lib/prep/diagnostic.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
+import { withDiagnosticLimits, LEAKAGE_CAP, NO_SIGNAL_CAP } from "../src/components/utils/core/scoring/health.js";
 
 let failed = 0;
 const check = (label, ok) => {
@@ -31,6 +32,29 @@ const decision = ridgePredict(ridgeFit(X, 8, 3, Y, 3), X, 3);
 check("one-vs-rest ±1 decision values match scikit-learn's RidgeClassifier",
   [0.985897435897, -1.176923076923, -0.808974358974, -1.239743589744, -0.007692307692,
    0.247435897436, -0.414102564103, -0.376923076923, -0.208974358974].every((v, i) => Math.abs(decision[i] - v) < 1e-11));
+
+/* Balanced class weights, against scikit-learn 1.9:
+     RidgeClassifier(alpha=1.0, class_weight="balanced").fit(X, y).decision_function(X[:k])
+   with the weights passed as scikit-learn computes them, n / (classes · nᶜ). */
+const balanced = (ys) => {
+  const counts = new Map();
+  for (const v of ys) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return Float64Array.from(ys, v => ys.length / (counts.size * counts.get(v)));
+};
+const yBin = [1, 0, 0, 1, 0, 0, 0, 0];
+const decisionBin = ridgePredict(
+  ridgeFit(X, 8, 3, Float64Array.from(yBin, v => (v === 1 ? 1 : -1)), 1, 1, balanced(yBin)), X, 4);
+check("a class-weighted binary fit matches scikit-learn's RidgeClassifier(class_weight=\"balanced\")",
+  [0.751330746248, -1.368934372746, -0.882653937292, 0.921528898657].every((v, i) => Math.abs(decisionBin[i] - v) < 1e-9));
+const y3 = [0, 1, 2, 0, 0, 0, 0, 2];
+const Y3 = new Float64Array(24);
+y3.forEach((k, r) => { for (let j = 0; j < 3; j++) Y3[r * 3 + j] = k === j ? 1 : -1; });
+const decision3 = ridgePredict(ridgeFit(X, 8, 3, Y3, 3, 1, balanced(y3)), X, 3);
+check("a class-weighted one-vs-rest fit matches scikit-learn's RidgeClassifier(class_weight=\"balanced\")",
+  [0.908575455155, -1.657214246848, -0.251361208307, -0.869372622396, 0.312389814282,
+   -0.443017191885, -0.233033044462, -0.505700715994, -0.261266239544].every((v, i) => Math.abs(decision3[i] - v) < 1e-9));
+check("unit weights give exactly the unweighted fit",
+  ridgeFit(X, 8, 3, Y, 3, 1, new Float64Array(8).fill(1)).W.every((w, i) => close(w, ridgeFit(X, 8, 3, Y, 3).W[i])));
 
 /* ── scores ─────────────────────────────────────────────────────────────────── */
 check("a majority-class guess scores 1 / classes in balanced accuracy, whatever the imbalance",
@@ -90,6 +114,35 @@ const broken = withDiagnostic(report, null);
 check("a failing diagnostic is reported as unavailable and the report survives intact",
   broken.diagnostic.status === "unavailable" && /failed/.test(broken.diagnostic.reason) && broken.healthScore === report.healthScore);
 check("no report, no diagnostic", withDiagnostic(null, signal) === null);
+
+/* ── the health score reads the diagnostic ───────────────────────────────────
+   The score is computed before the model runs, so without this a report could say
+   "Excellent" beside "No reliable signal". Caps only ever lower it. */
+const excellent = { score: 91, grade: "Excellent", breakdown: {}, limits: [], hasTarget: true };
+const noSignal = withDiagnosticLimits(excellent, { status: "ok", signal: false, suspicious: [], nearPerfect: false });
+check("no signal holds an Excellent score below Good, and says why",
+  noSignal.score === NO_SIGNAL_CAP && noSignal.grade === "Fair" && noSignal.limits.length === 1 && /know-nothing/.test(noSignal.limits[0].reason));
+const leaky = withDiagnosticLimits(excellent, { status: "ok", signal: true, suspicious: ["refund_amount"], nearPerfect: true });
+check("a column that alone predicts the target caps the score as a leak, naming it",
+  leaky.score === LEAKAGE_CAP && leaky.limits.length === 1 && leaky.limits[0].reason.includes('"refund_amount"'));
+check("an unavailable diagnostic leaves the score untouched",
+  withDiagnosticLimits(excellent, { status: "unavailable", reason: "x" }) === excellent);
+check("a clean diagnostic leaves the score untouched",
+  withDiagnosticLimits(excellent, { status: "ok", signal: true, suspicious: [], nearPerfect: false }) === excellent);
+const low = { ...excellent, score: 40, grade: "Poor" };
+check("a cap never raises a score that is already lower",
+  withDiagnosticLimits(low, { status: "ok", signal: false, suspicious: [], nearPerfect: false }).score === 40);
+
+/* The engine's own leak suspects cap the score too: "leak" is y under another name. */
+const leakRows = Array.from({ length: 400 }, (_, i) => {
+  const y = i % 3 === 0 ? "yes" : "no";
+  return { a: String((i * 37) % 100), b: ["x", "y", "z"][(i * 7) % 3], leak: y === "yes" ? "1" : "0", y };
+});
+const leakReport = analyzeDataset(leakRows, ["a", "b", "leak", "y"], "y");
+check("an engine leak suspect holds the score to the leakage cap, naming the column",
+  leakReport.relationships.leakageSuspects.some(l => l.col === "leak")
+  && leakReport.healthScore.score <= LEAKAGE_CAP
+  && leakReport.healthScore.limits.some(l => l.reason.includes('"leak"')));
 
 console.log(failed === 0 ? "all diagnostic checks passed" : `${failed} diagnostic check(s) FAILED`);
 process.exit(failed === 0 ? 0 : 1);

@@ -8,7 +8,8 @@
    estimate of what a good model would reach.
 
    The model is ridge regression (alpha 1, scikit-learn's default), and for a class
-   target the one-vs-rest ±1 form scikit-learn calls RidgeClassifier. Closed form,
+   target the one-vs-rest ±1 form scikit-learn calls RidgeClassifier, with
+   class_weight="balanced" so an imbalanced target is not fitted as its majority. Closed form,
    deterministic, no iterations to converge, and it runs on the item-35 preparation
    re-fitted inside every fold — so the score is what the exported script's
    features can support, with nothing learned from the rows it is scored on.
@@ -17,6 +18,7 @@
 
 import { isMissing, normalizeValue, sampleIndices } from "../../components/utils/core/helpers.js";
 import { analyzeDataset, ANALYSIS_PHASES } from "../../components/utils/core/index.js";
+import { withDiagnosticLimits } from "../../components/utils/core/scoring/health.js";
 import { buildPrepPlan } from "./plan.js";
 import { findSameTargetValues } from "./sameTarget.js";
 import { assignFolds } from "./folds.js";
@@ -49,18 +51,25 @@ export const UNSTABLE_BASELINE = -1;
    ȳ − x̄·w, unpenalised — what scikit-learn's Ridge(fit_intercept=True) does.
    XᵀX is accumulated from each row's NON-ZERO entries only: a one-hot row has a
    handful of them among hundreds of columns, which is the difference between
-   seconds and minutes. X: n × d row-major; Y: n × m row-major. */
-export function ridgeFit(X, n, d, Y, m, alpha = RIDGE_ALPHA) {
+   seconds and minutes. X: n × d row-major; Y: n × m row-major.
+
+   `weights` (length n, optional) are per-row sample weights, as scikit-learn's
+   sample_weight: the means are weighted, and every row counts w times in XᵀX and
+   Xᵀy. Omitted, every row weighs 1 and this is the unweighted fit. */
+export function ridgeFit(X, n, d, Y, m, alpha = RIDGE_ALPHA, weights = null) {
   const A = new Float64Array(d * d), B = new Float64Array(d * m);
   const sx = new Float64Array(d), sy = new Float64Array(m);
   const nz = new Int32Array(d);
+  let sw = 0;
   for (let r = 0; r < n; r++) {
     let k = 0;
     const row = r * d;
+    const w = weights ? weights[r] : 1;
+    sw += w;
     for (let a = 0; a < d; a++) if (X[row + a] !== 0) nz[k++] = a;
-    for (let j = 0; j < m; j++) sy[j] += Y[r * m + j];
+    for (let j = 0; j < m; j++) sy[j] += w * Y[r * m + j];
     for (let p = 0; p < k; p++) {
-      const a = nz[p], xa = X[row + a];
+      const a = nz[p], xa = w * X[row + a];
       sx[a] += xa;
       for (let q = p; q < k; q++) A[a * d + nz[q]] += xa * X[row + nz[q]];
       for (let j = 0; j < m; j++) B[a * m + j] += xa * Y[r * m + j];
@@ -68,10 +77,10 @@ export function ridgeFit(X, n, d, Y, m, alpha = RIDGE_ALPHA) {
   }
   for (let a = 0; a < d; a++) {
     for (let b = a; b < d; b++) {
-      const v = A[a * d + b] - (sx[a] * sx[b]) / n + (a === b ? alpha : 0);
+      const v = A[a * d + b] - (sx[a] * sx[b]) / sw + (a === b ? alpha : 0);
       A[a * d + b] = v; A[b * d + a] = v;
     }
-    for (let j = 0; j < m; j++) B[a * m + j] -= (sx[a] * sy[j]) / n;
+    for (let j = 0; j < m; j++) B[a * m + j] -= (sx[a] * sy[j]) / sw;
   }
   // Cholesky, in place in the lower triangle: A = LLᵀ (A is positive definite for α > 0).
   for (let j = 0; j < d; j++) {
@@ -98,8 +107,8 @@ export function ridgeFit(X, n, d, Y, m, alpha = RIDGE_ALPHA) {
       W[i * m + j] = t / A[i * d + i];
     }
     let dot = 0;
-    for (let a = 0; a < d; a++) dot += (sx[a] / n) * W[a * m + j];
-    b[j] = sy[j] / n - dot;
+    for (let a = 0; a < d; a++) dot += (sx[a] / sw) * W[a * m + j];
+    b[j] = sy[j] / sw - dot;
   }
   return { W, b, d, m };
 }
@@ -172,16 +181,24 @@ function crossValidate(plan, rows, idx, folds, y, classes, features, bins) {
         if (m === 1) Y[r] = y[p] === 1 ? 1 : -1;
         else for (let j = 0; j < m; j++) Y[r * m + j] = y[p] === j ? 1 : -1;
       });
-      const scores = ridgePredict(ridgeFit(Xtr, trainPos.length, fitted.width, Y, m), Xte, testPos.length);
+      /* Balanced class weights — scikit-learn's class_weight="balanced", n / (k · nᶜ).
+         Unweighted, a least-squares fit on an 87/13 target puts every decision value
+         below zero, predicts the majority for every row and scores exactly the
+         baseline: the sample report's churn, generated FROM salary, read "no reliable
+         signal" in four runs out of five while salary alone scored 0.72. The metric
+         is balanced accuracy, so the fit weighs the classes the way the score does. */
+      const trainCounts = new Array(classes.length).fill(0);
+      for (const p of trainPos) trainCounts[y[p]]++;
+      const present = trainCounts.filter(c => c > 0).length;
+      const weights = Float64Array.from(trainPos, p => trainPos.length / (present * trainCounts[y[p]]));
+      const scores = ridgePredict(ridgeFit(Xtr, trainPos.length, fitted.width, Y, m, RIDGE_ALPHA, weights), Xte, testPos.length);
       const pred = testPos.map((_, r) => {
         if (m === 1) return scores[r] > 0 ? 1 : 0;
         let best = 0;
         for (let j = 1; j < m; j++) if (scores[r * m + j] > scores[r * m + best]) best = j;
         return best;
       });
-      const counts = new Array(classes.length).fill(0);
-      for (const p of trainPos) counts[y[p]]++;
-      const majority = counts.indexOf(Math.max(...counts));   // bounded by the class count, not the rows
+      const majority = trainCounts.indexOf(Math.max(...trainCounts));   // bounded by the class count, not the rows
       model.push(balancedAccuracy(yTest, pred));
       baseline.push(balancedAccuracy(yTest, yTest.map(() => majority)));
     } else {
@@ -275,7 +292,7 @@ export function withDiagnostic(result, rows) {
   } catch (err) {
     diagnostic = { status: "unavailable", reason: `The diagnostic model failed: ${err?.message ?? err}` };
   }
-  return { ...result, diagnostic };
+  return { ...result, diagnostic, healthScore: withDiagnosticLimits(result.healthScore, diagnostic) };
 }
 
 /* The engine's run, then the diagnostic as one more announced phase, so the
