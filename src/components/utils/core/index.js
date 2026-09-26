@@ -244,43 +244,75 @@ export function getDatasetSnapshot(data, columns) {
    TOP INSIGHTS — column-aware, cross-signal
 ══════════════════════════════════════════ */
 
+/* The sample report — the first thing most visitors see, so it has to show what the
+   engine catches, and show it the same way on every visit.
+
+   Seeded (mulberry32), never Math.random: the sample used to be regenerated on every
+   load, so its figures and even its signal verdict changed between two visits to the
+   same link — on a product whose claim is that the same file gives the same report.
+
+   Every problem below is planted on purpose, and each is one the report names:
+     employee_id           an identifier                       → dropped as a feature
+     company               one value on every row              → constant column
+     hire_date             a date                              → left out, with the reason
+     salary, performance   a few missing values                → imputed in the plan
+     exit_interview_score  recorded only for people who left   → target leakage (presence)
+     three exported twice  exact duplicate rows                → duplicates, dropped before the split
+   and churn is driven by salary, performance and experience, so the baseline has a
+   real signal to find. */
 export function generateSampleData() {
+  let seed = 20260926;
+  const random = () => {
+    seed = (seed + 0x6D2B79F5) >>> 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
   const departments = ["Engineering", "Sales", "HR", "Marketing", "Finance"];
   const educations  = ["Bachelor's", "Master's", "PhD", "High School"];
   const genders     = ["Male", "Female", "Other"];
 
-  const rand  = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-  const pick  = arr => arr[Math.floor(Math.random() * arr.length)];
+  const rand  = (min, max) => Math.floor(random() * (max - min + 1)) + min;
+  const pick  = arr => arr[Math.floor(random() * arr.length)];
   const gauss = (mu, sigma) => {
     let u = 0, v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
+    while (u === 0) u = random();
+    while (v === 0) v = random();
     return mu + sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
   };
+  const pad = n => String(n).padStart(2, "0");
 
   const rows = Array.from({ length: 500 }, (_, i) => {
     const age        = Math.round(Math.max(22, Math.min(58, gauss(38, 8))));
     const experience = Math.round(Math.max(1,  Math.min(25, gauss(8, 5))));
     const salary     = Math.round(Math.max(30000, Math.min(120000, gauss(65000, 18000))));
     const score      = Math.round(Math.max(1, Math.min(5, gauss(3.2, 0.8))));
-    const churn      = (salary < 45000 || score < 2 || experience < 2) && Math.random() > 0.4 ? 1 : 0;
+    const churn      = (salary < 45000 || score < 2 || experience < 2) && random() > 0.4 ? 1 : 0;
 
     return {
-      employee_id:       i + 1,
+      employee_id:          i + 1,
+      company:              "Acme Corp",
+      hire_date:            `${2025 - experience}-${pad(rand(1, 12))}-${pad(rand(1, 28))}`,
       age,
-      gender:            pick(genders),
-      department:        pick(departments),
-      years_experience:  experience,
-      education:         pick(educations),
+      gender:               pick(genders),
+      department:           pick(departments),
+      years_experience:     experience,
+      education:            pick(educations),
       salary,
-      performance_score: score,
-      remote_work:       rand(0, 1),
+      performance_score:    score,
+      remote_work:          rand(0, 1),
+      // Only people who left are interviewed on the way out — known AFTER the outcome.
+      exit_interview_score: churn ? rand(1, 10) : "",
       churn,
     };
   });
 
   [10, 55, 120, 200, 310].forEach(idx => { rows[idx].salary = ""; });
   [30, 90].forEach(idx => { rows[idx].performance_score = ""; });
+  // The same three records exported twice.
+  [42, 137, 260].forEach(idx => rows.push({ ...rows[idx] }));
 
   const columns = Object.keys(rows[0]);
   return { data: rows, columns };
