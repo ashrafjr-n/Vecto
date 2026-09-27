@@ -130,6 +130,84 @@ export function findCleaningCandidates(data, columns, roles) {
   return out;
 }
 
+/* ── Rules the engine can write itself ──────────────────────────────────────
+   Some candidates have one meaning whatever the file is about, so they need no model:
+     a currency sign or code        "$1,200" → 1200            (factor 1)
+     a percent sign                 "25%"    → 25, or 0.25 when the plain numbers are fractions
+     a scale word                   "42 Lac" → 4200000         (k, thousand, lakh, crore, mn, bn…)
+     a bound                        "125+", "<5" → the bound   (censored_numeric)
+     spellings of one level         "semi furnished" → "Semi-Furnished", the commonest spelling
+     a placeholder far outside the real values   -999 among ages 18-90 → missing
+   A physical unit ("sqft", "kg") is NOT here: whether the plain numbers are in the same
+   unit is a fact about the file, and that is what the optional AI review is asked.
+   "m" is not here either — metres or million. The output is the same { rules } shape
+   the model answers in, so it goes through verifyCleaningRules like any answer. */
+const CURRENCY = new Set(["$", "€", "£", "¥", "₹", "usd", "eur", "gbp", "inr", "rs", "rs.", "sar", "aed", "ils", "₪"]);
+const SCALE = {
+  k: 1e3, thousand: 1e3, thousands: 1e3,
+  lac: 1e5, lacs: 1e5, lakh: 1e5, lakhs: 1e5, l: 1e5,
+  cr: 1e7, crore: 1e7, crores: 1e7,
+  mn: 1e6, million: 1e6, millions: 1e6,
+  bn: 1e9, billion: 1e9, billions: 1e9,
+};
+const BOUNDS = new Set(["+", "<", ">", "<=", ">=", "≤", "≥"]);
+/* A placeholder is "far outside" when the gap to the nearest real value is more than
+   this many interquartile ranges of the real values. */
+const SENTINEL_GAP_IQR = 3;
+const fmt = (n) => n.toLocaleString("en-US");
+
+export function proposeEngineRules(candidates, data) {
+  const rules = [];
+  for (const col of candidates) {
+    for (const c of col.candidates) {
+      if (c.kind === "numeric_affix") {
+        const units = [], bounds = [], notes = [];
+        let plainMedian = null;
+        for (const a of c.affixes) {
+          if (BOUNDS.has(a.affix)) { bounds.push(a.affix); continue; }
+          if (CURRENCY.has(a.affix)) { units.push({ affix: a.affix, factor: 1 }); notes.push(`"${a.affix}" is a currency mark`); continue; }
+          if (SCALE[a.affix]) { units.push({ affix: a.affix, factor: SCALE[a.affix] }); notes.push(`"${a.affix}" is ${fmt(SCALE[a.affix])}`); continue; }
+          if (a.affix === "%") {
+            if (plainMedian === null) {
+              const plain = [];
+              for (const row of data) { const v = row[col.name]; if (!isMissing(v) && isNumeric(v)) plain.push(parseFloat(v)); }
+              plainMedian = plain.length ? median(plain) : null;
+            }
+            const fraction = plainMedian !== null && Math.abs(plainMedian) <= 1;
+            units.push({ affix: "%", factor: fraction ? 0.01 : 1 });
+            notes.push(fraction ? `"25%" is 0.25, since the plain numbers are fractions` : `"%" is a percent sign`);
+          }
+        }
+        if (units.length) rules.push({ column: col.name, type: "unit_map", reason: `${notes.join("; ")}.`, affixes: units, values: [], merges: [] });
+        if (bounds.length) {
+          rules.push({ column: col.name, type: "censored_numeric", reason: `${bounds.map((b) => `"${b}"`).join(", ")} marks an open-ended value; it is read as its bound, and the report says the column holds bounds.`, affixes: bounds.map((b) => ({ affix: b, factor: 1 })), values: [], merges: [] });
+        }
+      } else if (c.kind === "level_collision") {
+        const merges = [];
+        for (const group of c.groups) {
+          if (group.some(([v]) => v.endsWith("…"))) continue;   // a clipped value is not the level itself
+          const [to] = [...group].sort((x, y) => y[1] - x[1])[0];
+          for (const [from] of group) if (from !== to) merges.push({ from, to });
+        }
+        if (merges.length) rules.push({ column: col.name, type: "merge_levels", reason: "The same level written with different case, spacing or punctuation; each is merged into its commonest spelling.", affixes: [], values: [], merges });
+      } else if (c.kind === "sentinel") {
+        const s = Number(c.value);
+        const real = [];
+        for (const row of data) { const v = row[col.name]; if (!isMissing(v) && isNumeric(v) && parseFloat(v) !== s) real.push(parseFloat(v)); }
+        if (real.length < 10) continue;
+        real.sort((x, y) => x - y);
+        const q = (p) => real[Math.floor(p * (real.length - 1))];
+        const iqr = q(0.75) - q(0.25);
+        const gap = s < real[0] ? real[0] - s : s > real[real.length - 1] ? s - real[real.length - 1] : 0;
+        if (gap > SENTINEL_GAP_IQR * Math.max(iqr, Number.EPSILON)) {
+          rules.push({ column: col.name, type: "treat_as_missing", reason: `${c.value} appears on ${fmt(c.count)} rows, far outside the column's other values (${fmt(real[0])} to ${fmt(real[real.length - 1])}) — a placeholder for "unknown", not a measurement.`, affixes: [], values: [c.value], merges: [] });
+        }
+      }
+    }
+  }
+  return { rules };
+}
+
 /* ── Applying ─────────────────────────────────────────────────────────────── */
 
 const tidy = (x) => String(Number(x.toPrecision(12)));
