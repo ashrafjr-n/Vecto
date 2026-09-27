@@ -1,8 +1,13 @@
 /* Small HTTP helpers shared by the Worker's routes: JSON replies, cookie reading
    and writing, and the origin check. Nothing here talks to the database. */
 
+/* nosniff so a JSON body is never run as a script or rendered as a page, and no-store
+   because every /api answer is about one person's session or request. */
 export const json = (body, status = 200, headers = {}) =>
-  Response.json(body, { status, headers });
+  Response.json(body, {
+    status,
+    headers: { "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store", ...headers },
+  });
 
 /* One cookie out of a request's Cookie header, or null. No library: the header is
    `a=1; b=2` and the values we set are base64url or hex, so there is nothing to

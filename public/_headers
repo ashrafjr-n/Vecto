@@ -1,0 +1,21 @@
+# Security headers for every static asset, applied by Workers Static Assets.
+# (/api/* is answered by the Worker, which sets its own headers — see worker/http.js.)
+#
+# The dataset lives in this page's memory, so the Content-Security-Policy is the
+# privacy boundary in practice: a script from any origin not listed here cannot load,
+# and nothing can be sent anywhere not listed in connect-src.
+#   script-src   the app's own bundle, and Cloudflare Web Analytics
+#   style-src    the app's CSS and Google Fonts' stylesheet; 'unsafe-inline' because
+#                React and Framer Motion set style attributes
+#   font-src     Google Fonts' font files
+#   img-src      the app's images, data: URIs, and the GitHub avatar in the header
+#   connect-src  the app's own /api, and Cloudflare Web Analytics' beacon endpoint
+#   worker-src   the analysis runs in a same-origin Web Worker
+# A new third-party script, font or endpoint has to be added here or it is blocked.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://avatars.githubusercontent.com; connect-src 'self' https://cloudflareinsights.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000
