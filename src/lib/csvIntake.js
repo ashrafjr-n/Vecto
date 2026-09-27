@@ -41,10 +41,17 @@ export function decodeCsv(bytes) {
   }
 }
 
+/* Delimited text in any of its usual spellings. The delimiter is never set anywhere a
+   file is parsed, so PapaParse detects it from the text — comma, tab, semicolon or
+   pipe — and a .tsv or a .txt export parses exactly like a .csv. */
+export const ACCEPTED_EXTENSIONS = [".csv", ".tsv", ".txt"];
+const ACCEPTED_TYPES = new Set(["text/csv", "text/tab-separated-values"]);
+
 /* → "format" | "size" | null  (null = accepted) */
 export function validateFile(file) {
   if (!file) return "format";
-  if (!file.name?.toLowerCase().endsWith(".csv") && file.type !== "text/csv") return "format";
+  const name = file.name?.toLowerCase() ?? "";
+  if (!ACCEPTED_EXTENSIONS.some(ext => name.endsWith(ext)) && !ACCEPTED_TYPES.has(file.type)) return "format";
   if (file.size > MAX_SIZE_B) return "size";
   return null;
 }
