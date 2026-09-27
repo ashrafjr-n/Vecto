@@ -6,7 +6,7 @@
    payload field, a new third-party script), this copy is wrong until it changes
    too; nothing links the two. */
 
-const UPDATED = "23 September 2026";
+const UPDATED = "27 September 2026";
 const GITHUB = "https://github.com/ashrafjr-n/vecto";
 
 /* /about is its own page (pages/About.jsx), not a TextPage: it is the one place
@@ -84,14 +84,14 @@ export const PRIVACY = {
       id: "storage",
       title: "Stored in your browser",
       body: [
-        "Successful AI answers are kept in this browser's local storage — at most 20, under the key vecto.ai.answers — so asking the same question about the same file costs no second request. They never leave the browser. The Clear link under an answer deletes them, and so does clearing the site's data. Vecto stores nothing else; the analytics below sets its own cookies.",
+        "Successful AI answers are kept in this browser's local storage — at most 20, under the key vecto.ai.answers — so asking the same question about the same file costs no second request. They never leave the browser. The Clear link under an answer deletes them, and so does clearing the site's data. Vecto stores nothing else, and sets no cookies unless you sign in.",
       ],
     },
     {
       id: "analytics",
       title: "Analytics",
       body: [
-        "The site uses Google Analytics to count visits and the pages viewed. Google receives the page address, basic browser and device information and your IP address, and sets cookies to recognise a returning browser. It does not receive your file or anything in the report.",
+        "The site uses Cloudflare Web Analytics to count visits and the pages viewed. It sets no cookies, does not use local storage and does not recognise a returning browser, so it cannot follow you across visits or across sites. Cloudflare receives the page address, the referring page, basic browser and device information and page-load timings. It does not receive your file or anything in the report.",
       ],
     },
     {
