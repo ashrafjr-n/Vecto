@@ -80,6 +80,51 @@ function OtherIssues({ items }) {
   );
 }
 
+/* Repeated records: exact duplicates, the same record under a new id, and rows that
+   agree on every feature but not on the target (analyzers/duplicates.js). Always
+   drawn when a target is set, so "none found" is stated rather than implied. */
+function RepeatedRecords({ quality, duplicates, target, identifierCols }) {
+  if (!target || !duplicates?.conflicts) return null;
+  const { conflicts, idOnlyRows } = duplicates;
+  const lines = [
+    {
+      label: "Exact duplicate rows",
+      value: quality.duplicateRows,
+      detail: "A row repeated in every column. The preparation plan drops the copies before splitting.",
+    },
+    identifierCols.length > 0 && {
+      label: "Same record under a different id",
+      value: idOnlyRows,
+      detail: `Matches an earlier row on every column except ${identifierCols.map((c) => `"${c}"`).join(", ")}, target included — likely entered twice. A random split can put the copies on both sides.`,
+    },
+    {
+      label: "Identical features, different target",
+      value: conflicts.rows,
+      detail: conflicts.groups > 0
+        ? `${conflicts.groups.toLocaleString()} group${conflicts.groups === 1 ? "" : "s"} of rows agree on every feature but not on "${target}". No model can be right on both. For example, file lines ${conflicts.examples[0].lines.join(", ")} (${conflicts.examples[0].targets.map((t) => `"${t}"`).join(" vs ")}).`
+        : `No two rows with the same features disagree on "${target}".`,
+    },
+  ].filter(Boolean);
+
+  return (
+    <SectionCard title="Repeated records">
+      <div className="divide-y divide-line">
+        {lines.map((line) => (
+          <div key={line.label} className="flex items-start justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+            <div>
+              <div className="text-[12.5px] text-ink">{line.label}</div>
+              <div className="text-[12px] leading-relaxed text-ink-soft">{line.detail}</div>
+            </div>
+            <span className={`shrink-0 font-mono text-[13px] font-medium ${line.value > 0 ? "text-warning" : "text-success"}`}>
+              {line.value.toLocaleString()}
+            </span>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 /* `ai` (from Analyze.jsx) carries the original rows and the cleaning state for AI phase D. */
 function QualityTab({ result, ai }) {
   const { quality, meta } = result;
@@ -155,6 +200,7 @@ function QualityTab({ result, ai }) {
       </SectionCard>
 
       <MissingRanking cols={missingCols} />
+      <RepeatedRecords quality={quality} duplicates={result.duplicates} target={meta.target} identifierCols={meta.identifierCols} />
       <OtherIssues items={otherIssues} />
 
       {/* The optional panel sits AFTER the measurements, not above them: what the

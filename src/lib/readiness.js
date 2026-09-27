@@ -20,6 +20,8 @@ export const MIN_CLASS_ROWS = 10;
 export const MIN_ROWS = 50;
 export const SMALL_ROWS = 200;
 export const MOSTLY_MISSING_PCT = 50;
+/* Conflicting labels on this share of rows or more cap what any model can score. */
+export const CONFLICT_BLOCK_PCT = 5;
 
 const LEVEL_ORDER = { blocker: 0, fix: 1, note: 2 };
 const quote = (cols, max = 3) => {
@@ -119,12 +121,23 @@ export function buildReadiness(result) {
       `Rows sharing a value of ${entities.length === 1 ? "this column" : "these columns"} almost always share the target. A random split puts the same entity in train and test, and the score overstates how the model does on new ones — split by group${plan.usable && plan.groupBy ? ` (the plan groups by "${plan.groupBy}")` : ""}.`,
       "preparation");
   }
-  if (quality.duplicatesComputed && quality.duplicateRows > 0) {
+  if (quality.duplicateRows > 0) {
     add("fix", plural(quality.duplicateRows, "duplicate row"),
       "A duplicate can land in train and test at once and inflate the score. The preparation plan drops them before splitting.", "quality");
-  } else if (!quality.duplicatesComputed) {
-    add("note", "Duplicate rows were not checked",
-      "The file has more than 50,000 rows, where the duplicate scan is skipped. Deduplicate before splitting if the source can repeat rows.", "quality");
+  }
+  const repeats = result.duplicates;
+  if (repeats?.idOnlyRows > 0) {
+    add("fix", `${plural(repeats.idOnlyRows, "record")} repeated under a different id`,
+      `These rows match an earlier row on every column except ${quote(meta.identifierCols)} — the same record entered twice. A random split can put the two copies on both sides; drop the copies or split by the record.`,
+      "quality");
+  }
+  if (repeats?.conflicts?.groups > 0) {
+    const { groups, rows } = repeats.conflicts;
+    const share = (rows / meta.rows) * 100;
+    add(share >= CONFLICT_BLOCK_PCT ? "blocker" : "fix",
+      `${plural(rows, "row")} with identical features but different targets`,
+      `${plural(groups, "group")} of rows match on every feature yet disagree on "${meta.target}" (${share < 0.1 ? "<0.1" : share.toFixed(1)}% of rows). No model can be right on both; if the labels are errors, fix them, and if they are real, the target depends on something the file does not record.`,
+      "quality");
   }
 
   /* ── columns ── */
