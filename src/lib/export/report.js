@@ -104,6 +104,24 @@ export function reportModel(result, { fileName = null, generatedAt = new Date() 
     }
   }
 
+  if (result.time) {
+    const t = result.time;
+    const day = (x) => new Date(x).toISOString().slice(0, 10);
+    const blocks = [{ p: `"${t.column}" runs from ${day(t.from)} to ${day(t.to)} (${t.parsed.toLocaleString()} dated rows).` }];
+    if (t.target) {
+      blocks.push({ table: {
+        head: ["Period", t.target.kind === "rate" ? `Share of "${t.target.label}"` : `Average "${meta.target}"`, "Rows"],
+        rows: t.periods.map((p) => [`${day(p.from)} – ${day(p.to)}`,
+          p.value === null ? "—" : t.target.kind === "rate" ? `${(p.value * 100).toFixed(1)}%` : num(p.value, 2), p.rows.toLocaleString()]),
+      } });
+    }
+    if (t.lateColumns.length) blocks.push({ p: `Only filled in from part-way through: ${t.lateColumns.map((c) => c.col).join(", ")}.` });
+    blocks.push({ p: t.recommendTimeSplit
+      ? `If "${t.column}" is when each row was recorded, train on rows before ${day(t.cutoff)} and test on the rest. If it describes the entity (a hire or birth date), derive tenure or age from it instead.`
+      : `Nothing moves with "${t.column}"; a random split is not misleading by itself.` });
+    sections.push({ heading: "Time", blocks });
+  }
+
   if (recommendations?.length) {
     sections.push({
       heading: "Recommendations",

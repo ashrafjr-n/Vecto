@@ -147,6 +147,27 @@ export function buildReadiness(result) {
       "quality");
   }
 
+  /* ── time (lib/timeChecks.js) ── */
+  const time = result.time;
+  if (time) {
+    const day = (t) => new Date(t).toISOString().slice(0, 10);
+    const either = `If "${time.column}" is when each row was recorded, train on rows before ${day(time.cutoff)} and test on the rest — a random split scores the model on the period it learned from. If it describes the entity (a hire or birth date), it is a feature: derive tenure or age from it instead.`;
+    if (time.target?.drifts) {
+      const change = time.target.kind === "rate"
+        ? `the share of "${time.target.label}" runs from ${(Math.min(...time.periods.map(p => p.value ?? 1)) * 100).toFixed(0)}% to ${(Math.max(...time.periods.map(p => p.value ?? 0)) * 100).toFixed(0)}% across the period`
+        : `its average moves by ${time.target.spread.toFixed(2)} standard deviations across the period`;
+      add("fix", `"${meta.target}" changes over time`, `Ordered by "${time.column}", ${change}. ${either}`, "time");
+    }
+    if (time.lateColumns.length) {
+      add("fix", `${quote(time.lateColumns.map(c => c.col))} only exist${time.lateColumns.length === 1 ? "s" : ""} from part-way through`,
+        `Empty in the earliest rows and filled in the latest (by "${time.column}"). A model can learn "recorded or not" as a stand-in for time. ${either}`, "time");
+    }
+    if (time.futureRows > 0) {
+      add("fix", `${plural(time.futureRows, "row")} dated in the future`,
+        `"${time.column}" holds dates after today — a typo, a placeholder, or a planned date that has not happened. Check them before they are used as history.`, "time");
+    }
+  }
+
   /* ── columns ── */
   const personal = ofKind("personal_data");
   if (personal.length) {

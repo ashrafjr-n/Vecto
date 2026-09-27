@@ -10,6 +10,8 @@ import RelationshipsTab  from "./tabs/RelationshipsTab.jsx";
 import ClassBalanceTab   from "./tabs/ClassBalanceTab.jsx";
 import TargetSignalTab   from "./tabs/TargetSignalTab.jsx";
 import PreparationTab    from "./tabs/PreparationTab.jsx";
+import TimeTab           from "./tabs/TimeTab.jsx";
+import CompareTab        from "./tabs/CompareTab.jsx";
 import AiBadge           from "../shared/AiBadge.jsx";
 import ExportMenu        from "./ExportMenu.jsx";
 
@@ -20,6 +22,8 @@ const BASE_TABS = [
   { id: "visualizations", label: "Visualizations"                      },
   { id: "targetsignal",   label: "Target signal", requiresTarget: true },
   { id: "relationships",  label: "Relationships"                       },
+  { id: "time",           label: "Time",          requiresTime: true   },
+  { id: "compare",        label: "Train vs test", requiresRows: true   },
   { id: "classbalance",   label: "Class balance", requiresClasses: true },
   { id: "preparation",    label: "Preparation",   requiresTarget: true },
 ];
@@ -71,12 +75,16 @@ function SectionNav({ tabs, activeTab, onSelect, vertical }) {
 
 function ResultsDashboard({ result, source, saved, onReset, onChangeTarget, ai }) {
   const [activeTab, setActiveTab] = useState("overview");
+  /* The train/test comparison, held here so switching sections keeps it. */
+  const [comparison, setComparison] = useState(null);
   if (!result) return null;
 
   const { meta, quality, healthScore } = result;
   // classBalance is null for a regression target — there are no classes to show.
   const tabs = BASE_TABS.filter((t) => (!t.requiresTarget || !!meta.target)
-                                    && (!t.requiresClasses || !!result.classBalance));
+                                    && (!t.requiresClasses || !!result.classBalance)
+                                    && (!t.requiresTime || !!result.time)
+                                    && (!t.requiresRows || !!source?.rows));
   // A constant or identifier target: there is no task, and several sections say so.
   const unusableTarget = Boolean(meta.target) && (meta.targetIsConstant || meta.targetIsIdentifier);
   const healthTone = healthScore
@@ -249,6 +257,8 @@ function ResultsDashboard({ result, source, saved, onReset, onChangeTarget, ai }
               {activeTab === "relationships"  && <RelationshipsTab  result={result} ai={ai} />}
               {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
               {activeTab === "preparation"    && <PreparationTab    result={result} ai={ai} />}
+              {activeTab === "time"           && <TimeTab           result={result} />}
+              {activeTab === "compare"        && <CompareTab        result={result} rows={source?.rows} state={comparison} onState={setComparison} />}
             </motion.div>
           </AnimatePresence>
         </div>
