@@ -102,13 +102,13 @@ function Analyze() {
       const { result, error }       = runAnalysisSync(data, cols, detectedTarget);
       return {
         step: error ? "failed" : "results",
-        data, columns: cols, target: detectedTarget, result, error,
+        data, columns: cols, target: detectedTarget, result, error, fileName: "sample.csv",
       };
     }
     const pending = getPendingDataset();
     if (pending) {
-      const { data, columns: cols, encoding } = pending;
-      return { step: "target", data, columns: cols, encoding, target: detectTarget(cols, data), result: null, error: null };
+      const { data, columns: cols, encoding, fileName } = pending;
+      return { step: "target", data, columns: cols, encoding, fileName, target: detectTarget(cols, data), result: null, error: null };
     }
     return null;
   });
@@ -351,6 +351,7 @@ function Analyze() {
               <Suspense fallback={<div className="min-h-[60vh]" />}>
                 <ResultsDashboard
                   result={analysisResult}
+                  source={{ fileName: entry?.fileName ?? null, rows: analysisData }}
                   onReset={handleReset}
                   onChangeTarget={() => setStep("target")}
                   ai={{

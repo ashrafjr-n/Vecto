@@ -11,6 +11,7 @@ import ClassBalanceTab   from "./tabs/ClassBalanceTab.jsx";
 import TargetSignalTab   from "./tabs/TargetSignalTab.jsx";
 import PreparationTab    from "./tabs/PreparationTab.jsx";
 import AiBadge           from "../shared/AiBadge.jsx";
+import ExportMenu        from "./ExportMenu.jsx";
 
 const BASE_TABS = [
   { id: "overview",       label: "Overview"                            },
@@ -68,7 +69,7 @@ function SectionNav({ tabs, activeTab, onSelect, vertical }) {
   );
 }
 
-function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
+function ResultsDashboard({ result, source, onReset, onChangeTarget, ai }) {
   const [activeTab, setActiveTab] = useState("overview");
   if (!result) return null;
 
@@ -144,6 +145,7 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
               It is a button beside New analysis, not an underlined word: the two are
               the report's two actions and reading as one pair is the honest shape. */}
           <div className="flex shrink-0 items-center gap-2">
+            <ExportMenu result={result} source={source} />
             {onChangeTarget && (
               <button
                 type="button"

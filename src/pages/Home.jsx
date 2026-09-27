@@ -186,7 +186,7 @@ function Home() {
   }, [navigate]);
 
   const readFirstRowAsData = () => {
-    const { text, encoding } = headerless;
+    const { text, encoding, fileName } = headerless;
     setHeaderless(null);
     setIsParsing(true);
     Papa.parse(text, {
@@ -194,7 +194,7 @@ function Home() {
       skipEmptyLines: true,
       complete: (results) => {
         const { data, fields, malformed: ragged } = headerlessRows(results.data);
-        setPendingDataset(data, fields, encoding);
+        setPendingDataset(data, fields, encoding, fileName);
         proceed(ragged);
       },
     });
@@ -237,7 +237,7 @@ function Home() {
             return;
           }
 
-          setPendingDataset(results.data, results.meta.fields, encoding);
+          setPendingDataset(results.data, results.meta.fields, encoding, file.name);
 
           /* A headerless file used to lose its first row into the column names
              without a word. Ask before anything else: which row is the header
@@ -245,7 +245,7 @@ function Home() {
           const firstRowIsData = headerlessVerdict(results);
           if (firstRowIsData) {
             setIsParsing(false);
-            setHeaderless({ ...firstRowIsData, text, encoding, malformed });
+            setHeaderless({ ...firstRowIsData, text, encoding, malformed, fileName: file.name });
             return;
           }
 
