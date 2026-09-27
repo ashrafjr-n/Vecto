@@ -10,6 +10,7 @@ import Header from "../components/layout/Header.jsx";
 import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
 import { setPendingDataset } from "../lib/datasetHandoff.js";
+import RecentReports from "../components/home/RecentReports.jsx";
 import {
   validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader, headerlessVerdict, headerlessRows, decodeCsv, ACCEPTED_EXTENSIONS,
 } from "../lib/csvIntake.js";
@@ -328,7 +329,7 @@ function Home() {
             </div>
 
             <p className="mt-6 text-center text-[13px] text-ink-faint">
-              CSV up to {MAX_SIZE_MB} MB · processed in your browser ·{" "}
+              CSV or TSV up to {MAX_SIZE_MB} MB · processed in your browser ·{" "}
               <Link to="/analyze?sample=1" onClick={() => window.scrollTo(0, 0)} className="font-medium text-ink-soft underline decoration-line-strong underline-offset-4 hover:text-ink">
                 or open a sample report
               </Link>
@@ -405,6 +406,8 @@ function Home() {
                 </div>
               </div>
             )}
+
+            <RecentReports />
 
             </motion.div>
 

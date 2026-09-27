@@ -325,7 +325,8 @@ function AiNudgeCard({ ai }) {
   const [dismissed, setDismissed] = useState(false);
   const { user, signIn } = useSession();
   const alreadyUsed = Boolean(ai?.dossier) || Boolean(ai?.leakageReview);
-  if (dismissed || alreadyUsed) return null;
+  // A saved report has no rows to review, so there is nothing to offer.
+  if (dismissed || alreadyUsed || !ai?.data) return null;
 
   return (
     <SectionCard

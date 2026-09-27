@@ -69,7 +69,7 @@ function SectionNav({ tabs, activeTab, onSelect, vertical }) {
   );
 }
 
-function ResultsDashboard({ result, source, onReset, onChangeTarget, ai }) {
+function ResultsDashboard({ result, source, saved, onReset, onChangeTarget, ai }) {
   const [activeTab, setActiveTab] = useState("overview");
   if (!result) return null;
 
@@ -199,6 +199,15 @@ function ResultsDashboard({ result, source, onReset, onChangeTarget, ai }) {
           {meta.target
             ? <>{meta.datasetType} task. Every figure in this report is computed in your browser and comes with the reasoning behind it.</>
             : <>Class balance, target signal and preparation need a target and are omitted. Every other section is computed normally.</>}
+        </p>
+      )}
+      {/* A report opened from this browser's saved list has no rows behind it. */}
+      {saved && (
+        <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-ink-soft">
+          Saved in this browser on {new Date(saved.savedAt).toLocaleString()}
+          {saved.fileName ? <> from <span className="font-mono text-ink">{saved.fileName}</span></> : null}.
+          The file itself is not stored, so to change the target, run a deeper review or export the data
+          dictionary, upload it again.
         </p>
       )}
       {/* Provenance: a report built from cleaned rows must say so where the report starts. */}

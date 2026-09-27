@@ -84,7 +84,9 @@ export const PRIVACY = {
       id: "storage",
       title: "Stored in your browser",
       body: [
-        "Successful AI answers are kept in this browser's local storage — at most 20, under the key vecto.ai.answers — so asking the same question about the same file costs no second request. They never leave the browser. The Clear link under an answer deletes them, and so does clearing the site's data. Vecto stores nothing else, and sets no cookies unless you sign in.",
+        "Successful AI answers are kept in this browser's local storage — at most 20, under the key vecto.ai.answers — so asking the same question about the same file costs no second request. They never leave the browser. The Clear link under an answer deletes them, and so does clearing the site's data.",
+        "Your last ten reports are kept in this browser's IndexedDB, so a refresh or a closed tab does not lose them. What is kept is the report — its figures and findings, the file name and the target — never the file or its rows. They never leave the browser. Each one can be deleted from the Recent reports list on the home page, all of them with Delete all, and clearing the site's data removes them too.",
+        "Vecto stores nothing else, and sets no cookies unless you sign in.",
       ],
     },
     {

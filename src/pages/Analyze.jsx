@@ -17,6 +17,8 @@ import { applyCleaningRules } from "../lib/ai/cleaning.js";
 import { buildLeakagePayload, verifyLeakage } from "../lib/ai/leakage.js";
 import { requestAi } from "../lib/ai/requestAi.js";
 import { useSession, hasQuota } from "../components/auth/sessionContext.js";
+import { saveReport, getSavedReport, toSavedRecord } from "../lib/savedReports.js";
+import { buildReadiness } from "../lib/readiness.js";
 
 const stepVariants = {
   initial:  { opacity: 0, y: 16 },
@@ -93,6 +95,10 @@ function Analyze() {
      Anything else — a direct visit or a hard refresh with nothing pending — has
      nothing to analyze and is redirected back to "/" below. */
   const [entry] = useState(() => {
+    /* A saved report (lib/savedReports.js) — read from IndexedDB on mount, below. The
+       file itself was never stored, so this entry has no rows. */
+    const savedId = new URLSearchParams(location.search).get("report");
+    if (savedId) return { step: "loading", savedId, data: null, columns: [], target: "", result: null, error: null };
     if (new URLSearchParams(location.search).get("sample")) {
       const { data, columns: cols } = generateSampleData();
       const detectedTarget          = detectTarget(cols, data);
@@ -150,6 +156,9 @@ function Analyze() {
   /* The rules the user has ticked — on the target step (column review) or on the
      Quality tab. The next analysis is built with exactly these. */
   const [acceptedRules,  setAcceptedRules]  = useState([]);
+  /* The saved record this page is showing, when it was opened from the home page's
+     list rather than from a file — read-only: no rows, so no re-run and no AI. */
+  const [saved,          setSaved]          = useState(null);
   // The running analysis's AbortController, so Cancel and unmount can stop it.
   const runRef = useRef(null);
   // The same, for the leakage request, which outlives the click that started it.
@@ -176,7 +185,18 @@ function Analyze() {
      first one returns at its own `run.signal.aborted` check. */
   useEffect(() => {
     if (entry?.step === "target") startAnalysis(entry.target, []);
-    return () => { runRef.current?.abort(); leakRunRef.current?.abort(); };
+    let live = true;
+    if (entry?.step === "loading") {
+      getSavedReport(entry.savedId).then((record) => {
+        if (!live) return;
+        if (!record?.result?.meta) { setStep("missing"); return; }
+        setSaved(record);
+        setAnalysisResult(record.result);
+        setTarget(record.target ?? "");
+        setStep("results");
+      });
+    }
+    return () => { live = false; runRef.current?.abort(); leakRunRef.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -254,6 +274,14 @@ function Analyze() {
         setAnalysisData(rows);
         setCleaningRules(rules);
         setStep("results");
+        /* Kept in this browser so a refresh or a closed tab does not lose it — the
+           report only, never the rows. The address then names the saved copy, so a
+           reload opens it instead of sending the user back to an empty home page.
+           A re-run on the same file replaces it (same id). */
+        saveReport(toSavedRecord(result, {
+          id: analysisId, fileName: entry?.fileName ?? null, cleaningRules: rules,
+          verdict: buildReadiness(result)?.verdict ?? null,
+        })).then((ok) => { if (ok && !run.signal.aborted) navigate(`/analyze?report=${analysisId}`, { replace: true }); });
         /* Started here, in the same handler that produced the report, rather than in
            an effect watching `step` — see the note on the one useEffect above.
            Only for a signed-in user with quota left: an automatic request that can
@@ -316,6 +344,37 @@ function Analyze() {
             </motion.div>
           )}
 
+          {step === "loading" && (
+            <motion.div key="loading" {...stepVariants}>
+              <div className="flex min-h-[70vh] items-center justify-center">
+                <LoaderCircle size={26} className="animate-spin text-accent-ink" />
+              </div>
+            </motion.div>
+          )}
+
+          {step === "missing" && (
+            <motion.div key="missing" {...stepVariants}>
+              <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
+                <div className="rounded-2xl border border-line bg-paper-sunken p-6 sm:p-8">
+                  <h1 className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-3xl">
+                    This saved report is not in this browser.
+                  </h1>
+                  <p className="mt-6 text-[15px] leading-[1.7] text-ink-soft">
+                    Reports are saved only in the browser that built them, and only the last ten. It may have been
+                    deleted, or the site&apos;s data cleared. Upload the file again to rebuild it.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="mt-8 rounded-xl bg-ink px-6 py-3 text-[13px] font-semibold text-paper transition-opacity hover:opacity-90"
+                  >
+                    Upload a file
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {step === "failed" && (
             <motion.div key="failed" {...stepVariants}>
               <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
@@ -349,6 +408,15 @@ function Analyze() {
           {step === "results" && (
             <motion.div key="results" {...stepVariants}>
               <Suspense fallback={<div className="min-h-[60vh]" />}>
+                {saved ? (
+                  <ResultsDashboard
+                    result={analysisResult}
+                    source={{ fileName: saved.fileName, rows: null }}
+                    saved={saved}
+                    onReset={handleReset}
+                    ai={{ data: null, cleaningRules: saved.cleaningRules ?? [] }}
+                  />
+                ) : (
                 <ResultsDashboard
                   result={analysisResult}
                   source={{ fileName: entry?.fileName ?? null, rows: analysisData }}
@@ -364,6 +432,7 @@ function Analyze() {
                     analysisId, onUsage: applyUsage,
                   }}
                 />
+                )}
               </Suspense>
             </motion.div>
           )}
