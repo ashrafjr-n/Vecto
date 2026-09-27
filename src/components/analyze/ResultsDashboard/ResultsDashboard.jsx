@@ -224,7 +224,13 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
             >
-              {activeTab === "overview"       && <OverviewTab       result={result} ai={ai} />}
+              {activeTab === "overview"       && (
+                <OverviewTab
+                  result={result} ai={ai}
+                  tabLabels={Object.fromEntries(tabs.map((t) => [t.id, t.label]))}
+                  onNavigate={(id) => { setActiveTab(id); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                />
+              )}
               {activeTab === "quality"        && <QualityTab        result={result} ai={ai} />}
               {activeTab === "statistics"     && <StatisticsTab     result={result} />}
               {activeTab === "visualizations" && <VisualizationsTab result={result} />}

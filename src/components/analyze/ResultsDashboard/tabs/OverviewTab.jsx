@@ -7,6 +7,7 @@ import AiBadge      from "../../shared/AiBadge.jsx";
 import StatusBadge  from "../../shared/StatusBadge.jsx";
 import { useSession } from "../../../auth/sessionContext.js";
 import { ROLE }      from "../../../utils/core/roles.constants.js";
+import ReadinessCard from "../ReadinessCard.jsx";
 
 /* ─────────────────────────────────────────────
    HEALTH SCORE — radial gauge (a single ratio against a limit -> meter, in
@@ -376,11 +377,13 @@ function AiNudgeCard({ ai }) {
 /* ─────────────────────────────────────────────
    OVERVIEW TAB
 ───────────────────────────────────────────── */
-function OverviewTab({ result, ai }) {
+function OverviewTab({ result, ai, tabLabels, onNavigate }) {
   const { meta, snapshot, healthScore, insights, recommendations } = result;
 
   return (
     <div className="space-y-4">
+      {/* The answer first: can this be trained on, and what comes first. */}
+      <ReadinessCard result={result} tabLabels={tabLabels} onNavigate={onNavigate} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
         <HealthScoreCard healthScore={healthScore} />
         <ColumnRolesCard meta={meta} />
