@@ -142,6 +142,10 @@ npm test     # analysis engine, AI layer, preparation and baseline
 npm run lint
 ```
 
+GitHub Actions runs lint, tests and the build on every push and pull request
+(`.github/workflows/ci.yml`). Cloudflare Workers Builds deploys on its own, so its build
+command is `npm test && npm run build`: a commit that fails a test is never deployed.
+
 ## Local development
 
 ```bash
@@ -164,7 +168,7 @@ src/
 ├── components/analyze/      target picker and the report
 ├── pages/                   routes
 └── content/                 copy for the documentation pages
-worker/                      Cloudflare Worker: auth, quotas, AI tasks
+worker/                      Cloudflare Worker: auth, quotas, AI tasks (Gemini, OpenRouter)
 tests/                       plain-Node test suites
 ```
 
