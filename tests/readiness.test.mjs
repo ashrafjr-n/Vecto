@@ -10,7 +10,7 @@ const check = (label, ok) => {
   console.log(`${ok ? "PASS" : "FAIL"} ${label}`);
   if (!ok) failed++;
 };
-const TABS = new Set(["overview", "quality", "statistics", "visualizations", "targetsignal", "relationships", "classbalance", "preparation"]);
+const TABS = new Set(["overview", "quality", "statistics", "visualizations", "targetsignal", "relationships", "time", "classbalance", "preparation"]);
 const run = (rows, target) => analyzeWithDiagnostic(rows, Object.keys(rows[0]), target);
 const titles = (r) => r.items.map(i => `${i.level}:${i.title}`);
 

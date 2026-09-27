@@ -111,3 +111,52 @@ export function isTemporalColumn(sample) {
 
   return true;
 }
+
+/* ── Parsing, for the checks that need a date's VALUE, not just its shape ───────
+   Same families and the same validation as dateFamily above — never Date.parse,
+   which reads "01/02/2024" by the browser's locale. Returns UTC milliseconds or null.
+   `dayFirst` settles the ambiguous slash family; year-first and ISO need no hint.
+   Two-digit years: below 50 is 20xx, otherwise 19xx (the POSIX strptime pivot is 69;
+   50 keeps "85" a 1985 birth year and "30" a 2030 expiry). */
+const year4 = (y) => (y.length <= 2 ? (+y < 50 ? 2000 + +y : 1900 + +y) : +y);
+const utc = (y, mo, d, h = 0, mi = 0, s = 0) => {
+  const t = Date.UTC(y, mo - 1, d, h, mi, s);
+  // Reject a day the month does not have (Feb 30) — Date.UTC would roll it over.
+  return new Date(t).getUTCDate() === d ? t : null;
+};
+
+export function parseDate(value, dayFirst = false) {
+  if (value == null) return null;
+  const s = String(value).trim();
+  let m;
+  if ((m = ISO_DATETIME.exec(s)) || (m = ISO_DATE.exec(s))) {
+    const [, y, mo, d, h = 0, mi = 0, sec = 0] = m;
+    const t = utc(+y, +mo, +d, +h, +mi, +sec);
+    // An explicit offset moves the instant; Z or none is read as UTC.
+    const off = /([+-])(\d{2}):?(\d{2})$/.exec(s.includes("T") || s.includes(" ") ? s.slice(10) : "");
+    return t === null ? null : off ? t - (off[1] === "+" ? 1 : -1) * (+off[2] * 60 + +off[3]) * 60000 : t;
+  }
+  if ((m = SLASH_YMD.exec(s))) return inMonth(+m[2]) ? utc(+m[1], +m[2], +m[3]) : null;
+  if ((m = MONTH_DAY_FIRST.exec(s))) return utc(year4(m[3]), MONTHS[m[1].toLowerCase()], +m[2]);
+  if ((m = DAY_MONTH_FIRST.exec(s))) return utc(year4(m[3]), MONTHS[m[2].toLowerCase()], +m[1]);
+  if ((m = SLASH_DM.exec(s))) {
+    const [d, mo] = dayFirst ? [+m[1], +m[2]] : [+m[2], +m[1]];
+    return inMonth(mo) && inDay(d) ? utc(year4(m[3]), mo, d) : null;
+  }
+  return null;
+}
+
+/* Whether a column's ambiguous dates are day-first, decided the way isTemporalColumn
+   decides it: any first part over 12 means day-first; otherwise month-first (US), and
+   `assumed` says the file could not settle it. */
+export function dayFirstFor(values) {
+  let p1Over = false, p2Over = false, ambiguous = false;
+  for (const v of values) {
+    const f = dateFamily(String(v ?? "").trim());
+    if (f?.family !== "slash_dm") continue;
+    ambiguous = true;
+    if (f.p1 > 12) p1Over = true;
+    if (f.p2 > 12) p2Over = true;
+  }
+  return { dayFirst: p1Over && !p2Over, assumed: ambiguous && !p1Over && !p2Over };
+}

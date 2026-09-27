@@ -10,6 +10,7 @@ import RelationshipsTab  from "./tabs/RelationshipsTab.jsx";
 import ClassBalanceTab   from "./tabs/ClassBalanceTab.jsx";
 import TargetSignalTab   from "./tabs/TargetSignalTab.jsx";
 import PreparationTab    from "./tabs/PreparationTab.jsx";
+import TimeTab           from "./tabs/TimeTab.jsx";
 import AiBadge           from "../shared/AiBadge.jsx";
 import ExportMenu        from "./ExportMenu.jsx";
 
@@ -20,6 +21,7 @@ const BASE_TABS = [
   { id: "visualizations", label: "Visualizations"                      },
   { id: "targetsignal",   label: "Target signal", requiresTarget: true },
   { id: "relationships",  label: "Relationships"                       },
+  { id: "time",           label: "Time",          requiresTime: true   },
   { id: "classbalance",   label: "Class balance", requiresClasses: true },
   { id: "preparation",    label: "Preparation",   requiresTarget: true },
 ];
@@ -76,7 +78,8 @@ function ResultsDashboard({ result, source, saved, onReset, onChangeTarget, ai }
   const { meta, quality, healthScore } = result;
   // classBalance is null for a regression target — there are no classes to show.
   const tabs = BASE_TABS.filter((t) => (!t.requiresTarget || !!meta.target)
-                                    && (!t.requiresClasses || !!result.classBalance));
+                                    && (!t.requiresClasses || !!result.classBalance)
+                                    && (!t.requiresTime || !!result.time));
   // A constant or identifier target: there is no task, and several sections say so.
   const unusableTarget = Boolean(meta.target) && (meta.targetIsConstant || meta.targetIsIdentifier);
   const healthTone = healthScore
@@ -249,6 +252,7 @@ function ResultsDashboard({ result, source, saved, onReset, onChangeTarget, ai }
               {activeTab === "relationships"  && <RelationshipsTab  result={result} ai={ai} />}
               {activeTab === "classbalance"   && <ClassBalanceTab   result={result} />}
               {activeTab === "preparation"    && <PreparationTab    result={result} ai={ai} />}
+              {activeTab === "time"           && <TimeTab           result={result} />}
             </motion.div>
           </AnimatePresence>
         </div>

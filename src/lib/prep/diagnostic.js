@@ -21,6 +21,7 @@ import { analyzeDataset, ANALYSIS_PHASES } from "../../components/utils/core/ind
 import { withDiagnosticLimits } from "../../components/utils/core/scoring/health.js";
 import { buildPrepPlan } from "./plan.js";
 import { findSameTargetValues } from "./sameTarget.js";
+import { runTimeChecks } from "../timeChecks.js";
 import { assignFolds } from "./folds.js";
 import { usableRows, encodeTarget, fitPrep, transformRows } from "./encode.js";
 
@@ -311,5 +312,12 @@ export function analyzeWithDiagnostic(data, columns, target, onPhase = () => {},
   } catch {
     sameTargetValues = [];
   }
-  return { ...withDiagnostic(result, data), sameTargetValues };
+  /* The date checks read the same rows; like the others, a failure leaves them out. */
+  let time;
+  try {
+    time = runTimeChecks(result, data);
+  } catch {
+    time = null;
+  }
+  return { ...withDiagnostic(result, data), sameTargetValues, time };
 }
