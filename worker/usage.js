@@ -9,14 +9,16 @@
       carrying it after the first is free — including across midnight, because the
       lookup is by id and never reads the period.
 
-   2. GLOBALLY — DAILY_AI_BUDGET requests a day across every user. This is the one
+   2. GLOBALLY — a daily allowance per provider across every user
+      (GEMINI_DAILY_BUDGET, and DAILY_AI_BUDGET for OpenRouter). This is the one
       that actually bounds the upstream bill: accounts are free to create, so a
       per-user limit bounds nobody. Eval traffic records here but is never blocked
       by it (see worker/index.js), or public traffic could lock the owner out of
       his own measurements.
 
-   Usage is recorded only after a SUCCESSFUL answer. A provider failure costs
-   nothing upstream and must never cost a user one of their allowance. */
+   A user's analysis is charged only after a SUCCESSFUL answer: a provider failure
+   must never cost a user one of their allowance. The global counters are different
+   — they count every request sent, because the provider does. */
 
 /* The largest legitimate analysis is 6 review parts (DOSSIER_MAX_COLUMNS 150 /
    DOSSIER_PART_COLUMNS 25) plus one leakage call = 7. Ten leaves room for a retry
@@ -25,7 +27,8 @@ export const MAX_REQUESTS_PER_ANALYSIS = 10;
 
 const DEFAULT_FREE_ANALYSES = 3;      // per DAY, per user
 const DEFAULT_MONTHLY_CEILING = 25;   // per user, a safety net rather than a UX number
-const DEFAULT_DAILY_BUDGET = 30;      // all users together — the real cost bound
+const DEFAULT_DAILY_BUDGET = 30;      // OpenRouter, all users together — the real cost bound
+const DEFAULT_GEMINI_BUDGET = 450;    // Gemini, all users together, under its free 500 a day
 
 const num = (value, fallback) => {
   const n = Number.parseInt(value, 10);
@@ -35,6 +38,17 @@ const num = (value, fallback) => {
 export const freeAnalyses   = (env) => num(env.FREE_ANALYSES_PER_DAY, DEFAULT_FREE_ANALYSES);
 export const monthlyCeiling = (env) => num(env.MONTHLY_ANALYSIS_CEILING, DEFAULT_MONTHLY_CEILING);
 export const dailyBudget    = (env) => num(env.DAILY_AI_BUDGET, DEFAULT_DAILY_BUDGET);
+
+/* Each provider has its own upstream allowance, so each has its own daily counter.
+   DAILY_AI_BUDGET keeps meaning OpenRouter, as it always did. */
+export const providerBudget = (env, provider = "openrouter") =>
+  provider === "gemini" ? num(env.GEMINI_DAILY_BUDGET, DEFAULT_GEMINI_BUDGET) : dailyBudget(env);
+
+/* The `budget` row for a provider today. OpenRouter keeps the bare day it has always
+   used, so a counter already running today carries on; any other provider suffixes
+   it. A key, not a new column — no migration to run before a deploy works. */
+export const budgetKey = (provider = "openrouter", now = new Date()) =>
+  provider === "openrouter" ? dayOf(now) : `${dayOf(now)}:${provider}`;
 
 /* 'YYYY-MM-DD' in UTC. The period is a KEY, not a countdown: a new day simply has
    no rows yet, so nothing has to run to "reset" anything.
@@ -112,10 +126,8 @@ export async function checkQuota(env, userId, analysisId) {
   return { ok: true };
 }
 
-/* After a successful answer: charge the analysis (creating it on first use) and
-   count the request globally. Two statements, not a transaction — the worst case
-   if the second fails is that the global counter runs one behind, which is not
-   worth a transaction on D1's free tier. */
+/* After a successful answer: charge the analysis (creating it on first use). The
+   upstream request itself was already counted by reserveBudget, before it was sent. */
 export async function recordUsage(env, userId, analysisId, meta = {}) {
   const now = Date.now();
   /* `rows` and `columns` are for History and are read out of the payload the
@@ -132,7 +144,6 @@ export async function recordUsage(env, userId, analysisId, meta = {}) {
                 columns  = COALESCE(analyses.columns, excluded.columns)`)
     .bind(userId, analysisId, periodOf(), now, meta.rows ?? null, meta.columns ?? null)
     .run();
-  await recordBudget(env);
 }
 
 /* The signed-in user's own analyses, newest first. Counts and timestamps only —
@@ -155,22 +166,41 @@ export async function historyFor(env, userId, limit = 20) {
   }));
 }
 
-export async function budgetSpent(env) {
+export async function budgetSpent(env, provider = "openrouter") {
   const row = await env.DB
     .prepare("SELECT requests FROM budget WHERE day = ?")
-    .bind(dayOf())
+    .bind(budgetKey(provider))
     .first();
   return row?.requests ?? 0;
 }
 
-export async function budgetAvailable(env) {
-  return (await budgetSpent(env)) < dailyBudget(env);
+export async function budgetAvailable(env, provider = "openrouter") {
+  return (await budgetSpent(env, provider)) < providerBudget(env, provider);
 }
 
-export async function recordBudget(env) {
+/* Take one request from a provider's allowance BEFORE sending it → true, or false
+   when today's allowance is spent. Every request that reaches a provider counts,
+   answered or not — a retry, a JSON repair round and a failed call all spend the
+   upstream quota, and counting only successes let the real total run past it.
+   One statement, so two requests at the same moment cannot both take the last
+   slot: the upsert's WHERE refuses the increment at the limit, and changes = 0. */
+export async function reserveBudget(env, provider = "openrouter") {
+  const limit = providerBudget(env, provider);
+  if (limit <= 0) return false;
+  const result = await env.DB
+    .prepare(`INSERT INTO budget (day, requests) VALUES (?, 1)
+              ON CONFLICT(day) DO UPDATE SET requests = requests + 1 WHERE requests < ?`)
+    .bind(budgetKey(provider), limit)
+    .run();
+  return (result?.meta?.changes ?? 0) > 0;
+}
+
+/* Count a request without a limit — the eval harness, which the budget must see but
+   must never block (see worker/index.js). */
+export async function recordBudget(env, provider = "openrouter") {
   await env.DB
     .prepare(`INSERT INTO budget (day, requests) VALUES (?, 1)
               ON CONFLICT(day) DO UPDATE SET requests = requests + 1`)
-    .bind(dayOf())
+    .bind(budgetKey(provider))
     .run();
 }

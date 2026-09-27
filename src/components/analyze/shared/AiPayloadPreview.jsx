@@ -6,7 +6,7 @@ import { useState } from "react";
    preview cannot differ from the bytes that leave the browser. Built only when
    opened: on a large file the profile is a full pass over the data.
 
-   The full account — what each task sends, the answer cache, OpenRouter — lives on
+   The full account — what each task sends, the answer cache, the providers — lives on
    /privacy; this is the version a user reads while deciding whether to ask. */
 function AiPayloadPreview({ build, sent }) {
   const [preview, setPreview] = useState(null);

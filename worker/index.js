@@ -1,9 +1,10 @@
 /* Vecto's Worker entry. Static files are served by the ASSETS binding without
    running this script — wrangler.jsonc's run_worker_first sends only /api/* here.
 
-   POST /api/ai  { task, payload, analysisId }  →  200 { task, model, result, usage?, retried? }
+   POST /api/ai  { task, payload, analysisId }  →  200 { task, model, provider, result, usage?, retried? }
                                                 →  4xx/5xx { error, message?, retried? }
-   `retried: true` only when a provider failed inside a 200 and the one retry ran.
+   `retried: true` when an attempt failed and another one ran: the next Gemini model,
+   the OpenRouter fallback, or OpenRouter's own single retry.
 
    GET  /api/auth/github    GET /api/auth/callback   GET  /api/auth/me
    POST /api/auth/logout    POST /api/auth/delete                  (worker/auth.js)
@@ -23,7 +24,8 @@ import { REVIEW_SCHEMA } from "../src/lib/ai/reviewSchema.js";
 import { reviewMessages } from "./reviewPrompt.js";
 import { json, originAllowed } from "./http.js";
 import * as auth from "./auth.js";
-import { checkQuota, recordUsage, recordBudget, budgetAvailable, usageFor, validAnalysisId, historyFor } from "./usage.js";
+import { checkQuota, recordUsage, recordBudget, reserveBudget, budgetAvailable, usageFor, validAnalysisId, historyFor } from "./usage.js";
+import { completeGemini } from "./gemini.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BODY_CHARS = 256_000;
@@ -136,9 +138,22 @@ function datasetMeta(name, payload) {
   };
 }
 
+/* The providers, in the order they are tried. Gemini first when it has a key (its
+   free tier allows ~500 requests a day, OpenRouter's 50, and it answers in seconds
+   rather than 70-95 s); OpenRouter behind it. Either one alone still works. */
+const listOf = (value) => (value ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+export function aiProviders(env) {
+  const providers = [];
+  const gemini = listOf(env.GEMINI_MODELS);
+  if (env.GEMINI_API_KEY && gemini.length) providers.push({ name: "gemini", models: gemini });
+  const openrouter = listOf(env.AI_MODELS);
+  if (env.OPENROUTER_API_KEY && openrouter.length) providers.push({ name: "openrouter", models: openrouter });
+  return providers;
+}
+
 async function handleAi(request, env) {
-  const models = (env.AI_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-  if (!env.OPENROUTER_API_KEY || models.length === 0) return json({ error: "ai_disabled" }, 503);
+  const providers = aiProviders(env);
+  if (providers.length === 0) return json({ error: "ai_disabled" }, 503);
 
   /* Order matters: the eval bypass is checked before the origin, because a Node
      client sends no Origin at all and would otherwise be rejected here. */
@@ -152,8 +167,11 @@ async function handleAi(request, env) {
     if (!user) return json({ error: "unauthenticated" }, 401);
 
     /* The global guard, before the per-user one: the upstream account quota is
-       shared by everyone, so this is the limit that actually bounds the bill. */
-    if (!(await budgetAvailable(env))) return json({ error: "budget_exhausted" }, 503);
+       shared by everyone, so this is the limit that actually bounds the bill.
+       Open while ANY provider has requests left today. */
+    let open = false;
+    for (const p of providers) if (await budgetAvailable(env, p.name)) { open = true; break; }
+    if (!open) return json({ error: "budget_exhausted" }, 503);
   }
 
   const text = await request.text();
@@ -173,7 +191,7 @@ async function handleAi(request, env) {
 
   /* One analysis id per dataset. Every request carrying an id this user has
      already paid for is free (up to a ceiling no real file reaches), so a wide
-     file sent in six parts still costs one of the three monthly analyses. */
+     file sent in six parts still costs one of the three daily analyses. */
   const analysisId = body?.analysisId;
   if (!fromEval) {
     if (!validAnalysisId(analysisId)) return json({ error: "invalid_analysis_id" }, 400);
@@ -183,27 +201,66 @@ async function handleAi(request, env) {
     }
   }
 
-  const messages = task.messages(body.payload);
-  /* A provider failing inside a 200 ends the request for OpenRouter, so its `models`
-     fallback never runs — measured 2026-09-15: 5/18 dossier files lost this way and the
-     second model answered none. Ask once more, without the model that failed when the
-     reply names it. One retry, not a loop over models; further fallback stays with OpenRouter. */
-  /* `retried` goes into the response, success or failure (vecto-plan item 43): the path
-     had never run on a real overload, so every reply that used it is the evidence. */
+  /* Every request sent upstream is counted against its provider's day BEFORE it is
+     sent — a failed call spends the provider's quota as surely as an answer does.
+     Eval traffic is counted but never refused, or public traffic could lock the
+     owner out of his own measurements. */
+  const spend = async (provider) => {
+    if (fromEval) {
+      if (env.DB) await recordBudget(env, provider);
+      return true;
+    }
+    return reserveBudget(env, provider);
+  };
+
   let retried = false;
-  const ask = async (msgs) => {
+  let answeredBy = null;
+
+  /* OpenRouter as it always ran: its own `models` fallback, then — when a provider
+     failed inside a 200, which ends the request for OpenRouter so its fallback never
+     runs (measured 2026-09-15: 5/18 dossier files lost this way) — one more request
+     without the model that failed. One retry, not a loop over models. */
+  const askOpenRouter = async (msgs, models) => {
+    if (!(await spend("openrouter"))) return { skipped: true };
     const first = await complete(env.OPENROUTER_API_KEY, models, name, task, msgs);
     if (first.unavailable === undefined) return first;
+    if (!(await spend("openrouter"))) return first;
     retried = true;
     const rest = models.filter((m) => m !== first.unavailable);
     return complete(env.OPENROUTER_API_KEY, rest.length ? rest : models, name, task, msgs);
   };
+
+  /* Each Gemini model is its own attempt (each has its own free allowance), then
+     OpenRouter. Any failure moves on to the next: a busy model, a spent allowance, a
+     timeout or a cut-off answer may all go differently elsewhere. A provider whose
+     day is spent is skipped without a request. The last failure is what the page sees. */
+  const ask = async (msgs) => {
+    let last = null;
+    for (const provider of providers) {
+      const attempts = provider.name === "gemini"
+        ? provider.models.map((model) => async () => {
+            if (!(await spend("gemini"))) return { skipped: true };
+            return completeGemini(env.GEMINI_API_KEY, model, task, msgs);
+          })
+        : [() => askOpenRouter(msgs, provider.models)];
+      for (const attempt of attempts) {
+        if (last) retried = true;
+        const reply = await attempt();
+        if (reply.skipped) continue;
+        if (!reply.error) { answeredBy = provider.name; return reply; }
+        console.warn(`${provider.name} failed for ${name}: ${reply.error.status}`);
+        last = reply;
+      }
+    }
+    return last ?? { error: json({ error: "budget_exhausted" }, 503) };
+  };
   const failed = async (res) => (retried ? json({ ...(await res.json()), retried }, res.status) : res);
 
+  const messages = task.messages(body.payload);
   let reply = await ask(messages);
   if (reply.error) return failed(reply.error);
 
-  // A 200 carrying invalid JSON is not an error to OpenRouter, so its fallback never
+  // A 200 carrying invalid JSON is not an error to the provider, so no fallback
   // fires. Ask once more with the parse error.
   let parsed = parseJson(reply.content);
   if (parsed.error) {
@@ -217,20 +274,18 @@ async function handleAi(request, env) {
     if (parsed.error) return json({ error: "invalid_json", message: parsed.error, ...(retried && { retried }) }, 502);
   }
 
-  /* Charged only here, on a successful answer. A provider failure costs nothing
-     upstream and must never cost a user one of their three analyses. */
+  /* The user is charged only here, on a successful answer. A provider failure must
+     never cost a user one of their daily analyses. */
   let usage;
-  if (env.DB) {
-    if (fromEval) await recordBudget(env);
-    else {
-      await recordUsage(env, user.id, analysisId, datasetMeta(name, body.payload));
-      usage = await usageFor(env, user.id);
-    }
+  if (env.DB && !fromEval) {
+    await recordUsage(env, user.id, analysisId, datasetMeta(name, body.payload));
+    usage = await usageFor(env, user.id);
   }
 
   return json({
     task: name,
     model: reply.model,
+    provider: answeredBy,
     result: parsed.value,
     ...(usage && { usage }),        // lets the page update its counter without a second call
     ...(retried && { retried }),

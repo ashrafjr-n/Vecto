@@ -81,7 +81,7 @@ function AiLeakageReview({ result, dossier, review, status, failure, onAsk, onCa
           </p>
           <AiPayloadPreview
             build={payload}
-            sent={<>Sends column names, roles and the engine&apos;s measurements{dossier ? ", plus the column meanings from the review" : ""}, never cell values, to OpenRouter&apos;s free models, which may log requests. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
+            sent={<>Sends column names, roles and the engine&apos;s measurements{dossier ? ", plus the column meanings from the review" : ""}, never cell values, to free AI models (Google Gemini, or OpenRouter as a fallback), whose providers may log requests and use them to improve their products. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
           />
           {/* Signing in here runs the leakage check itself — `onAsk` is the same
               request the button fires, owned by Analyze.jsx. */}

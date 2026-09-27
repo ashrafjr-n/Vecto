@@ -39,7 +39,16 @@
 		"FREE_ANALYSES_PER_DAY": "3",
 		"MONTHLY_ANALYSIS_CEILING": "25",
 		"DAILY_AI_BUDGET": "30",
-		// Tried in order by OpenRouter's `models` fallback. Each is the free variant of a
+		// Gemini's own daily allowance (worker/usage.js keeps a counter per provider).
+		// Its free tier gives Flash-Lite about 500 requests a day; 450 leaves room for
+		// the owner's eval runs. Every request sent counts, answered or not.
+		"GEMINI_DAILY_BUDGET": "450",
+		// PRIMARY provider since 2026-09-26, tried before AI_MODELS, one model at a time
+		// in this order (each model has its own free allowance). Used only when the
+		// GEMINI_API_KEY secret is set; empty string = Gemini off, OpenRouter alone.
+		"GEMINI_MODELS": "gemini-2.5-flash-lite,gemini-3.5-flash-lite",
+		// The FALLBACK provider since 2026-09-26: reached only when every Gemini model
+		// failed or Gemini's day is spent. Tried in order by OpenRouter's `models` fallback. Each is the free variant of a
 		// paid model, so dropping ":free" later changes billing, not behaviour.
 		// Empty string = AI switched off (the endpoint answers 503 ai_disabled).
 		//
@@ -50,6 +59,6 @@
 		// fallback: an overloaded ultra is now an upstream_error, which is free and retryable.
 		"AI_MODELS": "nvidia/nemotron-3-ultra-550b-a55b:free"
 	}
-	// OPENROUTER_API_KEY is a Worker SECRET (dashboard or `wrangler secret put`), and
-	// `.dev.vars` locally — never a var here, never VITE_*.
+	// OPENROUTER_API_KEY and GEMINI_API_KEY are Worker SECRETS (dashboard or
+	// `wrangler secret put`), and `.dev.vars` locally — never a var here, never VITE_*.
 }

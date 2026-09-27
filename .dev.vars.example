@@ -3,7 +3,11 @@
 # never move any of these into wrangler.jsonc or a VITE_ variable — everything
 # here except GITHUB_CLIENT_ID is a secret, and VITE_ vars are shipped to the browser.
 
-# Existing: the OpenRouter key the AI endpoint proxies with.
+# The Gemini key (Google AI Studio) — the primary provider. Leave empty to run on
+# OpenRouter alone.
+GEMINI_API_KEY = ""
+
+# The OpenRouter key — the fallback provider behind Gemini.
 OPENROUTER_API_KEY = "sk-or-..."
 
 # From the DEV GitHub OAuth app (callback http://localhost:3001/api/auth/callback).
@@ -16,7 +20,7 @@ GITHUB_CLIENT_SECRET = ""
 EVAL_TOKEN = ""
 
 # Quota knobs live in wrangler.jsonc (FREE_ANALYSES_PER_DAY, MONTHLY_ANALYSIS_CEILING,
-# DAILY_AI_BUDGET) and apply in dev too — override here only to test a limit.
+# DAILY_AI_BUDGET, GEMINI_DAILY_BUDGET) and apply in dev too — override here only to test a limit.
 
 # The Vite dev origin. In production this is set in wrangler.jsonc instead.
 ALLOWED_ORIGINS = "http://localhost:3001"

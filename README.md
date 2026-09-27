@@ -125,7 +125,7 @@ shows exactly what will be sent before the request is made. Details:
 
 **Backend** Cloudflare Workers · D1
 
-**AI** OpenRouter
+**AI** Google Gemini API (primary) · OpenRouter (fallback)
 
 **Data / ML** JavaScript analysis engine · scikit-learn pipeline export
 

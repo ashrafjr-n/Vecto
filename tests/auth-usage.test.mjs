@@ -19,6 +19,7 @@ import worker from "../worker/index.js";
 import {
   checkQuota, recordUsage, usageFor, resetsOn, periodOf, validAnalysisId,
   budgetAvailable, monthStart, historyFor, MAX_REQUESTS_PER_ANALYSIS,
+  reserveBudget, budgetKey, providerBudget,
 } from "../worker/usage.js";
 
 let failures = 0;
@@ -30,17 +31,18 @@ function check(name, ok) {
 /* A D1 stand-in: `first()` returns the next queued row, `run()` and `batch()`
    record that a write happened. Every statement is kept so a test can assert that
    a path wrote nothing at all. */
-function stubDb(rows = []) {
+function stubDb(rows = [], { changes = 1 } = {}) {
   const queue = [...rows];
   const db = {
     statements: [],
     writes: 0,
+    changes,
     prepare(sql) {
       const stmt = {
         sql,
         bind: (...args) => { stmt.args = args; db.statements.push({ sql, args }); return stmt; },
         first: async () => (queue.length ? queue.shift() : null),
-        run: async () => { db.writes++; return { success: true }; },
+        run: async () => { db.writes++; return { success: true, meta: { changes: db.changes } }; },
         all: async () => ({ results: queue.length ? queue.shift() : [] }),
       };
       return stmt;
@@ -173,7 +175,8 @@ globalThis.fetch = async () => {
 {
   const env = { ...ENV(), DB: stubDb() };
   await recordUsage(env, 1, ID);
-  check("recording a success writes the analysis and the budget", env.DB.writes === 2);
+  // The upstream request was already counted by reserveBudget before it was sent.
+  check("recording a success writes the analysis only", env.DB.writes === 1);
   check("the analysis row carries the UTC period", env.DB.statements[0].args.includes(periodOf()));
 }
 
@@ -194,6 +197,57 @@ globalThis.fetch = async () => {
 {
   const env = { ...ENV(), DB: stubDb([{ requests: 30 }]) };
   check("at the daily budget the endpoint is closed to everyone", (await budgetAvailable(env)) === false);
+}
+
+/* ── per-provider allowance, reserved before each request ─────────────────── */
+
+{
+  const env = { ...ENV(), DB: stubDb([], { changes: 1 }) };
+  check("a request under the allowance reserves its slot", (await reserveBudget(env, "gemini")) === true && env.DB.writes === 1);
+  check("the reservation is one statement that refuses the increment at the limit",
+    /WHERE requests < \?/.test(env.DB.statements[0].sql) && env.DB.statements[0].args[1] === 450);
+}
+
+{
+  const env = { ...ENV(), DB: stubDb([], { changes: 0 }) };
+  check("a spent allowance refuses the reservation", (await reserveBudget(env, "openrouter")) === false);
+}
+
+{
+  const env = { ...ENV(), GEMINI_DAILY_BUDGET: "0", DB: stubDb() };
+  check("an allowance of zero switches a provider off without a write",
+    (await reserveBudget(env, "gemini")) === false && env.DB.writes === 0);
+}
+
+check("OpenRouter keeps the bare day as its budget key, so today's counter carries on",
+  budgetKey("openrouter", new Date("2026-09-26T10:00:00Z")) === "2026-09-26");
+check("Gemini counts under its own key", budgetKey("gemini", new Date("2026-09-26T10:00:00Z")) === "2026-09-26:gemini");
+check("each provider has its own daily allowance",
+  providerBudget(ENV(), "openrouter") === 30 && providerBudget(ENV(), "gemini") === 450
+  && providerBudget({ ...ENV(), GEMINI_DAILY_BUDGET: "400" }, "gemini") === 400);
+
+{
+  /* The gate: signed in, but every provider's day is spent → 503 before any model. */
+  upstreamCalls = 0;
+  const env = { ...ENV(), GEMINI_API_KEY: "g", GEMINI_MODELS: "gemini-x",
+    DB: stubDb([{ id: 1, login: "u", avatar_url: null, plan: "free" }, { requests: 450 }, { requests: 30 }]) };
+  const res = await worker.fetch(new Request("https://vecto.test/api/ai", {
+    method: "POST", headers: { Origin: "https://vecto.test", Cookie: "vecto_session=abc" },
+    body: JSON.stringify({ task: "ping", analysisId: ID }),
+  }), env);
+  check("every provider spent is 503 budget_exhausted, with no request sent",
+    res.status === 503 && (await res.json()).error === "budget_exhausted" && upstreamCalls === 0);
+}
+
+{
+  /* Gemini spent, OpenRouter still open: the gate lets the request through. */
+  const env = { ...ENV(), GEMINI_API_KEY: "g", GEMINI_MODELS: "gemini-x",
+    DB: stubDb([{ id: 1, login: "u", avatar_url: null, plan: "free" }, { requests: 450 }, { requests: 3 }]) };
+  const res = await worker.fetch(new Request("https://vecto.test/api/ai", {
+    method: "POST", headers: { Origin: "https://vecto.test", Cookie: "vecto_session=abc" },
+    body: JSON.stringify({ task: "ping", analysisId: ID }),
+  }), env);
+  check("one provider with requests left keeps the endpoint open", res.status !== 503);
 }
 
 /* ── history: counts only ─────────────────────────────────────────────────── */
