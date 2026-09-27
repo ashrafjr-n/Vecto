@@ -1,4 +1,5 @@
 import { isMissing, isNumeric, toNumber } from "../helpers.js";
+import { personalDataKind, PERSONAL_LABEL } from "../detectors/personal.js";
 
 /* The share of present values that must parse as numbers before a column is
    analysed as numeric — the same 0.8 relations.js gates on. Above it, every
@@ -87,6 +88,21 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
                 + `the mean, median and histogram reported for "${col}" describe nothing. The values alone cannot tell the two apart.`,
         });
       }
+    }
+
+    /* Personal data: a column whose values are email addresses, phone numbers, card
+       numbers and the like. Not a defect in the data and not scored — a fact the
+       person handling the file has to act on, and the reason the AI review masks
+       these values before anything is sent. */
+    const personal = numericRoleCols.includes(col) ? null : personalDataKind(nonEmpty);
+    if (personal) {
+      columnsWithIssues.push({
+        col,
+        issue:  "personal_data",
+        kind:   personal.kind,
+        detail: `Looks like ${PERSONAL_LABEL[personal.kind]} (${personal.share}% of sampled values) — personal data. `
+              + `Drop it, or replace it with a stable hash, before training or sharing the file. Its values are masked in any AI review.`,
+      });
     }
 
     // Only check constant/cardinality on non-empty values

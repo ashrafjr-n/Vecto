@@ -16,6 +16,7 @@ import { isTemporalColumn } from "../../components/utils/core/detectors/temporal
 import { usableTargetColumns } from "../../components/utils/core/detectors/target.js";
 import { ROLE } from "../../components/utils/core/roles.constants.js";
 import { DOSSIER_ROLES, DOSSIER_SUBTYPES, DOSSIER_CONFIDENCE, DOSSIER_SENSITIVE, DOSSIER_TASKS, DOSSIER_MAX_COLUMNS } from "./dossierSchema.js";
+import { maskPersonalData } from "../../components/utils/core/detectors/personal.js";
 
 const DISTINCT_CAP = 20000;   // same ceiling as roles.js CARD_CAP
 const TOP_VALUES = 8;
@@ -25,7 +26,14 @@ const EXAMPLE_SCAN_POINTS = 200;
 const MAX_CHARS = 60;
 const MAX_TARGETS = 3;
 
-const clip = (s) => (s.length > MAX_CHARS ? `${s.slice(0, MAX_CHARS)}…` : s);
+/* Every value that leaves the browser goes through here: personal data masked first
+   (an email becomes "[email]" — the shape the model needs, not the address), then
+   clipped. Masking before clipping, so a clip cannot cut an address in half and
+   leave the first half unmasked. */
+const clip = (s) => {
+  const masked = String(maskPersonalData(s));
+  return masked.length > MAX_CHARS ? `${masked.slice(0, MAX_CHARS)}…` : masked;
+};
 const sig = (x) => Number(x.toPrecision(6));
 
 /* The engine's detectTarget() guess is deliberately NOT sent. Measured on the eval

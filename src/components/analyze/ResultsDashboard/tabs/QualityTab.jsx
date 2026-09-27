@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { CircleCheckBig, CircleSlash, Hash, Layers, Minus } from "lucide-react";
+import { CircleCheckBig, CircleSlash, Hash, Layers, Minus, ShieldAlert } from "lucide-react";
 
 import SectionCard from "../../shared/SectionCard.jsx";
 import AiCleaningProposals from "./AiCleaningProposals.jsx";
 
-const ISSUE_ICON = { high_cardinality: Layers, constant: Minus, mixed_numeric: CircleSlash, possible_code: Hash };
+const ISSUE_ICON = { high_cardinality: Layers, constant: Minus, mixed_numeric: CircleSlash, possible_code: Hash, personal_data: ShieldAlert };
 
 const parseCount = (detail) => {
   const cleaned = String(detail ?? "0").replace(/[^\d.]/g, "");

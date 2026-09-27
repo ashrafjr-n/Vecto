@@ -11,7 +11,7 @@ import Footer from "../components/layout/Footer.jsx";
 import SectionLabel from "../components/common/SectionLabel.jsx";
 import { setPendingDataset } from "../lib/datasetHandoff.js";
 import {
-  validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader, headerlessVerdict, headerlessRows, decodeCsv,
+  validateFile, inspectParseResult, MAX_SIZE_MB, transformHeader, headerlessVerdict, headerlessRows, decodeCsv, ACCEPTED_EXTENSIONS,
 } from "../lib/csvIntake.js";
 
 /* Radius pair that makes the hero and the content panel read as one continuous
@@ -24,7 +24,7 @@ const PANEL_RADIUS_TOP    = "rounded-t-[2.5rem] sm:rounded-t-[4.5rem] lg:rounded
 const ERRORS = {
   format: {
     title: "Unsupported file format.",
-    desc:  "Only CSV files are accepted.",
+    desc:  "Vecto reads delimited text: .csv, .tsv or .txt. From Excel, use File → Save As → CSV first.",
   },
   size: {
     title: "File exceeds the size limit.",
@@ -306,7 +306,7 @@ function Home() {
               <input
                 ref={inputRef}
                 type="file"
-                accept=".csv"
+                accept={ACCEPTED_EXTENSIONS.join(",")}
                 className="hidden"
                 onChange={(e) => handleFile(e.target.files[0])}
               />
@@ -320,7 +320,7 @@ function Home() {
                 <>
                   <UploadCloud size={28} className="text-ink-faint" />
                   <div className="mt-6 text-[22px] font-medium tracking-tight text-ink sm:text-[26px]">
-                    {isDragOver ? "Drop to upload" : "Drag and drop a CSV file"}
+                    {isDragOver ? "Drop to upload" : "Drag and drop a CSV or TSV file"}
                   </div>
                   <div className="mt-2 text-[14px] text-ink-soft">or click to browse</div>
                 </>

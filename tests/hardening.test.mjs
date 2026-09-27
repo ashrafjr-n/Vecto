@@ -131,8 +131,22 @@ check("errors with no row number do not fabricate a warning",
 check("oversized file is rejected",
   validateFile({ name: "big.csv", type: "text/csv", size: MAX_SIZE_B + 1 }) === "size");
 
-check("non-CSV file is rejected",
-  validateFile({ name: "notes.txt", type: "text/plain", size: 10 }) === "format");
+check("a spreadsheet file is rejected",
+  validateFile({ name: "book.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: 10 }) === "format");
+
+check("a .tsv and a .txt export are accepted",
+  validateFile({ name: "data.TSV", type: "", size: 10 }) === null
+  && validateFile({ name: "export.txt", type: "text/plain", size: 10 }) === null
+  && validateFile({ name: "blob", type: "text/tab-separated-values", size: 10 }) === null);
+
+/* No delimiter is ever passed to PapaParse, so it is detected from the text: a tab or
+   semicolon file must come out with the same columns a comma file does. */
+for (const [label, sep] of [["tab", "\t"], ["semicolon", ";"], ["pipe", "|"]]) {
+  const text = ["id", "city", "score"].join(sep) + "\n" + ["1", "Haifa", "3.5"].join(sep) + "\n" + ["2", "Jaffa", "4"].join(sep);
+  const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, transformHeader });
+  check(`a ${label}-separated file parses into its columns`,
+    parsed.meta.fields.join() === "id,city,score" && parsed.data[1].city === "Jaffa" && parsed.data[0].score === "3.5");
+}
 
 check("valid CSV file is accepted",
   validateFile({ name: "data.csv", type: "text/csv", size: 1000 }) === null);

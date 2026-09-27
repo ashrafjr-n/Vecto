@@ -8,13 +8,24 @@
 
 import { buildDossierPayload, verifyDossier } from "./dossier.js";
 import { verifyCleaningRules } from "./cleaning.js";
+import { maskPersonalData } from "../../components/utils/core/detectors/personal.js";
+
+/* The cleaning candidates carry real cell values (affix examples, colliding spellings).
+   They are masked here, on the way out, not where they are found: the browser still
+   needs the real values to apply an accepted rule to the file. */
+const maskCandidate = (c) => ({
+  ...c,
+  ...(c.affixes && { affixes: c.affixes.map((a) => ({ ...a, examples: (a.examples ?? []).map(maskPersonalData) })) }),
+  ...(c.groups && { groups: c.groups.map((g) => g.map(([value, count]) => [maskPersonalData(value), count])) }),
+  ...(c.value !== undefined && { value: maskPersonalData(c.value) }),
+});
 
 /* `candidates` is findCleaningCandidates() output for the SAME file, as uploaded. */
 export function buildReviewPayload(data, columns, roles, candidates) {
   const payload = buildDossierPayload(data, columns, roles);
   const byName = new Map(candidates.map((c) => [c.name, c.candidates]));
   for (const col of payload.columns) {
-    if (byName.has(col.name)) col.cleaning = byName.get(col.name);
+    if (byName.has(col.name)) col.cleaning = byName.get(col.name).map(maskCandidate);
   }
   return payload;
 }
