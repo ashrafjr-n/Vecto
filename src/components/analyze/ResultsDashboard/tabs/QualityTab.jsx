@@ -85,14 +85,14 @@ function OtherIssues({ items }) {
    drawn when a target is set, so "none found" is stated rather than implied. */
 function RepeatedRecords({ quality, duplicates, target, identifierCols }) {
   if (!target || !duplicates?.conflicts) return null;
-  const { conflicts, idOnlyRows } = duplicates;
+  const { conflicts, idOnlyRows, coarse, distinctShare } = duplicates;
   const lines = [
     {
       label: "Exact duplicate rows",
       value: quality.duplicateRows,
       detail: "A row repeated in every column. The preparation plan drops the copies before splitting.",
     },
-    identifierCols.length > 0 && {
+    identifierCols.length > 0 && !coarse && {
       label: "Same record under a different id",
       value: idOnlyRows,
       detail: `Matches an earlier row on every column except ${identifierCols.map((c) => `"${c}"`).join(", ")}, target included — likely entered twice. A random split can put the copies on both sides.`,
@@ -108,6 +108,12 @@ function RepeatedRecords({ quality, duplicates, target, identifierCols }) {
 
   return (
     <SectionCard title="Repeated records">
+      {coarse && (
+        <p className="mb-3 text-[12px] leading-relaxed text-ink-soft">
+          Only {Math.round(distinctShare * 100)}% of rows have a combination of feature values no other row has, so rows
+          repeat by chance here: a repeat is not a copy, and a disagreement is how much of the target these columns cannot see.
+        </p>
+      )}
       <div className="divide-y divide-line">
         {lines.map((line) => (
           <div key={line.label} className="flex items-start justify-between gap-4 py-2.5 first:pt-0 last:pb-0">

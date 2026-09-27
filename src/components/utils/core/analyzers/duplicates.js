@@ -26,17 +26,24 @@ export function rowKey(row, cols) {
   return key;
 }
 
-/* → { featureColumns, idOnlyRows, conflicts: { groups, rows, examples } | null } */
+/* Below this share of distinct feature combinations among rows, the features are too
+   coarse for a repeat to mean a copy: with two cities and three age bands, most rows
+   share their features with another by chance. Copies come in pairs; coarse features
+   come in large groups, and they pull the share down far faster. */
+export const COARSE_FEATURE_SHARE = 0.5;
+
+/* → { featureColumns, distinctShare, coarse, idOnlyRows, conflicts: { groups, rows, examples } | null } */
 export function getDuplicates(data, columns, target, identifierCols = []) {
   const ids = new Set(identifierCols);
   const featureColumns = columns.filter(c => c !== target && !ids.has(c));
-  if (!target || featureColumns.length === 0) return { featureColumns, idOnlyRows: 0, conflicts: null };
+  if (!target || featureColumns.length === 0) return { featureColumns, distinctShare: null, coarse: false, idOnlyRows: 0, conflicts: null };
 
   /* feature key → { first row, targets seen (normalized → a spelling), rows } */
   const groups = new Map();
   const seenWithTarget = new Set();
   const seenExact = new Set();
   let idOnlyRows = 0;
+  let withTargetRows = 0;
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
@@ -44,6 +51,7 @@ export function getDuplicates(data, columns, target, identifierCols = []) {
     if (isMissing(raw)) continue;
     const fKey = rowKey(row, featureColumns);
     const t = normalizeValue(raw);
+    withTargetRows++;
 
     if (ids.size > 0) {
       // Same features, same target. An exact duplicate is counted by Quality; only a
@@ -78,8 +86,11 @@ export function getDuplicates(data, columns, target, identifierCols = []) {
     }
   }
 
+  const distinctShare = withTargetRows ? Math.round((groups.size / withTargetRows) * 1000) / 1000 : null;
   return {
     featureColumns,
+    distinctShare,
+    coarse: distinctShare !== null && distinctShare < COARSE_FEATURE_SHARE,
     idOnlyRows,
     conflicts: { groups: conflictGroups, rows: conflictRows, examples },
   };

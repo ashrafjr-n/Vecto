@@ -63,7 +63,7 @@ assertKeysExact(withTarget, [
   "insights", "healthScore", "recommendations",
 ], "analyzeDataset() result");
 
-assertKeysExact(withTarget.duplicates, ["featureColumns", "idOnlyRows", "conflicts"], "duplicates");
+assertKeysExact(withTarget.duplicates, ["featureColumns", "distinctShare", "coarse", "idOnlyRows", "conflicts"], "duplicates");
 assertKeysExact(withTarget.duplicates.conflicts, ["groups", "rows", "examples"], "duplicates.conflicts");
 
 assertKeysExact(withTarget.meta, [

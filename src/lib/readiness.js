@@ -126,12 +126,19 @@ export function buildReadiness(result) {
       "A duplicate can land in train and test at once and inflate the score. The preparation plan drops them before splitting.", "quality");
   }
   const repeats = result.duplicates;
-  if (repeats?.idOnlyRows > 0) {
+  if (repeats?.coarse && repeats.conflicts?.groups > 0) {
+    /* Coarse features: repeats are chance, not copies, and disagreement is not a label
+       error — it is how much of the target these columns cannot see. */
+    const share = (repeats.conflicts.rows / meta.rows) * 100;
+    add("note", "The features leave much of the target unexplained",
+      `Only ${Math.round(repeats.distinctShare * 100)}% of rows have a combination of feature values no other row has, and ${share.toFixed(1)}% of rows share their features with a row that has a different "${meta.target}". No model on these columns can separate those rows — the target depends on something they do not record.`,
+      "quality");
+  } else if (repeats?.idOnlyRows > 0) {
     add("fix", `${plural(repeats.idOnlyRows, "record")} repeated under a different id`,
       `These rows match an earlier row on every column except ${quote(meta.identifierCols)} — the same record entered twice. A random split can put the two copies on both sides; drop the copies or split by the record.`,
       "quality");
   }
-  if (repeats?.conflicts?.groups > 0) {
+  if (!repeats?.coarse && repeats?.conflicts?.groups > 0) {
     const { groups, rows } = repeats.conflicts;
     const share = (rows / meta.rows) * 100;
     add(share >= CONFLICT_BLOCK_PCT ? "blocker" : "fix",

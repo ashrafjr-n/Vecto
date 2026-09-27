@@ -56,5 +56,15 @@ check("a record under a new id is a fix naming the id column",
   buildReadiness(withDiagnostic(analyzeDataset(copies, ["id", "x", "g", "y"], "y"), copies))
     .items.some(i => i.level === "fix" && /repeated under a different id/.test(i.title) && /"id"/.test(i.detail)));
 
+/* Coarse features: two cities and a yes/no over 300 rows repeat by chance. */
+const coarseRows = Array.from({ length: 300 }, (_, i) => ({ id: String(i), city: ["Haifa", "Jaffa"][i % 2], y: i % 3 ? "yes" : "no" }));
+const coarse = getDuplicates(coarseRows, ["id", "city", "y"], "y", ["id"]);
+check("coarse features are recognised as such", coarse.coarse === true && coarse.distinctShare < 0.05);
+const coarseReady = buildReadiness(withDiagnostic(analyzeDataset(coarseRows, ["id", "city", "y"], "y"), coarseRows));
+check("on coarse features, repeats are not called copies and conflicts are not called errors",
+  !coarseReady.items.some(i => /repeated under a different id|different targets/.test(i.title))
+  && coarseReady.items.some(i => i.level === "note" && /leave much of the target unexplained/.test(i.title)));
+check("rich features are not coarse", d.coarse === false || d.distinctShare >= 0.5);
+
 if (failed) { console.error(`${failed} duplicates check(s) failed`); process.exit(1); }
 console.log("all duplicates checks passed");
