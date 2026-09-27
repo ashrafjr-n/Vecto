@@ -9,6 +9,7 @@ import { getQuality }              from "./analyzers/quality.js";
 import { getStatistics,
          getVisualizations }       from "./analyzers/stats.js";
 import { getRelationshipsV3 }      from "./analyzers/relations.js";
+import { getDuplicates }           from "./analyzers/duplicates.js";
 import { getHealthScore }          from "./scoring/health.js";
 import { getRecommendations }      from "./intelligence/recommendations.js";
 import { getPriorityInsights }     from "./intelligence/insights.js";
@@ -118,6 +119,8 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}, roleOv
   const relationships  = getRelationshipsV3(data, numericCols, target, skipFromCorrelation, categoricalCols, columnRoles);
   const classBalance   = getClassBalance(data, target, columnRoles[target]);
   const snapshot       = getDatasetSnapshot(data, columns);
+  // Records repeated beyond exact duplicates: conflicting labels, and copies under a new id.
+  const duplicates     = getDuplicates(data, columns, target, identifierCols);
 
   phase(5);
   // V3 systems
@@ -127,7 +130,7 @@ export function analyzeDataset(data, columns, target, onPhase = () => {}, roleOv
 
   return {
     meta, quality, statistics, visualizations,
-    relationships, classBalance, snapshot,
+    relationships, classBalance, snapshot, duplicates,
     insights, healthScore, recommendations,
   };
 }

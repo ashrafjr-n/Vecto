@@ -1,5 +1,6 @@
 import { isMissing, isNumeric, toNumber } from "../helpers.js";
 import { personalDataKind, PERSONAL_LABEL } from "../detectors/personal.js";
+import { rowKey } from "./duplicates.js";
 
 /* The share of present values that must parse as numbers before a column is
    analysed as numeric — the same 0.8 relations.js gates on. Above it, every
@@ -135,14 +136,18 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
     }
   });
 
-  // FIX P6: skip duplicate detection for large datasets (expensive O(n × cols log cols))
-  // FIX #4: "skipped" ≠ "zero". Represent not-computed as null + a duplicatesComputed
-  // flag, so 0 unambiguously means "checked, none found".
-  const duplicatesComputed = data.length <= 50000;
-  let duplicateRows = null;
-  if (duplicatesComputed) {
-    const serialized = data.map(r => JSON.stringify(r, Object.keys(r).sort()));
-    duplicateRows    = serialized.length - new Set(serialized).size;
+  /* Exact duplicate rows, on every file. The check used to be skipped above 50,000
+     rows because sorting and serialising each row cost 1.8 s on 400,000 of them; a
+     joined key costs 0.6 s (analyzers/duplicates.js), inside the file-size cap.
+     `duplicatesComputed` stays in the output — "skipped" ≠ "zero" is still the rule
+     for any reader — and is now always true. */
+  const duplicatesComputed = true;
+  const seenRows = new Set();
+  let duplicateRows = 0;
+  for (const r of data) {
+    const key = rowKey(r, columns);
+    if (seenRows.has(key)) duplicateRows++;
+    else seenRows.add(key);
   }
   const missingPct    = (missingCells / (data.length * columns.length)) * 100;
 
@@ -186,22 +191,12 @@ export function getQuality(data, columns, identifierCols = [], temporalCols = []
   // Identifiers are expected in real data — a small charge, not a defect.
   const idScore       = Math.max(0, 100 - identifierCols.length * 3);
 
-  /* The duplicates term participates only when duplicates were actually counted.
-     When the check is skipped its weight is redistributed across the other three
-     rather than scored as a perfect 100 — "not measured" must never read as
-     "measured, and clean". */
-  const components = duplicatesComputed
-    ? {
-        missing:    { score: missingScore,  weight: 0.45, detail: `${missingPct.toFixed(1)}% of cells empty${worstMissingCol ? `, worst column "${worstMissingCol}" at ${worstColMissingPct.toFixed(1)}%` : ""}` },
-        duplicates: { score: Math.max(0, 100 - pct(duplicateRows, data.length) * 50), weight: 0.25, detail: `${duplicateRows} duplicate row${duplicateRows === 1 ? "" : "s"}` },
-        constant:   { score: constantScore, weight: 0.15, detail: `${constantCols} constant column${constantCols === 1 ? "" : "s"}` },
-        id:         { score: idScore,       weight: 0.15, detail: `${identifierCols.length} identifier column${identifierCols.length === 1 ? "" : "s"}` },
-      }
-    : {
-        missing:  { score: missingScore,  weight: 0.60, detail: `${missingPct.toFixed(1)}% of cells empty${worstMissingCol ? `, worst column "${worstMissingCol}" at ${worstColMissingPct.toFixed(1)}%` : ""}` },
-        constant: { score: constantScore, weight: 0.20, detail: `${constantCols} constant column${constantCols === 1 ? "" : "s"}` },
-        id:       { score: idScore,       weight: 0.20, detail: `${identifierCols.length} identifier column${identifierCols.length === 1 ? "" : "s"}` },
-      };
+  const components = {
+    missing:    { score: missingScore,  weight: 0.45, detail: `${missingPct.toFixed(1)}% of cells empty${worstMissingCol ? `, worst column "${worstMissingCol}" at ${worstColMissingPct.toFixed(1)}%` : ""}` },
+    duplicates: { score: Math.max(0, 100 - pct(duplicateRows, data.length) * 50), weight: 0.25, detail: `${duplicateRows} duplicate row${duplicateRows === 1 ? "" : "s"}` },
+    constant:   { score: constantScore, weight: 0.15, detail: `${constantCols} constant column${constantCols === 1 ? "" : "s"}` },
+    id:         { score: idScore,       weight: 0.15, detail: `${identifierCols.length} identifier column${identifierCols.length === 1 ? "" : "s"}` },
+  };
 
   const LABEL = { missing: "Missing values", duplicates: "Duplicate rows", constant: "Constant columns", id: "Identifier columns" };
   const deductions = Object.entries(components).map(([key, c]) => ({

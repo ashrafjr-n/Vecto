@@ -272,21 +272,17 @@ for (const [ok, msg] of [
   [case1c, `computed: quality score uses the 4-weight formula (=${q1.qualityScore}, expected 75)`],
 ]) { if (!ok) failures++; console.log(`${ok ? "PASS" : "FAIL"}  ${msg}`); }
 
-// Case 2 — over the duplicate-detection ceiling, so the term is absent entirely.
+// Case 2 — a large file. The 50,000-row ceiling is gone: duplicates are counted on
+// every file now, so the term is always present and a big file is scored like a small one.
 const bigRows = [];
 for (let i = 0; i < 50001; i++) bigRows.push({ a: `v${i}`, b: `w${i % 7}` });
+bigRows.push({ a: "v0", b: "w0" });
 const q2 = getQuality(bigRows, ["a", "b"], [], [], []);
 const c2 = q2.qualityComponents;
-const case2a = Number.isFinite(q2.qualityScore);                 // no NaN from a null count
-const case2b = Math.abs(sumWeights(c2) - 1.0) < 1e-9
-  && Math.abs(c2.missing.weight - 0.60) < 1e-9
-  && Math.abs(c2.constant.weight - 0.20) < 1e-9
-  && Math.abs(c2.id.weight - 0.20) < 1e-9;                       // renormalized {0.60,0.20,0.20}
-const case2c = !("duplicates" in c2);                            // duplicates dim absent
 for (const [ok, msg] of [
-  [case2a, `skipped: no NaN (quality=${q2.qualityScore})`],
-  [case2b, `skipped: 3 weights renormalized & sum to 1.0 (${sumWeights(c2)})`],
-  [case2c, `skipped: duplicates dimension ABSENT from components (keys: ${Object.keys(c2).join(",")})`],
+  [Number.isFinite(q2.qualityScore), `large file: no NaN (quality=${q2.qualityScore})`],
+  [q2.duplicatesComputed === true && q2.duplicateRows === 1, `large file: duplicates counted (${q2.duplicateRows})`],
+  ["duplicates" in c2 && Math.abs(sumWeights(c2) - 1.0) < 1e-9, "large file: 4 weights incl. duplicates, sum to 1.0"],
 ]) { if (!ok) failures++; console.log(`${ok ? "PASS" : "FAIL"}  ${msg}`); }
 
 /* One number, not two: the health dimension IS the published quality score. */

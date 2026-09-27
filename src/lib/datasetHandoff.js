@@ -7,9 +7,10 @@
 let pending = null;
 
 /* `encoding` is what decodeCsv read the bytes as — shown on the target step when it
-   was not UTF-8, because the fallback is a guess the user can check and we cannot. */
-export function setPendingDataset(data, columns, encoding = "utf-8") {
-  pending = { data, columns, encoding };
+   was not UTF-8, because the fallback is a guess the user can check and we cannot.
+   `fileName` names the exported report and the saved copy; it never leaves the browser. */
+export function setPendingDataset(data, columns, encoding = "utf-8", fileName = null) {
+  pending = { data, columns, encoding, fileName };
 }
 
 /* Non-destructive on purpose: React 19 StrictMode double-invokes a lazy useState

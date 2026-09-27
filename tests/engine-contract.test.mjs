@@ -59,9 +59,12 @@ const withTarget = analyzeDataset(ROWS, COLUMNS, "y");
 
 assertKeysExact(withTarget, [
   "meta", "quality", "statistics", "visualizations",
-  "relationships", "classBalance", "snapshot",
+  "relationships", "classBalance", "snapshot", "duplicates",
   "insights", "healthScore", "recommendations",
 ], "analyzeDataset() result");
+
+assertKeysExact(withTarget.duplicates, ["featureColumns", "distinctShare", "coarse", "idOnlyRows", "conflicts"], "duplicates");
+assertKeysExact(withTarget.duplicates.conflicts, ["groups", "rows", "examples"], "duplicates.conflicts");
 
 assertKeysExact(withTarget.meta, [
   "rows", "columns", "numericCols", "categoricalCols", "identifierCols",

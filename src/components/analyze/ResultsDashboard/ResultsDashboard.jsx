@@ -11,6 +11,7 @@ import ClassBalanceTab   from "./tabs/ClassBalanceTab.jsx";
 import TargetSignalTab   from "./tabs/TargetSignalTab.jsx";
 import PreparationTab    from "./tabs/PreparationTab.jsx";
 import AiBadge           from "../shared/AiBadge.jsx";
+import ExportMenu        from "./ExportMenu.jsx";
 
 const BASE_TABS = [
   { id: "overview",       label: "Overview"                            },
@@ -68,7 +69,7 @@ function SectionNav({ tabs, activeTab, onSelect, vertical }) {
   );
 }
 
-function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
+function ResultsDashboard({ result, source, saved, onReset, onChangeTarget, ai }) {
   const [activeTab, setActiveTab] = useState("overview");
   if (!result) return null;
 
@@ -144,6 +145,7 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
               It is a button beside New analysis, not an underlined word: the two are
               the report's two actions and reading as one pair is the honest shape. */}
           <div className="flex shrink-0 items-center gap-2">
+            <ExportMenu result={result} source={source} />
             {onChangeTarget && (
               <button
                 type="button"
@@ -197,6 +199,15 @@ function ResultsDashboard({ result, onReset, onChangeTarget, ai }) {
           {meta.target
             ? <>{meta.datasetType} task. Every figure in this report is computed in your browser and comes with the reasoning behind it.</>
             : <>Class balance, target signal and preparation need a target and are omitted. Every other section is computed normally.</>}
+        </p>
+      )}
+      {/* A report opened from this browser's saved list has no rows behind it. */}
+      {saved && (
+        <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-ink-soft">
+          Saved in this browser on {new Date(saved.savedAt).toLocaleString()}
+          {saved.fileName ? <> from <span className="font-mono text-ink">{saved.fileName}</span></> : null}.
+          The file itself is not stored, so to change the target, run a deeper review or export the data
+          dictionary, upload it again.
         </p>
       )}
       {/* Provenance: a report built from cleaned rows must say so where the report starts. */}
