@@ -1,0 +1,96 @@
+employee_id,company,hire_date,age,gender,department,years_experience,education,salary,performance_score,remote_work,exit_interview_score,churn
+401,Acme Corp,2020-10-26,34,Female,Legal,5,Master's,236004.5,3,0,,0
+402,Acme Corp,2024-10-09,28,Other,Engineering,1,Bachelor's,199344.90000000002,2,1,,0
+403,Acme Corp,2012-04-08,25,Male,Sales,13,Bachelor's,174788,3,1,,0
+404,Acme Corp,2020-09-03,46,Other,Sales,5,High School,235989.7,4,0,,0
+405,Acme Corp,2010-09-01,40,Male,Engineering,15,High School,274136.7,2,0,,0
+406,Acme Corp,2020-01-05,44,Other,Legal,5,Bachelor's,141883.9,4,1,8,1
+407,Acme Corp,2022-09-10,30,Male,Finance,3,PhD,299063.60000000003,4,0,,0
+408,Acme Corp,2019-01-21,26,Male,Engineering,6,Bachelor's,239956.1,3,0,,0
+409,Acme Corp,2021-07-16,27,Male,Sales,4,PhD,157327.7,3,0,5,1
+410,Acme Corp,2024-06-04,41,Female,Finance,1,Master's,167402.80000000002,4,1,,0
+411,Acme Corp,2011-03-12,37,Male,Legal,14,High School,283024.10000000003,3,1,,0
+412,Acme Corp,2009-03-23,46,Male,HR,16,PhD,164446.5,4,0,7,1
+413,Acme Corp,2014-06-07,39,Other,Marketing,11,High School,298146,5,0,,0
+414,Acme Corp,2012-11-03,39,Female,HR,13,Master's,282617.10000000003,3,1,,0
+415,Acme Corp,2018-07-07,42,Female,Finance,7,Master's,263832.2,3,0,,0
+416,Acme Corp,2024-12-24,22,Female,Legal,1,High School,196407.1,3,0,2,1
+417,Acme Corp,2023-09-22,33,Male,Sales,2,Master's,151030.30000000002,3,1,8,1
+418,Acme Corp,2018-04-17,33,Other,Marketing,7,Master's,188008.1,3,1,,0
+419,Acme Corp,2019-06-22,40,Male,Finance,6,Master's,130166,4,1,,0
+420,Acme Corp,2024-02-16,52,Female,Engineering,1,Bachelor's,209679,3,1,2,1
+421,Acme Corp,2018-05-15,36,Other,Legal,7,High School,175949.80000000002,3,0,,0
+422,Acme Corp,2005-03-12,38,Other,HR,20,PhD,144762.5,3,1,,0
+423,Acme Corp,2018-07-06,45,Female,Engineering,7,High School,378920.7,3,1,,0
+424,Acme Corp,2021-09-07,39,Male,Marketing,4,Master's,222129.5,2,0,,0
+425,Acme Corp,2023-10-19,44,Other,Sales,2,High School,193173.30000000002,3,0,,0
+426,Acme Corp,2010-02-12,39,Female,Legal,15,High School,335408.7,3,1,,0
+427,Acme Corp,2019-11-25,40,Other,Finance,6,High School,178143.9,3,0,,0
+428,Acme Corp,2019-03-07,25,Female,Finance,6,PhD,186446.7,3,0,,0
+429,Acme Corp,2021-10-14,47,Other,Sales,4,Bachelor's,224123.80000000002,3,0,,0
+430,Acme Corp,2022-03-06,29,Female,Engineering,3,Master's,241221.5,4,0,,0
+431,Acme Corp,2023-06-15,43,Female,Legal,2,PhD,290531.4,4,1,,0
+432,Acme Corp,2018-02-24,46,Other,Finance,7,PhD,182654.2,3,1,,0
+433,Acme Corp,2019-03-15,25,Female,Finance,6,PhD,254604.40000000002,4,1,,0
+434,Acme Corp,2018-12-06,34,Male,Finance,7,High School,199215.40000000002,3,0,,0
+435,Acme Corp,2017-08-13,48,Male,HR,8,Bachelor's,326658.2,4,1,,0
+436,Acme Corp,2021-06-17,22,Female,Legal,4,Master's,213848.90000000002,3,1,,0
+437,Acme Corp,2020-07-13,36,Female,Sales,5,Master's,269104.7,3,1,,0
+438,Acme Corp,2014-02-19,38,Other,HR,11,Bachelor's,213131.1,2,0,,0
+439,Acme Corp,2018-08-27,39,Male,Sales,7,High School,300654.60000000003,4,1,,0
+440,Acme Corp,2014-12-21,37,Female,Finance,11,High School,227772,3,0,,0
+441,Acme Corp,2019-05-06,51,Male,Legal,6,Bachelor's,235523.5,3,0,,0
+442,Acme Corp,2022-01-08,47,Other,Engineering,3,Bachelor's,231201.90000000002,4,1,,0
+443,Acme Corp,2016-09-12,52,Female,HR,9,PhD,350171.7,2,0,,0
+444,Acme Corp,2017-08-09,28,Male,Engineering,8,Bachelor's,299304.10000000003,3,0,,0
+445,Acme Corp,2023-01-08,28,Other,HR,2,PhD,259532.80000000002,5,1,,0
+446,Acme Corp,2019-06-05,31,Male,Legal,6,Bachelor's,268560.8,3,0,,0
+447,Acme Corp,2006-03-13,43,Other,Marketing,19,PhD,235009.2,3,0,,0
+448,Acme Corp,2013-01-03,37,Other,Sales,12,Bachelor's,308446.8,3,1,,0
+449,Acme Corp,2018-02-28,34,Female,HR,7,PhD,251588.90000000002,2,0,,0
+450,Acme Corp,2017-05-07,32,Male,HR,8,Master's,342312.9,3,0,,0
+451,Acme Corp,2016-07-20,22,Female,Legal,9,High School,226243.90000000002,3,0,,0
+452,Acme Corp,2017-07-09,42,Male,Marketing,8,High School,430524.60000000003,4,0,,0
+453,Acme Corp,2014-08-16,29,Female,Finance,11,PhD,284659.5,5,0,,0
+454,Acme Corp,2014-12-08,33,Female,Sales,11,Bachelor's,200717.6,4,0,,0
+455,Acme Corp,2012-09-16,47,Female,Engineering,13,Master's,243711.6,3,1,,0
+456,Acme Corp,2016-06-08,34,Female,Legal,9,Bachelor's,172286.80000000002,2,0,,0
+457,Acme Corp,2017-05-15,33,Other,Engineering,8,High School,240481.5,2,0,,0
+458,Acme Corp,2017-03-08,44,Male,Finance,8,High School,117360.3,2,1,7,1
+459,Acme Corp,2021-10-05,39,Other,Finance,4,High School,301542.60000000003,2,1,,0
+460,Acme Corp,2022-02-23,34,Other,Engineering,3,Bachelor's,320516.2,3,1,,0
+461,Acme Corp,2016-10-04,44,Other,Legal,9,High School,262899.8,4,1,,0
+462,Acme Corp,2012-04-03,34,Male,Marketing,13,Master's,243197.30000000002,4,1,,0
+463,Acme Corp,2012-05-20,38,Other,Marketing,13,PhD,218159.40000000002,3,0,,0
+464,Acme Corp,2016-09-12,31,Female,Finance,9,Bachelor's,210104.5,3,0,,0
+465,Acme Corp,2015-04-11,46,Other,Sales,10,Master's,176127.4,4,1,,0
+466,Acme Corp,2008-10-24,42,Other,Legal,17,PhD,273600.2,3,0,,0
+467,Acme Corp,2020-06-09,37,Other,Marketing,5,Master's,163554.80000000002,4,1,2,1
+468,Acme Corp,2013-08-12,33,Other,HR,12,Bachelor's,281081.60000000003,5,1,,0
+469,Acme Corp,2015-09-02,39,Male,Finance,10,Bachelor's,246808.5,3,1,,0
+470,Acme Corp,2014-03-20,36,Other,Marketing,11,Bachelor's,281577.4,3,0,,0
+471,Acme Corp,2015-11-14,45,Male,Legal,10,High School,233177.7,3,0,,0
+472,Acme Corp,2010-03-26,28,Male,HR,15,PhD,339423.2,4,1,,0
+473,Acme Corp,2008-02-18,29,Male,Finance,17,High School,283623.5,4,0,,0
+474,Acme Corp,2011-09-06,39,Female,Sales,14,Master's,336444.7,4,1,,0
+475,Acme Corp,2019-08-25,35,Other,Finance,6,Master's,217819,4,1,,0
+476,Acme Corp,2012-07-25,55,Female,Legal,13,Bachelor's,271147.10000000003,2,0,,0
+477,Acme Corp,2012-05-13,26,Male,Sales,13,High School,237022,5,0,,0
+478,Acme Corp,2014-06-18,52,Male,Finance,11,High School,170003.9,3,1,,0
+479,Acme Corp,2008-09-17,35,Other,HR,17,PhD,374399.30000000005,2,1,,0
+480,Acme Corp,2015-12-23,42,Male,Sales,10,PhD,255140.90000000002,3,1,,0
+1,Acme Corp,2017-07-08,33,Male,Finance,8,Bachelor's,65871,4,1,,0
+2,Acme Corp,2017-09-08,39,Other,Marketing,8,PhD,72057,4,1,,0
+3,Acme Corp,2010-12-18,32,Female,Engineering,15,PhD,73762,4,0,,0
+4,Acme Corp,2013-05-20,47,Female,Marketing,12,Bachelor's,35590,4,0,5,1
+5,Acme Corp,2019-08-13,32,Male,Engineering,6,Master's,72339,3,1,,0
+6,Acme Corp,2022-05-15,43,Other,Sales,3,High School,55184,2,0,,0
+7,Acme Corp,2015-04-02,31,Other,Finance,10,High School,79354,2,0,,0
+8,Acme Corp,2023-12-03,33,Other,Finance,2,Master's,57560,4,0,,0
+9,Acme Corp,2012-04-12,30,Male,Marketing,13,High School,67072,4,0,,0
+10,Acme Corp,2016-04-10,22,Other,Engineering,9,Master's,81423,3,1,,0
+11,Acme Corp,2019-04-16,43,Female,HR,6,Master's,,5,1,,0
+12,Acme Corp,2016-05-08,41,Male,HR,9,High School,38291,3,0,2,1
+13,Acme Corp,2018-08-12,40,Other,Marketing,7,Master's,67584,3,0,,0
+14,Acme Corp,2017-08-06,37,Male,Marketing,8,PhD,62282,2,1,,0
+15,Acme Corp,2012-06-25,33,Male,HR,13,High School,76020,4,1,,0

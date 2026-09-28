@@ -39,7 +39,7 @@ const ERRORS = {
 
 /* Three facts about the product, not live data — each one checkable. */
 const DIAGNOSTICS = [
-  { value: "8",                   label: "Report sections" },
+  { value: "10",                  label: "Report sections" },
   { value: "0",                   label: "Rows uploaded" },
   { value: `${MAX_SIZE_MB} MB`,   label: "Largest file" },
 ];
