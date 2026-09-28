@@ -15,7 +15,13 @@ const py = (s) => JSON.stringify(s);   // a JSON string literal is a valid Pytho
 const pyList = (items) => `[${items.map(py).join(", ")}]`;
 const IMPUTE_ORDER = ["mean", "median", "most_frequent"];
 
-export function prepPlanToSklearn(plan, cleaningRules = []) {
+/* `options.timeSplit` — { column, cutoff (YYYY-MM-DD), dayFirst } when the report's time
+   checks recommend training on earlier rows. The script then carries a SPLIT switch,
+   because only the user knows whether the date is when the row was recorded or a fact
+   about the entity. `options.model` (default true) adds a first model, cross-validated. */
+export function prepPlanToSklearn(plan, cleaningRules = [], options = {}) {
+  const { timeSplit = null, model = true } = options;
+  const classification = plan.task === "classification";
   const numericBy = Object.fromEntries(IMPUTE_ORDER.map(s => [s, plan.numeric.filter(f => f.impute === s).map(f => f.col)]));
   const numericCols = plan.numeric.map(f => f.col);
   const categoricalCols = plan.categorical.map(f => f.col);
@@ -31,7 +37,14 @@ export function prepPlanToSklearn(plan, cleaningRules = []) {
     "import pandas as pd",
     "from sklearn.compose import ColumnTransformer",
     "from sklearn.impute import MissingIndicator, SimpleImputer",
-    `from sklearn.model_selection import ${plan.groupBy ? "GroupShuffleSplit" : "train_test_split"}`,
+    `from sklearn.model_selection import ${[plan.groupBy ? "GroupShuffleSplit" : "train_test_split",
+      ...(model ? ["cross_val_score", plan.groupBy ? "GroupKFold" : classification && plan.stratify ? "StratifiedKFold" : "KFold"] : []),
+      ...(model && timeSplit ? ["TimeSeriesSplit"] : [])].join(", ")}`,
+    ...(model ? [
+      classification
+        ? "from sklearn.dummy import DummyClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import balanced_accuracy_score, f1_score"
+        : "from sklearn.dummy import DummyRegressor\nfrom sklearn.linear_model import Ridge\nfrom sklearn.metrics import mean_absolute_error, r2_score",
+    ] : []),
     "from sklearn.pipeline import make_pipeline",
     "from sklearn.preprocessing import OneHotEncoder, StandardScaler",
     "",
@@ -99,18 +112,41 @@ export function prepPlanToSklearn(plan, cleaningRules = []) {
     "# ── 5. Split FIRST, so nothing below learns from the test rows ──",
   );
 
-  if (plan.groupBy) {
+  /* The random or grouped split, as lines — indented under the SPLIT switch when a
+     time split is offered. */
+  const defaultSplit = plan.groupBy
+    ? [
+        `# Grouped by "${plan.groupBy}": every row of one value stays on one side. test_size counts groups, not rows.`,
+        `groups = df.loc[X.index, ${py(plan.groupBy)}].fillna(pd.Series("row " + X.index.astype(str), index=X.index))`,
+        "train_idx, test_idx = next(GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42).split(X, y, groups))",
+        "X_train, X_test, y_train, y_test = X.iloc[train_idx], X.iloc[test_idx], y.iloc[train_idx], y.iloc[test_idx]",
+        "groups_train = groups.iloc[train_idx]",
+      ]
+    : [
+        `X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42${plan.stratify ? ", stratify=y" : ""})`,
+        ...(classification && !plan.stratify ? ["# Not stratified: a class has a single row, which cannot sit on both sides."] : []),
+      ];
+
+  if (timeSplit) {
     lines.push(
-      `# Grouped by "${plan.groupBy}": every row of one value stays on one side. test_size counts groups, not rows.`,
-      `groups = df.loc[X.index, ${py(plan.groupBy)}].fillna(pd.Series("row " + X.index.astype(str), index=X.index))`,
-      "train_idx, test_idx = next(GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42).split(X, y, groups))",
-      "X_train, X_test, y_train, y_test = X.iloc[train_idx], X.iloc[test_idx], y.iloc[train_idx], y.iloc[test_idx]",
+      `# The report found that rows move with "${timeSplit.column}" (the Time section). If that column is`,
+      "# WHEN each row was recorded, test on the later rows: a random split would test the model",
+      "# on the period it learned from. If it describes the entity (a hire or birth date), it is a",
+      `# feature, not the time of the row — set SPLIT = ${py(plan.groupBy ? "group" : "random")}.`,
+      'SPLIT = "time"',
+      "",
+      'if SPLIT == "time":',
+      `    when = pd.to_datetime(df.loc[X.index, ${py(timeSplit.column)}], errors="coerce", dayfirst=${timeSplit.dayFirst ? "True" : "False"}, utc=True)`,
+      `    cutoff = pd.Timestamp(${py(timeSplit.cutoff)}, tz="UTC")   # the first 80% of the period trains`,
+      "    order = when[when.notna()].sort_values().index   # rows with no date sit on neither side",
+      "    train_rows = [i for i in order if when[i] < cutoff]",
+      "    test_rows = [i for i in order if when[i] >= cutoff]",
+      "    X_train, X_test, y_train, y_test = X.loc[train_rows], X.loc[test_rows], y.loc[train_rows], y.loc[test_rows]",
+      "else:",
+      ...defaultSplit.map(l => `    ${l}`),
     );
   } else {
-    lines.push(
-      `X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42${plan.stratify ? ", stratify=y" : ""})`,
-      ...(plan.task === "classification" && !plan.stratify ? ["# Not stratified: a class has a single row, which cannot sit on both sides."] : []),
-    );
+    lines.push(...defaultSplit);
   }
 
   lines.push(
@@ -135,10 +171,97 @@ export function prepPlanToSklearn(plan, cleaningRules = []) {
     "",
   );
 
+  if (model) {
+    /* The cross-validation splits the training rows the way the train/test split did:
+       by group, in time order, stratified, or plainly. The preparation is inside the
+       pipeline, so every fold refits it on its own training rows. */
+    const cvFor = (kind) => ({
+      time:   "TimeSeriesSplit(n_splits=5)   # rows are in date order: each fold tests on later rows",
+      group:  "GroupKFold(n_splits=min(5, groups_train.nunique()))   # never more folds than groups",
+      strat:  "StratifiedKFold(n_splits=5, shuffle=True, random_state=42)",
+      plain:  "KFold(n_splits=5, shuffle=True, random_state=42)",
+    })[kind];
+    const fallback = plan.groupBy ? "group" : classification && plan.stratify ? "strat" : "plain";
+    const cvLines = (kind) => [`cv = ${cvFor(kind)}`, ...(kind === "group" ? ["cv_groups = groups_train"] : ["cv_groups = None"])];
+    lines.push(
+      "# ── 7. A first model, and what it is worth ──",
+      classification
+        ? "# Class weights balance the classes, and the score is balanced accuracy — the report's own"
+        : "# Ridge regression, scored in R² and mean absolute error against predicting the training mean.",
+      ...(classification ? ["# measure — so a model that ignores the smaller classes cannot look good."] : []),
+      classification
+        ? 'model = make_pipeline(preprocess, LogisticRegression(class_weight="balanced", max_iter=1000))'
+        : "model = make_pipeline(preprocess, Ridge(alpha=1.0))",
+      classification
+        ? 'know_nothing = make_pipeline(preprocess, DummyClassifier(strategy="most_frequent"))'
+        : 'know_nothing = make_pipeline(preprocess, DummyRegressor(strategy="mean"))',
+      "",
+      ...(timeSplit
+        ? ['if SPLIT == "time":', ...cvLines("time").map(l => `    ${l}`), "else:", ...cvLines(fallback).map(l => `    ${l}`)]
+        : cvLines(fallback)),
+      `scores = cross_val_score(model, X_train, y_train, cv=cv, groups=cv_groups, scoring=${py(classification ? "balanced_accuracy" : "r2")})`,
+      `print("cross-validated ${classification ? "balanced accuracy" : "R²"} on the training rows: %.3f ± %.3f" % (scores.mean(), scores.std()))`,
+      "",
+      "model.fit(X_train, y_train)",
+      "know_nothing.fit(X_train, y_train)",
+      "predicted = model.predict(X_test)",
+      ...(classification
+        ? [
+            'print("test balanced accuracy: %.3f (know-nothing: %.3f)" % (balanced_accuracy_score(y_test, predicted), balanced_accuracy_score(y_test, know_nothing.predict(X_test))))',
+            'print("test macro F1: %.3f" % f1_score(y_test, predicted, average="macro"))',
+          ]
+        : [
+            'print("test R²: %.3f (know-nothing: %.3f)" % (r2_score(y_test, predicted), r2_score(y_test, know_nothing.predict(X_test))))',
+            'print("test mean absolute error: %.4g" % mean_absolute_error(y_test, predicted))',
+          ]),
+      "# A floor, not a result: nothing here is tuned. Beat it with better features before a bigger model.",
+      "",
+    );
+  }
+
   /* Every NUMERIC_* name is read by the loop and the ColumnTransformer above, so
      an empty group is still defined — as an empty list. */
   const defined = IMPUTE_ORDER.filter(s => numericBy[s].length === 0).map(s => `NUMERIC_${s.toUpperCase()} = []`);
   const at = lines.findIndex(l => l.startsWith("CATEGORICAL = "));
   lines.splice(at, 0, ...defined);
   return lines.join("\n");
+}
+
+/* The same script as a Jupyter notebook: one code cell per numbered section, each
+   under a heading, after a short introduction. Nothing is added or dropped — the
+   cells concatenated are the script — so what runs is what was reviewed.
+   nbformat 4.4: cells need no ids, and every Jupyter since 2015 opens it. */
+export function sklearnToNotebook(code, { title = "Preparation pipeline", intro = [] } = {}) {
+  const lines = code.split("\n");
+  const cells = [];
+  const src = (block) => block.map((l, i) => (i < block.length - 1 ? `${l}\n` : l));
+  const markdown = (text) => cells.push({ cell_type: "markdown", metadata: {}, source: src(text.split("\n")) });
+  const codeCell = (block) => {
+    while (block.length && block[block.length - 1].trim() === "") block.pop();
+    if (block.length) cells.push({ cell_type: "code", execution_count: null, metadata: {}, outputs: [], source: src(block) });
+  };
+
+  markdown([`# ${title}`, "", ...intro].join("\n"));
+  let block = [];
+  for (const line of lines) {
+    const section = /^# ── (.+?) ──\s*$/.exec(line) ?? /^# ── (.+)$/.exec(line);
+    if (section) {
+      codeCell(block);
+      block = [];
+      markdown(`## ${section[1].replace(/\s*──\s*$/, "")}`);
+      continue;
+    }
+    block.push(line);
+  }
+  codeCell(block);
+
+  return JSON.stringify({
+    cells,
+    metadata: {
+      kernelspec: { display_name: "Python 3", language: "python", name: "python3" },
+      language_info: { name: "python" },
+    },
+    nbformat: 4,
+    nbformat_minor: 4,
+  }, null, 1);
 }

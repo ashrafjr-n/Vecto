@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TriangleAlert, RotateCcw } from "lucide-react";
 
 import { buildReviewPayload, verifyReview } from "../../../lib/ai/review.js";
-import { findCleaningCandidates } from "../../../lib/ai/cleaning.js";
+import { findCleaningCandidates, proposeEngineRules, verifyCleaningRules } from "../../../lib/ai/cleaning.js";
 import { requestAi } from "../../../lib/ai/requestAi.js";
 import { askDossier } from "../../../lib/ai/askDossier.js";
 import { Link } from "react-router-dom";
@@ -61,7 +61,12 @@ function AiDossier({ data, columns, roles, dossier, onDossier, overrides, onOver
       return;
     }
     onDossier({ ...verified.dossier, model });
-    onCleaning({ candidates, proposal: { ...verified.cleaning, model } });
+    /* The engine's own rules first (the same ones the Quality tab writes without a
+       model), then the model's for whatever the engine could not write. */
+    const engineRules = verifyCleaningRules(proposeEngineRules(candidates, data), { data, columns, candidates }).rules ?? [];
+    const taken = new Set(engineRules.map((r) => `${r.column}|${r.type}`));
+    const added = verified.cleaning.rules.filter((r) => !taken.has(`${r.column}|${r.type}`));
+    onCleaning({ candidates, proposal: { ...verified.cleaning, rules: [...engineRules, ...added], engineRules, model } });
     // A new answer replaces the old rules; ticks on rules it no longer proposes would apply unseen rules.
     onAcceptedRulesChange([]);
     setStatus("idle");

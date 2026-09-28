@@ -10,7 +10,7 @@ import { isLimitCode } from "../../../lib/ai/requestAi.js";
    call looks the same on the target picker and in the report, and always says
    that nothing else depends on it. The feature renders its own idle and result
    content as children. */
-function AiPanel({ title, status, failure, loadingText, onCancel, className = "", children }) {
+function AiPanel({ title, status, failure, loadingText, onCancel, className = "", aiBadge = true, children }) {
   /* A refused ask for a used-up allowance: the notice replaces the panel's body,
      or its "Try again" button would sit under a line saying there is nothing to try. */
   const limited = status === "error" && isLimitCode(failure?.code);
@@ -18,7 +18,8 @@ function AiPanel({ title, status, failure, loadingText, onCancel, className = ""
     <div className={`rounded-2xl border border-line bg-paper-sunken p-5 sm:p-6 ${className}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h2 className="text-[14px] font-semibold tracking-tight text-ink">{title}</h2>
-        <AiBadge>optional</AiBadge>
+        {/* A panel whose first half is the engine's own work labels its AI part itself. */}
+        {aiBadge && <AiBadge>optional</AiBadge>}
       </div>
 
       {status === "loading" && (

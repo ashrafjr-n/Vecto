@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { RotateCcw, ScanSearch, Copy, Check } from "lucide-react";
 
 import { detectColumnRoles } from "../../../utils/core/detectors/roles.js";
-import { findCleaningCandidates, cleaningRulesToPandas } from "../../../../lib/ai/cleaning.js";
+import { findCleaningCandidates, cleaningRulesToPandas, proposeEngineRules, verifyCleaningRules } from "../../../../lib/ai/cleaning.js";
 import { buildReviewPayload, verifyReview } from "../../../../lib/ai/review.js";
 import { requestAi } from "../../../../lib/ai/requestAi.js";
 import { askDossier } from "../../../../lib/ai/askDossier.js";
@@ -48,14 +48,30 @@ function AiCleaningProposals({ result, ai }) {
   const candidates = cleaning?.candidates ?? null;
   const proposal = cleaning?.proposal ?? null;
 
+  /* The scan, then the rules the engine can write itself (proposeEngineRules) — measured
+     by the same verifier as a model's answer. No request, no account. */
   const handleScan = () => {
     setStatus("scanning");
     // Yield one frame so "Scanning" paints before a full pass over a large file blocks the thread.
     setTimeout(() => {
-      onCleaning({ candidates: findCleaningCandidates(originalData, columns, rolesOf()), proposal: null });
+      const found = findCleaningCandidates(originalData, columns, rolesOf());
+      const engine = verifyCleaningRules(proposeEngineRules(found, originalData), { data: originalData, columns, candidates: found });
+      onCleaning({ candidates: found, proposal: { rules: engine.rules ?? [], withheld: [], model: null, source: "engine" } });
       setStatus("idle");
     }, 30);
   };
+
+  /* What the engine could not write a rule for — the only part worth asking a model. */
+  const engineRules = proposal?.source === "engine" ? proposal.rules : (proposal?.engineRules ?? []);
+  const leftForAi = (candidates ?? []).flatMap((col) => col.candidates.flatMap((c) => {
+    const mine = engineRules.filter((r) => r.column === col.name);
+    if (c.kind === "numeric_affix") {
+      const covered = new Set(mine.flatMap((r) => r.affixes.map((a) => a.affix)));
+      return c.affixes.filter((a) => !covered.has(a.affix)).map((a) => `"${a.affix}" in ${col.name}`);
+    }
+    if (c.kind === "sentinel") return mine.some((r) => r.type === "treat_as_missing") ? [] : [`${c.value} in ${col.name}`];
+    return mine.some((r) => r.type === "merge_levels") ? [] : [`spellings in ${col.name}`];
+  }));
 
   const payload = () => buildReviewPayload(originalData, columns, rolesOf(), candidates ?? []);
 
@@ -79,7 +95,11 @@ function AiCleaningProposals({ result, ai }) {
       return;
     }
     onDossier({ ...verified.dossier, model });
-    onCleaning({ candidates, proposal: { ...verified.cleaning, model } });
+    /* The engine's rules stay; the model's are added for what the engine left. */
+    const mine = new Set(engineRules.map(ruleKey));
+    const keys = new Set(engineRules.map((r) => `${r.column}|${r.type}`));
+    const added = verified.cleaning.rules.filter((r) => !mine.has(ruleKey(r)) && !keys.has(`${r.column}|${r.type}`));
+    onCleaning({ candidates, proposal: { ...verified.cleaning, rules: [...engineRules, ...added], engineRules, model } });
     setStatus("idle");
   };
 
@@ -97,7 +117,8 @@ function AiCleaningProposals({ result, ai }) {
 
   return (
     <AiPanel
-      title="Cleaning proposals"
+      title="Cleaning rules"
+      aiBadge={false}
       status={status}
       failure={failure}
       onCancel={() => { runRef.current?.abort(); setStatus("idle"); }}
@@ -110,12 +131,14 @@ function AiCleaningProposals({ result, ai }) {
       {status !== "scanning" && !candidates && (
         <>
           <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
-            Finds values that look dirty: numbers written with a unit or bound (&quot;42 Lac&quot;,
-            &quot;125+&quot;), one category spelled several ways, placeholders such as -999. The scan
-            runs in this tab and sends nothing.
+            Finds values that look dirty — numbers written with a currency, a scale word or a bound
+            (&quot;$1,200&quot;, &quot;42 Lac&quot;, &quot;125+&quot;), one category spelled several ways,
+            placeholders such as -999 — and writes a rule for each one whose meaning does not depend on
+            the file. Every rule is measured on a copy before you can tick it. It runs in this tab and
+            sends nothing.
           </p>
           <button type="button" onClick={handleScan} className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line-strong px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-tint">
-            <ScanSearch size={14} /> Scan for cleaning candidates
+            <ScanSearch size={14} /> Find cleaning rules
           </button>
         </>
       )}
@@ -146,15 +169,43 @@ function AiCleaningProposals({ result, ai }) {
 
       {proposal && (
         <div className="mt-5 space-y-5">
-          <p className="font-mono text-[11px] text-ink-faint">
-            answered by {proposal.model ?? "an unknown model"} ·{" "}
-            <button type="button" onClick={handleAsk} className="inline-flex items-center gap-1 hover:text-ink"><RotateCcw size={11} /> ask again</button>
-          </p>
+          <CandidateSummary candidates={candidates ?? []} />
+          {proposal.source === "engine" ? (
+            <p className="font-mono text-[11px] text-ink-faint">written by the engine — no AI, nothing sent</p>
+          ) : (
+            <p className="font-mono text-[11px] text-ink-faint">
+              {engineRules.length ? `${engineRules.length} by the engine, the rest answered by` : "answered by"} {proposal.model ?? "an unknown model"} ·{" "}
+              <button type="button" onClick={handleAsk} className="inline-flex items-center gap-1 hover:text-ink"><RotateCcw size={11} /> ask again</button>
+            </p>
+          )}
 
           {proposal.rules.length === 0 ? (
-            <p className="text-[13px] text-ink-soft">The model proposed no rules for these candidates.</p>
+            <p className="text-[13px] text-ink-soft">{(candidates ?? []).length ? "No rule could be written for these candidates without knowing what the file is about." : "Nothing to clean."}</p>
           ) : (
             <CleaningRuleList rules={proposal.rules} picked={picked} onToggle={toggle} />
+          )}
+
+          {proposal.source === "engine" && leftForAi.length > 0 && (
+            <div className="rounded-xl border border-line bg-paper px-4 py-3.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-[12.5px] font-medium text-ink">Left for a review</h3>
+                <AiBadge>optional</AiBadge>
+              </div>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-soft">
+                {leftForAi.slice(0, 4).join(", ")}{leftForAi.length > 4 ? ` and ${leftForAi.length - 4} more` : ""} — whether
+                these are units the rest of the column shares depends on what the file is about. The column review can
+                propose rules for them{dossier ? "" : ", and describes each column too"}.
+              </p>
+              <AiPayloadPreview
+                build={payload}
+                sent={<>Sends a summary of every column with these values, never rows, to free AI models (Google Gemini, or OpenRouter as a fallback), whose providers may log requests and use them to improve their products. <Link to="/privacy" className="underline decoration-line-strong underline-offset-2 hover:text-ink">Privacy</Link></>}
+              />
+              <AiGate ctaLabel="Sign in to review the rest" onAfterSignIn={handleAsk}>
+                <button type="button" onClick={handleAsk} className="mt-4 inline-flex items-center rounded-xl border border-line-strong px-4 py-2 text-[12.5px] font-semibold text-ink transition-colors hover:bg-accent-tint">
+                  {status === "error" ? "Try again" : "Propose rules for the rest"}
+                </button>
+              </AiGate>
+            </div>
           )}
 
           {proposal.withheld.length > 0 && (

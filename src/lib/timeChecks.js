@@ -53,7 +53,7 @@ export function runTimeChecks(result, rows, now = Date.now()) {
       times[i] = t;
       if (t !== null) parsed++;
     }
-    if (!best || parsed > best.parsed) best = { col, times, parsed, assumed };
+    if (!best || parsed > best.parsed) best = { col, times, parsed, assumed, dayFirst };
   }
   if (!best || best.parsed < MIN_ROWS) return null;
 
@@ -132,6 +132,7 @@ export function runTimeChecks(result, rows, now = Date.now()) {
     column: best.col,
     others: dateCols.filter(c => c !== best.col),
     dayFirstAssumed: best.assumed,
+    dayFirst: best.dayFirst,
     parsed: best.parsed,
     unparsed: rows.length - best.parsed,
     from, to,
