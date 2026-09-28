@@ -56,6 +56,9 @@ check("personal data is a fix", buildReadiness(run(people, "y")).items.some(i =>
 const entity = buildReadiness({ ...run(clean, "y"), sameTargetValues: [{ column: "customer_id", values: 50, repeatedRows: 500, sameTargetShare: 0.99, overallShare: 0.5 }] });
 check("an entity that repeats the target asks for a group split", entity.items.some(i => i.level === "fix" && /Rows repeat by "customer_id"/.test(i.title)));
 
+const dated = { ...run(clean, "y"), sameTargetValues: [{ column: "g", values: 50, repeatedRows: 500, sameTargetShare: 0.99, overallShare: 0.5 }] };
+dated.meta = { ...dated.meta, columnRoles: { ...dated.meta.columnRoles, g: "temporal" } };
+check("a date column is never called an entity to split by", !buildReadiness(dated).items.some(i => /Rows repeat by/.test(i.title)));
 check("no report, no checklist", buildReadiness(null) === null);
 
 if (failed) { console.error(`${failed} readiness check(s) failed`); process.exit(1); }
