@@ -12,6 +12,9 @@
    → { verdict: "blocked" | "fix" | "ready" | "no_target", items: [{ level, title, detail, tab }] } */
 
 import { buildPrepPlan } from "./prep/plan.js";
+import { ROLE } from "../components/utils/core/roles.constants.js";
+
+const ROLE_TEMPORAL = ROLE.TEMPORAL;
 import { PERSONAL_LABEL } from "../components/utils/core/detectors/personal.js";
 
 /* A class with fewer rows than this cannot be learned or validated: five folds leave
@@ -115,7 +118,9 @@ export function buildReadiness(result) {
 
   /* ── splitting ── */
   const plan = buildPrepPlan(result);
-  const entities = (result.sameTargetValues ?? []).map(s => s.column).filter(c => !leaks.includes(c));
+  /* A date can repeat its target without naming an entity — the Time section reads it. */
+  const entities = (result.sameTargetValues ?? []).map(s => s.column)
+    .filter(c => !leaks.includes(c) && meta.columnRoles[c] !== ROLE_TEMPORAL);
   if (entities.length) {
     add("fix", `Rows repeat by ${quote(entities)}`,
       `Rows sharing a value of ${entities.length === 1 ? "this column" : "these columns"} almost always share the target. A random split puts the same entity in train and test, and the score overstates how the model does on new ones — split by group${plan.usable && plan.groupBy ? ` (the plan groups by "${plan.groupBy}")` : ""}.`,

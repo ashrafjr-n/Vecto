@@ -1,0 +1,301 @@
+price,area,age,furnished,sold
+10 Lac,800 sqft,-999,semi furnished,no
+501000,801,21,Furnished,no
+502000,802,22,Unfurnished,no
+503000,803,23,Semi-Furnished,yes
+504000,804,24,Furnished,yes
+505000,805,25,Unfurnished,yes
+506000,806 sqft,26,Semi-Furnished,no
+$1091,807,27,Furnished,no
+508000,808,28,Unfurnished,no
+509000,809,29,Semi-Furnished,yes
+20 Lac,810,30,Furnished,yes
+511000,811,31,Unfurnished,no
+512000,812 sqft,32,Semi-Furnished,no
+513000,813,33,Furnished,no
+$1182,814,34,Unfurnished,yes
+515000,815,35,semi furnished,yes
+516000,816,36,Furnished,no
+517000,817,37,Unfurnished,no
+518000,818 sqft,38,Semi-Furnished,no
+519000,819,39,Furnished,yes
+30 Lac,820,40,Unfurnished,yes
+$1273,821,41,Semi-Furnished,yes
+522000,822,42,Furnished,no
+523000,823,43,Unfurnished,no
+524000,824 sqft,44,Semi-Furnished,yes
+525000,825,-999,Furnished,yes
+526000,826,46,Unfurnished,yes
+527000,827,47,Semi-Furnished,no
+$1364,828,48,Furnished,no
+529000,829,49,Unfurnished,no
+40 Lac,830 sqft,50,semi furnished,yes
+531000,831,51,Furnished,yes
+532000,832,52,Unfurnished,no
+533000,833,53,Semi-Furnished,no
+534000,834,54,Furnished,no
+$1455,835,55,Unfurnished,yes
+536000,836 sqft,56,Semi-Furnished,yes
+537000,837,57,Furnished,no
+538000,838,58,Unfurnished,no
+539000,839,59,Semi-Furnished,no
+50 Lac,840,60,Furnished,yes
+541000,841,61,Unfurnished,yes
+$1546,842 sqft,62,Semi-Furnished,yes
+543000,843,63,Furnished,no
+544000,844,64,Unfurnished,no
+545000,845,65,semi furnished,no
+546000,846,66,Furnished,yes
+547000,847,67,Unfurnished,yes
+548000,848 sqft,68,Semi-Furnished,no
+$1637,849,69,Furnished,no
+10 Lac,850,-999,Unfurnished,no
+551000,851,21,Semi-Furnished,yes
+552000,852,22,Furnished,yes
+553000,853,23,Unfurnished,no
+554000,854 sqft,24,Semi-Furnished,no
+555000,855,25,Furnished,no
+$1728,856,26,Unfurnished,yes
+557000,857,27,Semi-Furnished,yes
+558000,858,28,Furnished,no
+559000,859,29,Unfurnished,no
+20 Lac,860 sqft,30,semi furnished,no
+561000,861,31,Furnished,yes
+562000,862,32,Unfurnished,yes
+$1819,863,33,Semi-Furnished,yes
+564000,864,34,Furnished,no
+565000,865,35,Unfurnished,no
+566000,866 sqft,36,Semi-Furnished,no
+567000,867,37,Furnished,yes
+568000,868,38,Unfurnished,yes
+569000,869,39,Semi-Furnished,no
+30 Lac,870,40,Furnished,no
+571000,871,41,Unfurnished,no
+572000,872 sqft,42,Semi-Furnished,yes
+573000,873,43,Furnished,yes
+574000,874,44,Unfurnished,no
+575000,875,-999,semi furnished,no
+576000,876,46,Furnished,no
+$2001,877,47,Unfurnished,yes
+578000,878 sqft,48,Semi-Furnished,yes
+579000,879,49,Furnished,no
+40 Lac,880,50,Unfurnished,no
+581000,881,51,Semi-Furnished,no
+582000,882,52,Furnished,yes
+583000,883,53,Unfurnished,yes
+$2092,884 sqft,54,Semi-Furnished,yes
+585000,885,55,Furnished,no
+586000,886,56,Unfurnished,no
+587000,887,57,Semi-Furnished,no
+588000,888,58,Furnished,yes
+589000,889,59,Unfurnished,yes
+50 Lac,890 sqft,60,semi furnished,no
+$2183,891,61,Furnished,no
+592000,892,62,Unfurnished,no
+593000,893,63,Semi-Furnished,yes
+594000,894,64,Furnished,yes
+595000,895,65,Unfurnished,no
+596000,896 sqft,66,Semi-Furnished,no
+597000,897,67,Furnished,no
+$2274,898,68,Unfurnished,yes
+599000,899,69,Semi-Furnished,yes
+10 Lac,900,-999,Furnished,no
+601000,901,21,Unfurnished,no
+602000,902 sqft,22,Semi-Furnished,no
+603000,903,23,Furnished,yes
+604000,904,24,Unfurnished,yes
+$2365,905,25,semi furnished,yes
+606000,906,26,Furnished,no
+607000,907,27,Unfurnished,no
+608000,908 sqft,28,Semi-Furnished,no
+609000,909,29,Furnished,yes
+20 Lac,910,30,Unfurnished,yes
+611000,911,31,Semi-Furnished,no
+$2456,912,32,Furnished,no
+613000,913,33,Unfurnished,no
+614000,914 sqft,34,Semi-Furnished,yes
+615000,915,35,Furnished,yes
+616000,916,36,Unfurnished,no
+617000,917,37,Semi-Furnished,no
+618000,918,38,Furnished,no
+$2547,919,39,Unfurnished,yes
+30 Lac,920 sqft,40,semi furnished,yes
+621000,921,41,Furnished,yes
+622000,922,42,Unfurnished,no
+623000,923,43,Semi-Furnished,no
+624000,924,44,Furnished,yes
+625000,925,-999,Unfurnished,yes
+$2638,926 sqft,46,Semi-Furnished,yes
+627000,927,47,Furnished,no
+628000,928,48,Unfurnished,no
+629000,929,49,Semi-Furnished,no
+40 Lac,930,50,Furnished,yes
+631000,931,51,Unfurnished,yes
+632000,932 sqft,52,Semi-Furnished,no
+$2729,933,53,Furnished,no
+634000,934,54,Unfurnished,no
+635000,935,55,semi furnished,yes
+636000,936,56,Furnished,yes
+637000,937,57,Unfurnished,no
+638000,938 sqft,58,Semi-Furnished,no
+639000,939,59,Furnished,no
+50 Lac,940,60,Unfurnished,yes
+641000,941,61,Semi-Furnished,yes
+642000,942,62,Furnished,yes
+643000,943,63,Unfurnished,no
+644000,944 sqft,64,Semi-Furnished,no
+645000,945,65,Furnished,no
+646000,946,66,Unfurnished,yes
+$2911,947,67,Semi-Furnished,yes
+648000,948,68,Furnished,no
+649000,949,69,Unfurnished,no
+10 Lac,950 sqft,-999,semi furnished,no
+651000,951,21,Furnished,yes
+652000,952,22,Unfurnished,yes
+653000,953,23,Semi-Furnished,no
+$3002,954,24,Furnished,no
+655000,955,25,Unfurnished,no
+656000,956 sqft,26,Semi-Furnished,yes
+657000,957,27,Furnished,yes
+658000,958,28,Unfurnished,no
+659000,959,29,Semi-Furnished,no
+20 Lac,960,30,Furnished,no
+$3093,961,31,Unfurnished,yes
+662000,962 sqft,32,Semi-Furnished,yes
+663000,963,33,Furnished,yes
+664000,964,34,Unfurnished,no
+665000,965,35,semi furnished,no
+666000,966,36,Furnished,no
+667000,967,37,Unfurnished,yes
+$3184,968 sqft,38,Semi-Furnished,yes
+669000,969,39,Furnished,no
+30 Lac,970,40,Unfurnished,no
+671000,971,41,Semi-Furnished,no
+672000,972,42,Furnished,yes
+673000,973,43,Unfurnished,yes
+674000,974 sqft,44,Semi-Furnished,no
+$3275,975,-999,Furnished,no
+676000,976,46,Unfurnished,no
+677000,977,47,Semi-Furnished,yes
+678000,978,48,Furnished,yes
+679000,979,49,Unfurnished,no
+40 Lac,980 sqft,50,semi furnished,no
+681000,981,51,Furnished,no
+$3366,982,52,Unfurnished,yes
+683000,983,53,Semi-Furnished,yes
+684000,984,54,Furnished,yes
+685000,985,55,Unfurnished,no
+686000,986 sqft,56,Semi-Furnished,no
+687000,987,57,Furnished,no
+688000,988,58,Unfurnished,yes
+$3457,989,59,Semi-Furnished,yes
+50 Lac,990,60,Furnished,no
+691000,991,61,Unfurnished,no
+692000,992 sqft,62,Semi-Furnished,no
+693000,993,63,Furnished,yes
+694000,994,64,Unfurnished,yes
+695000,995,65,semi furnished,no
+$3548,996,66,Furnished,no
+697000,997,67,Unfurnished,no
+698000,998 sqft,68,Semi-Furnished,yes
+699000,999,69,Furnished,yes
+10 Lac,1000,-999,Unfurnished,no
+701000,1001,21,Semi-Furnished,no
+702000,1002,22,Furnished,no
+$3639,1003,23,Unfurnished,yes
+704000,1004 sqft,24,Semi-Furnished,yes
+705000,1005,25,Furnished,yes
+706000,1006,26,Unfurnished,no
+707000,1007,27,Semi-Furnished,no
+708000,1008,28,Furnished,no
+709000,1009,29,Unfurnished,yes
+20 Lac,1010 sqft,30,semi furnished,yes
+711000,1011,31,Furnished,no
+712000,1012,32,Unfurnished,no
+713000,1013,33,Semi-Furnished,no
+714000,1014,34,Furnished,yes
+715000,1015,35,Unfurnished,yes
+716000,1016 sqft,36,Semi-Furnished,no
+$3821,1017,37,Furnished,no
+718000,1018,38,Unfurnished,no
+719000,1019,39,Semi-Furnished,yes
+30 Lac,1020,40,Furnished,yes
+721000,1021,41,Unfurnished,yes
+722000,1022 sqft,42,Semi-Furnished,no
+723000,1023,43,Furnished,no
+$3912,1024,44,Unfurnished,yes
+725000,1025,-999,semi furnished,yes
+726000,1026,46,Furnished,yes
+727000,1027,47,Unfurnished,no
+728000,1028 sqft,48,Semi-Furnished,no
+729000,1029,49,Furnished,no
+40 Lac,1030,50,Unfurnished,yes
+$4003,1031,51,Semi-Furnished,yes
+732000,1032,52,Furnished,no
+733000,1033,53,Unfurnished,no
+734000,1034 sqft,54,Semi-Furnished,no
+735000,1035,55,Furnished,yes
+736000,1036,56,Unfurnished,yes
+737000,1037,57,Semi-Furnished,no
+$4094,1038,58,Furnished,no
+739000,1039,59,Unfurnished,no
+50 Lac,1040 sqft,60,semi furnished,yes
+741000,1041,61,Furnished,yes
+742000,1042,62,Unfurnished,yes
+743000,1043,63,Semi-Furnished,no
+744000,1044,64,Furnished,no
+$4185,1045,65,Unfurnished,no
+746000,1046 sqft,66,Semi-Furnished,yes
+747000,1047,67,Furnished,yes
+748000,1048,68,Unfurnished,no
+749000,1049,69,Semi-Furnished,no
+10 Lac,1050,-999,Furnished,no
+751000,1051,21,Unfurnished,yes
+$4276,1052 sqft,22,Semi-Furnished,yes
+753000,1053,23,Furnished,no
+754000,1054,24,Unfurnished,no
+755000,1055,25,semi furnished,no
+756000,1056,26,Furnished,yes
+757000,1057,27,Unfurnished,yes
+758000,1058 sqft,28,Semi-Furnished,no
+$4367,1059,29,Furnished,no
+20 Lac,1060,30,Unfurnished,no
+761000,1061,31,Semi-Furnished,yes
+762000,1062,32,Furnished,yes
+763000,1063,33,Unfurnished,yes
+764000,1064 sqft,34,Semi-Furnished,no
+765000,1065,35,Furnished,no
+$4458,1066,36,Unfurnished,no
+767000,1067,37,Semi-Furnished,yes
+768000,1068,38,Furnished,yes
+769000,1069,39,Unfurnished,no
+30 Lac,1070 sqft,40,semi furnished,no
+771000,1071,41,Furnished,no
+772000,1072,42,Unfurnished,yes
+$4549,1073,43,Semi-Furnished,yes
+774000,1074,44,Furnished,no
+775000,1075,-999,Unfurnished,no
+776000,1076 sqft,46,Semi-Furnished,no
+777000,1077,47,Furnished,yes
+778000,1078,48,Unfurnished,yes
+779000,1079,49,Semi-Furnished,no
+40 Lac,1080,50,Furnished,no
+781000,1081,51,Unfurnished,no
+782000,1082 sqft,52,Semi-Furnished,yes
+783000,1083,53,Furnished,yes
+784000,1084,54,Unfurnished,yes
+785000,1085,55,semi furnished,no
+786000,1086,56,Furnished,no
+$4731,1087,57,Unfurnished,no
+788000,1088 sqft,58,Semi-Furnished,yes
+789000,1089,59,Furnished,yes
+50 Lac,1090,60,Unfurnished,no
+791000,1091,61,Semi-Furnished,no
+792000,1092,62,Furnished,no
+793000,1093,63,Unfurnished,yes
+$4822,1094 sqft,64,Semi-Furnished,yes
+795000,1095,65,Furnished,no
+796000,1096,66,Unfurnished,no
+797000,1097,67,Semi-Furnished,no
+798000,1098,68,Furnished,yes
+799000,1099,69,Unfurnished,yes
