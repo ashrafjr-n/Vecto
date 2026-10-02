@@ -2,7 +2,7 @@
 --   npx wrangler d1 execute vecto-db --local  --file=migrations/0001_init.sql
 --   npx wrangler d1 execute vecto-db --remote --file=migrations/0001_init.sql
 --
--- Four tables, no more. There is deliberately NO `usage` counter table: a month's
+-- Four tables, no more. There is deliberately NO `usage` counter table: a day's
 -- usage is COUNT(*) over `analyses` for that period, so there is no second number
 -- that can drift out of step with the first.
 
@@ -29,8 +29,9 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 
 -- One row per analysis (one dataset/report), whatever number of AI requests it
--- needed. `period` is 'YYYY-MM' in UTC — the monthly reset is this key changing,
--- not a scheduled job, so there is nothing to run at midnight on the 1st.
+-- needed. `period` is 'YYYY-MM-DD' in UTC (it was 'YYYY-MM' until 2026-09-23) — the
+-- daily reset is this key changing, not a scheduled job, so there is nothing to
+-- run at midnight. A row with requests = 0 is a reservation (worker/usage.js claimQuota).
 CREATE TABLE IF NOT EXISTS analyses (
   user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   analysis_id TEXT    NOT NULL,
