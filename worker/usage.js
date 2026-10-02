@@ -79,11 +79,22 @@ export function monthStart(now = new Date()) {
    scoped to one user, so it needs to be well-formed, not unguessable. */
 export const validAnalysisId = (id) => typeof id === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(id);
 
+/* How long a reservation holds a slot before it is treated as abandoned. A claim is
+   written BEFORE the model is asked and released if the answer fails; but when the
+   browser disconnects (Cancel, its own 180 s timeout) the Worker may be cancelled
+   before it can release anything. Such a row must not cost the user an analysis for
+   ever, so a row with no answered request counts only while it is this young — well
+   past the 180 s the page waits, and past a slow fallback chain behind it. */
+export const PENDING_MS = 10 * 60_000;
+
+/* "Counts against the user": answered at least once, or a reservation still in flight. */
+const LIVE = "(requests > 0 OR created_at > ?)";
+
 export async function usageFor(env, userId) {
   const period = periodOf();
   const row = await env.DB
-    .prepare("SELECT COUNT(*) AS used FROM analyses WHERE user_id = ? AND period = ?")
-    .bind(userId, period)
+    .prepare(`SELECT COUNT(*) AS used FROM analyses WHERE user_id = ? AND period = ? AND ${LIVE}`)
+    .bind(userId, period, Date.now() - PENDING_MS)
     .first();
   return {
     used:   row?.used ?? 0,
@@ -93,37 +104,68 @@ export async function usageFor(env, userId) {
   };
 }
 
-/* May this request go to the model? → { ok: true } | { ok: false, error, status }.
-   Nothing is written here: a request that is allowed but then fails upstream must
-   leave no trace. */
-export async function checkQuota(env, userId, analysisId) {
-  const existing = await env.DB
-    .prepare("SELECT requests FROM analyses WHERE user_id = ? AND analysis_id = ?")
-    .bind(userId, analysisId)
+/* May this request go to the model? Reserves the analysis if it is new.
+   → { ok: true, created } | { ok: false, error, status }.
+
+   Checking and then charging after the answer let N requests sent at once, each
+   with a new id, all pass the check during the 30-90 s the model takes — the daily
+   allowance was only as strong as one request at a time. So a NEW analysis is
+   claimed by one statement that inserts its row only while the day and the month
+   still have room: D1 runs one statement at a time, so two claims cannot both take
+   the last slot. `created` tells handleAi the row is this request's to release if
+   the answer fails (releaseAnalysis) — a failure still costs the user nothing. */
+export async function claimQuota(env, userId, analysisId) {
+  const cutoff = Date.now() - PENDING_MS;
+  const live = () => env.DB
+    .prepare(`SELECT requests FROM analyses WHERE user_id = ? AND analysis_id = ? AND ${LIVE}`)
+    .bind(userId, analysisId, cutoff)
     .first();
 
+  const existing = await live();
   if (existing) {
-    // Already paid for. Free until the ceiling, which no real file reaches.
+    // Already paid for (or being paid for). Free until the ceiling, which no real file reaches.
     return existing.requests >= MAX_REQUESTS_PER_ANALYSIS
       ? { ok: false, error: "analysis_request_limit", status: 429 }
-      : { ok: true };
+      : { ok: true, created: false };
   }
 
+  /* The day's allowance, then the month's safety net behind it — a daily reset alone
+     would let one account draw 3 × 30 a month for ever. Both are counted off the same
+     rows, so neither can drift from the other. An abandoned reservation of this same
+     id is taken over (the DO UPDATE), never a live one: its WHERE refuses that. */
+  const period = periodOf();
+  const result = await env.DB
+    .prepare(`INSERT INTO analyses (user_id, analysis_id, period, requests, created_at)
+              SELECT ?, ?, ?, 0, ?
+              WHERE (SELECT COUNT(*) FROM analyses WHERE user_id = ? AND period = ? AND ${LIVE}) < ?
+                AND (SELECT COUNT(*) FROM analyses WHERE user_id = ? AND created_at >= ? AND ${LIVE}) < ?
+              ON CONFLICT(user_id, analysis_id) DO UPDATE SET
+                period = excluded.period, created_at = excluded.created_at
+              WHERE analyses.requests = 0 AND analyses.created_at <= ?`)
+    .bind(
+      userId, analysisId, period, Date.now(),
+      userId, period, cutoff, freeAnalyses(env),
+      userId, monthStart(), cutoff, monthlyCeiling(env),
+      cutoff,
+    )
+    .run();
+  if ((result?.meta?.changes ?? 0) > 0) return { ok: true, created: true };
+
+  // Nothing written: a sibling request claimed this id a moment ago, or a limit is reached.
+  if (await live()) return { ok: true, created: false };
   const { used, limit } = await usageFor(env, userId);
-  if (used >= limit) return { ok: false, error: "quota_exhausted", status: 402 };
+  return used >= limit
+    ? { ok: false, error: "quota_exhausted", status: 402 }
+    : { ok: false, error: "monthly_ceiling", status: 402 };
+}
 
-  /* A safety net behind the daily allowance, not a number the UI leads with: a
-     daily reset alone would let one account draw 3 × 30 a month for ever. Counted
-     off `created_at`, so it needs no column of its own and cannot drift from the
-     daily count — they read the same rows. */
-  const ceiling = monthlyCeiling(env);
-  const month = await env.DB
-    .prepare("SELECT COUNT(*) AS used FROM analyses WHERE user_id = ? AND created_at >= ?")
-    .bind(userId, monthStart())
-    .first();
-  if ((month?.used ?? 0) >= ceiling) return { ok: false, error: "monthly_ceiling", status: 402 };
-
-  return { ok: true };
+/* The answer failed: give the reservation back. Only a row no request has been
+   charged on — a sibling part that already succeeded keeps the analysis paid for. */
+export async function releaseAnalysis(env, userId, analysisId) {
+  await env.DB
+    .prepare("DELETE FROM analyses WHERE user_id = ? AND analysis_id = ? AND requests = 0")
+    .bind(userId, analysisId)
+    .run();
 }
 
 /* After a successful answer: charge the analysis (creating it on first use). The
@@ -151,12 +193,13 @@ export async function recordUsage(env, userId, analysisId, meta = {}) {
 export async function historyFor(env, userId, limit = 20) {
   const { results } = await env.DB
     .prepare(`SELECT analysis_id, created_at, rows, columns
-              FROM analyses WHERE user_id = ?
+              FROM analyses WHERE user_id = ? AND requests > 0
               ORDER BY created_at DESC LIMIT ?`)
     .bind(userId, limit)
     .all();
-  /* No "reviewed" flag: a row exists only because `recordUsage` ran, and that only
-     runs after a successful answer, so every row here IS a deeper review. A field
+  /* No "reviewed" flag: only rows with an answered request are listed (a reservation
+     still in flight, or abandoned, is not an analysis yet), so every row here IS a
+     deeper review. A field
      that is true on every row tells the reader nothing. */
   return (results ?? []).map((r) => ({
     analysisId: r.analysis_id,

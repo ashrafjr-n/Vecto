@@ -24,7 +24,7 @@ import { REVIEW_SCHEMA } from "../src/lib/ai/reviewSchema.js";
 import { reviewMessages } from "./reviewPrompt.js";
 import { json, originAllowed } from "./http.js";
 import * as auth from "./auth.js";
-import { checkQuota, recordUsage, recordBudget, reserveBudget, budgetAvailable, usageFor, validAnalysisId, historyFor } from "./usage.js";
+import { claimQuota, releaseAnalysis, recordUsage, recordBudget, reserveBudget, budgetAvailable, usageFor, validAnalysisId, historyFor } from "./usage.js";
 import { completeGemini } from "./gemini.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -193,12 +193,14 @@ async function handleAi(request, env) {
      already paid for is free (up to a ceiling no real file reaches), so a wide
      file sent in six parts still costs one of the three daily analyses. */
   const analysisId = body?.analysisId;
+  let claimed = false;
   if (!fromEval) {
     if (!validAnalysisId(analysisId)) return json({ error: "invalid_analysis_id" }, 400);
-    const allowed = await checkQuota(env, user.id, analysisId);
+    const allowed = await claimQuota(env, user.id, analysisId);
     if (!allowed.ok) {
       return json({ error: allowed.error, usage: await usageFor(env, user.id) }, allowed.status);
     }
+    claimed = allowed.created;
   }
 
   /* Every request sent upstream is counted against its provider's day BEFORE it is
@@ -254,7 +256,12 @@ async function handleAi(request, env) {
     }
     return last ?? { error: json({ error: "budget_exhausted" }, 503) };
   };
-  const failed = async (res) => (retried ? json({ ...(await res.json()), retried }, res.status) : res);
+  /* Every failure after the claim goes through here, so a reservation this request
+     made is always given back: a failed answer must never cost the user an analysis. */
+  const failed = async (res) => {
+    if (claimed) await releaseAnalysis(env, user.id, analysisId);
+    return retried ? json({ ...(await res.json()), retried }, res.status) : res;
+  };
 
   const messages = task.messages(body.payload);
   let reply = await ask(messages);
@@ -271,7 +278,7 @@ async function handleAi(request, env) {
     ]);
     if (reply.error) return failed(reply.error);
     parsed = parseJson(reply.content);
-    if (parsed.error) return json({ error: "invalid_json", message: parsed.error, ...(retried && { retried }) }, 502);
+    if (parsed.error) return failed(json({ error: "invalid_json", message: parsed.error }, 502));
   }
 
   /* The user is charged only here, on a successful answer. A provider failure must
@@ -293,6 +300,9 @@ async function handleAi(request, env) {
 }
 
 async function complete(apiKey, models, name, task, messages) {
+  /* A network failure rejects instead of answering. Turned into the same error object
+     as an upstream failure (as gemini.js does), or it escapes handleAi as a bare 500
+     and skips the release of the user's reservation. */
   const res = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -313,7 +323,8 @@ async function complete(apiKey, models, name, task, messages) {
         json_schema: { name, strict: true, schema: task.schema },
       },
     }),
-  });
+  }).catch((err) => ({ failed: String(err?.message ?? err) }));
+  if (res.failed) return { error: json({ error: "upstream_error", message: res.failed }, 502) };
   const data = await res.json().catch(() => null);
   const message = data?.error?.message;
 
