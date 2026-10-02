@@ -3,9 +3,16 @@
    No imports. Used by all other modules.
 ───────────────────────────────────────────── */
 
+/* A number when the whole value reads as one AND parseFloat reads the same one.
+   The second half is what `isFinite(val)` alone missed: it accepts "0x1A", "0b101"
+   and "0o7" (26, 5, 7), while parseFloat — and so toNumber — reads all three as 0,
+   which then merged them with the level "0". pandas does not take them as numbers
+   either. Every other value answers exactly as before (whitespace, exponents,
+   "Infinity", "1,234", "12kg"). */
 export function isNumeric(val) {
   if (val === null || val === undefined || val === "") return false;
-  return !isNaN(parseFloat(val)) && isFinite(val);
+  const n = Number(val);
+  return Number.isFinite(n) && n === parseFloat(val);
 }
 
 export function getValues(data, col) {
