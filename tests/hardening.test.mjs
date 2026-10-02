@@ -638,6 +638,16 @@ check("the synchronous path RETURNS a failure instead of throwing",
   (() => { const r = runAnalysisSync(null, null, null);
            return r.result === null && typeof r.error === "string" && r.error.length > 0; })());
 
+/* A fresh upload starts with no target chosen (undefined): the guess is made inside the
+   run — in the worker in a browser — instead of freezing the page before it. null is
+   still "no target", and must never be replaced by a guess. */
+const guessed = runAnalysisSync(wRows, ["a", "b", "y"], undefined);
+check("an unchosen target is the engine's own guess, made inside the run",
+  guessed.error === null && guessed.result.meta.target === detectTarget(["a", "b", "y"], wRows)
+  && guessed.result.meta.target === "y");
+check("null still means no target, never a guess",
+  runAnalysisSync(wRows, ["a", "b", "y"], null).result.meta.target === null);
+
 /* `Worker` is undefined in Node, so this exercises the exact fallback branch a
    blocked or broken worker would take in a browser. */
 const asyncRun = await runAnalysis(wRows, ["a", "b", "y"], "y");
