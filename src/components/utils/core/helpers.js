@@ -47,6 +47,17 @@ export const MISSING_TOKENS = new Set(["", "na", "n/a", "nan", "null", "none", "
 export function isMissing(v) {
   if (v == null) return true;                 // null or undefined
   if (typeof v !== "string") return Number.isNaN(v);  // stray NaN number
+  /* Fast exits, same answer. A value starting with visible ASCII has nothing for trim()
+     to remove at that end, so its first character is the token's: every token starts
+     with "n", "N" or "?" (the empty one has no first character and takes the slow path).
+     And every token is ≤ 4 characters once trimmed, so a longer value with visible ASCII
+     at both ends is none. This runs on every cell several times over; trim +
+     toLowerCase allocated two strings each time. */
+  const first = v.charCodeAt(0), last = v.charCodeAt(v.length - 1);
+  if (first > 32 && first < 127) {
+    if (first !== 110 && first !== 78 && first !== 63) return false;   // n N ?
+    if (v.length > 4 && last > 32 && last < 127) return false;
+  }
   return MISSING_TOKENS.has(v.trim().toLowerCase());  // trims whitespace-only too
 }
 
@@ -653,18 +664,25 @@ export function discretize(values) {
   return values.map(normalizeValue);
 }
 
-/* Average ranks, ties shared — the transform Spearman is defined on. */
+/* Average ranks, ties shared — the transform Spearman is defined on.
+   A typed copy sorted natively, then one rank per DISTINCT value, then a lookup per
+   row. It used to sort an array of [value, index] pairs — one small array per value,
+   which on a 386k-row file was most of the engine's garbage-collection time. Same
+   ranks, value for value: a tie's members all get the mean of its positions, so the
+   order inside a tie never mattered (and -0 and 0 stay one tie, as `===` had them). */
 function rankValues(values) {
-  const order = values.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]);
-  const ranks = new Array(values.length);
+  const n = values.length;
+  const sorted = Float64Array.from(values).sort();
+  const rankOf = new Map();
   let i = 0;
-  while (i < order.length) {
+  while (i < n) {
     let j = i;
-    while (j + 1 < order.length && order[j + 1][0] === order[i][0]) j++;
-    const shared = (i + j) / 2 + 1;              // 1-based, averaged over the tie
-    for (let k = i; k <= j; k++) ranks[order[k][1]] = shared;
+    while (j + 1 < n && sorted[j + 1] === sorted[i]) j++;
+    rankOf.set(sorted[i], (i + j) / 2 + 1);       // 1-based, averaged over the tie
     i = j + 1;
   }
+  const ranks = new Array(n);
+  for (let k = 0; k < n; k++) ranks[k] = rankOf.get(values[k]);
   return ranks;
 }
 
@@ -691,21 +709,14 @@ export function pearsonOf(xs, ys) {
    missing or non-numeric). Used to rank ONCE PER COLUMN instead of once per
    pair — see the note at the matrix scan in relations.js. */
 export function rankColumn(data, col) {
-  const idx = [];
+  const rows = [], values = [];
   for (let i = 0; i < data.length; i++) {
     const v = toNumber(data[i][col]);
-    if (!isNaN(v)) idx.push([v, i]);
+    if (!isNaN(v)) { rows.push(i); values.push(v); }
   }
   const ranks = new Array(data.length).fill(NaN);
-  idx.sort((p, q) => p[0] - q[0]);
-  let i = 0;
-  while (i < idx.length) {
-    let j = i;
-    while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++;
-    const shared = (i + j) / 2 + 1;
-    for (let k = i; k <= j; k++) ranks[idx[k][1]] = shared;
-    i = j + 1;
-  }
+  const ranked = rankValues(values);
+  for (let k = 0; k < rows.length; k++) ranks[rows[k]] = ranked[k];
   return ranks;
 }
 
