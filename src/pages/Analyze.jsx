@@ -114,7 +114,9 @@ function Analyze() {
     const pending = getPendingDataset();
     if (pending) {
       const { data, columns: cols, encoding, fileName } = pending;
-      return { step: "target", data, columns: cols, encoding, fileName, target: detectTarget(cols, data), result: null, error: null };
+      /* target undefined: the engine guesses it inside the analysis worker (runAnalysisSync),
+         not here — on a large file that guess alone froze the page for seconds. */
+      return { step: "target", data, columns: cols, encoding, fileName, target: undefined, result: null, error: null };
     }
     return null;
   });
@@ -122,7 +124,8 @@ function Analyze() {
   const [step,           setStep]           = useState(entry?.step   ?? "target");
   const [csvData]                           = useState(entry?.data    ?? null);
   const [columns]                           = useState(entry?.columns ?? []);
-  const [target,         setTarget]         = useState(entry?.target ?? "");
+  // undefined (a fresh upload) is "not chosen yet", which `??` would turn into "" — no target.
+  const [target,         setTarget]         = useState(entry ? entry.target : "");
   // Which phase the engine is in, pushed by runAnalysis while the worker runs.
   const [phase,          setPhase]          = useState(null);
   const [analysisResult, setAnalysisResult] = useState(entry?.result ?? null);
@@ -271,6 +274,8 @@ function Analyze() {
           return;
         }
         setAnalysisResult(result);
+        // The target the report was built for — the engine's guess on a first run.
+        setTarget(result.meta.target);
         setAnalysisData(rows);
         setCleaningRules(rules);
         setStep("results");
@@ -302,6 +307,9 @@ function Analyze() {
      kept, so the user can start again or pick a different one. */
   const handleCancel = () => {
     runRef.current?.abort();
+    /* Cancelled before the first report: the guess was being made inside that run, so
+       make it here for the picker's "engine's guess", as it was before the move. */
+    if (target === undefined) setTarget(detectTarget(columns, csvData));
     setStep("target");
   };
 
