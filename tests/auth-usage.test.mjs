@@ -17,7 +17,7 @@
 
 import worker from "../worker/index.js";
 import {
-  checkQuota, recordUsage, usageFor, resetsOn, periodOf, validAnalysisId,
+  claimQuota, releaseAnalysis, recordUsage, usageFor, resetsOn, periodOf, validAnalysisId,
   budgetAvailable, monthStart, historyFor, MAX_REQUESTS_PER_ANALYSIS,
   reserveBudget, budgetKey, providerBudget,
 } from "../worker/usage.js";
@@ -128,32 +128,40 @@ globalThis.fetch = async () => {
 
 /* ── the quota rules ──────────────────────────────────────────────────────── */
 
+/* claimQuota's SQL is EXECUTED in quota-sql.test.mjs; here the stub's `changes` stands
+   for what that statement did, and the checks are about the decision taken from it. */
+
 {
-  // A fresh analysis for a user who has used 2 of 3 today, well under the month.
-  const env = { ...ENV(), DB: stubDb([null, { used: 2 }, { used: 4 }]) };
-  check("a new analysis is allowed under the daily limit", (await checkQuota(env, 1, ID)).ok === true);
+  // A fresh analysis: no row for this id, and the guarded insert wrote one.
+  const env = { ...ENV(), DB: stubDb([null], { changes: 1 }) };
+  const verdict = await claimQuota(env, 1, ID);
+  check("a new analysis under the limits is claimed", verdict.ok === true && verdict.created === true);
+  const insert = env.DB.statements[1].sql;
+  check("the claim is one statement guarded by the day AND the month",
+    /INSERT INTO analyses/.test(insert) && /period = \?/.test(insert) && /created_at >= \?/.test(insert));
 }
 
 {
-  // Under the day, but the month's safety net is full.
-  const env = { ...ENV(), DB: stubDb([null, { used: 0 }, { used: 25 }]) };
-  const verdict = await checkQuota(env, 1, ID);
+  // Nothing written, no sibling claimed it, the day still has room → the month refused.
+  const env = { ...ENV(), DB: stubDb([null, null, { used: 0 }], { changes: 0 }) };
+  const verdict = await claimQuota(env, 1, ID);
   check("the monthly ceiling blocks even on a fresh day", verdict.ok === false && verdict.error === "monthly_ceiling");
   check("the ceiling answers 402, like the daily limit", verdict.status === 402);
-  check("hitting the ceiling writes nothing", env.DB.writes === 0);
 }
 
 {
-  const env = { ...ENV(), DB: stubDb([null, { used: 0 }, { used: 24 }]) };
-  check("one below the ceiling still passes", (await checkQuota(env, 1, ID)).ok === true);
-}
-
-{
-  const env = { ...ENV(), DB: stubDb([null, { used: 3 }]) };
-  const verdict = await checkQuota(env, 1, ID);
+  const env = { ...ENV(), DB: stubDb([null, null, { used: 3 }], { changes: 0 }) };
+  const verdict = await claimQuota(env, 1, ID);
   check("the fourth analysis of a day is refused", verdict.ok === false && verdict.error === "quota_exhausted");
   check("quota_exhausted is 402, not 401 or 500", verdict.status === 402);
-  check("refusing to allow writes nothing", env.DB.writes === 0);
+}
+
+{
+  // The insert lost to a sibling part of the same file that claimed the id first.
+  const env = { ...ENV(), DB: stubDb([null, { requests: 0 }], { changes: 0 }) };
+  const verdict = await claimQuota(env, 1, ID);
+  check("a part that lost the claim to its sibling still passes", verdict.ok === true);
+  check("...and does not own the reservation, so never releases it", verdict.created === false);
 }
 
 {
@@ -162,14 +170,22 @@ globalThis.fetch = async () => {
      lookup is by (user_id, analysis_id) and never reads the period, which is
      also why a review begun before midnight stays free after it. */
   const env = { ...ENV(), DB: stubDb([{ requests: 4 }]) };
-  check("a later part of a paid analysis is free", (await checkQuota(env, 1, ID)).ok === true);
-  check("continuing an analysis never runs the day or month query", env.DB.statements.length === 1);
+  const verdict = await claimQuota(env, 1, ID);
+  check("a later part of a paid analysis is free", verdict.ok === true && verdict.created === false);
+  check("continuing an analysis runs one query and writes nothing", env.DB.statements.length === 1 && env.DB.writes === 0);
 }
 
 {
   const env = { ...ENV(), DB: stubDb([{ requests: MAX_REQUESTS_PER_ANALYSIS }]) };
-  const verdict = await checkQuota(env, 1, ID);
+  const verdict = await claimQuota(env, 1, ID);
   check("one analysis id cannot be reused without end", verdict.ok === false && verdict.error === "analysis_request_limit");
+}
+
+{
+  const env = { ...ENV(), DB: stubDb() };
+  await releaseAnalysis(env, 1, ID);
+  check("a release removes only a reservation no request was charged on",
+    /requests = 0/.test(env.DB.statements[0].sql) && env.DB.statements[0].args.join() === `1,${ID}`);
 }
 
 {
@@ -248,6 +264,29 @@ check("each provider has its own daily allowance",
     body: JSON.stringify({ task: "ping", analysisId: ID }),
   }), env);
   check("one provider with requests left keeps the endpoint open", res.status !== 503);
+}
+
+/* ── a failed answer gives its reservation back ──────────────────────────── */
+
+for (const [label, upstream, wantRelease] of [
+  ["a provider error", () => new Response("{}", { status: 500 }), true],
+  ["no network at all", () => { throw new TypeError("fetch failed"); }, true],
+  ["a good answer", () => new Response(JSON.stringify({ model: "a/one:free", choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200 }), false],
+]) {
+  const saved = globalThis.fetch;
+  globalThis.fetch = async () => upstream();
+  // session → budget open → no row for this id → the claim inserted one.
+  const env = { ...ENV(), DB: stubDb([{ id: 1, login: "u", avatar_url: null, plan: "free" }, { requests: 3 }, null], { changes: 1 }) };
+  const res = await worker.fetch(new Request("https://vecto.test/api/ai", {
+    method: "POST", headers: { Origin: "https://vecto.test", Cookie: "vecto_session=abc" },
+    body: JSON.stringify({ task: "ping", analysisId: ID }),
+  }), env);
+  globalThis.fetch = saved;
+  const released = env.DB.statements.some((st) => /^DELETE FROM analyses/.test(st.sql));
+  check(`${label}: ${wantRelease ? "the reservation is released" : "the analysis is kept"}`, released === wantRelease);
+  if (label === "no network at all") {
+    check("no network is a JSON upstream_error, not a bare 500", res.status === 502 && (await res.json()).error === "upstream_error");
+  }
 }
 
 /* ── history: counts only ─────────────────────────────────────────────────── */
