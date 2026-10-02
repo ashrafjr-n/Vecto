@@ -58,7 +58,8 @@ export const budgetKey = (provider = "openrouter", now = new Date()) =>
    (user_id, analysis_id) and never looks at the period, so a review begun at
    23:58 and continued at 00:02 is still the same analysis and is still free. */
 export const periodOf = (now = new Date()) => now.toISOString().slice(0, 10);
-export const dayOf    = (now = new Date()) => now.toISOString().slice(0, 10);
+// The budget's day — the same UTC day as the allowance's period, by construction.
+export const dayOf    = periodOf;
 
 /* The day after this one, as 'YYYY-MM-DD' — when the allowance comes back.
    Derived, never stored. Date handles month and year ends. */
