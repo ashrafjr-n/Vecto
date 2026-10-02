@@ -567,15 +567,21 @@ export function getRelationshipsV3(data, numericCols, target, skipCols = new Set
   const catCols = categoricalCols.filter(c => c !== target && !skipCols.has(c))
                                  .slice(0, CATEGORICAL_PAIR_LIMIT);
   const catLevels = new Map(catCols.map(c => [c, data.map(r => r[c]).map(normalizeValue)]));
+  /* Which rows each column is missing on, decided once per column like its levels
+     above. Asked inside the pair loop it was two isMissing calls per row per PAIR —
+     300 pairs at the 25-column limit, ~60 million calls on a 100k-row file, which
+     was most of the engine's time on diabetic_data. Same rows, same answer. */
+  const catMissing = new Map(catCols.map(c => [c, Uint8Array.from(data, r => (isMissing(r[c]) ? 1 : 0))]));
 
   const categoricalAssociations = [];
   for (let i = 0; i < catCols.length; i++) {
     for (let j = i + 1; j < catCols.length; j++) {
       const a = catCols[i], b = catCols[j];
       const la = catLevels.get(a), lb = catLevels.get(b);
+      const ma = catMissing.get(a), mb = catMissing.get(b);
       const va = [], vb = [];
       for (let k = 0; k < data.length; k++) {
-        if (isMissing(data[k][a]) || isMissing(data[k][b])) continue;
+        if (ma[k] || mb[k]) continue;
         va.push(la[k]); vb.push(lb[k]);
       }
       if (va.length < 5) continue;
