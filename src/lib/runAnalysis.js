@@ -14,13 +14,20 @@
    not a handover. */
 
 import { analyzeWithDiagnostic } from "./prep/diagnostic.js";
+import { detectTarget } from "../components/utils/core/detectors/target.js";
 
 /* Direct call, errors returned rather than thrown. The results-step call site is
    asynchronous and ErrorBoundary only catches errors thrown during render, so a
    throw escaping here leaves a spinner turning forever with no message. */
+/* `target` undefined means "not chosen yet": the engine's own guess is taken here,
+   inside the run, rather than by the page before it starts — detectTarget reads
+   every column's roles, which is 3 s on a 386k-row file, and on the main thread
+   that was 3 s of a frozen page before the spinner could even draw. null (or "")
+   still means "no target". The guess comes back as result.meta.target. */
 export function runAnalysisSync(data, columns, target, onPhase, roleOverrides) {
   try {
-    return { result: analyzeWithDiagnostic(data, columns, target, onPhase, roleOverrides), error: null };
+    const chosen = target === undefined ? detectTarget(columns, data) : target;
+    return { result: analyzeWithDiagnostic(data, columns, chosen, onPhase, roleOverrides), error: null };
   } catch (err) {
     console.error("analyzeDataset() failed:", err);
     return { result: null, error: err?.message ?? "Unknown error" };

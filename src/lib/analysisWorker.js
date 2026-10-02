@@ -9,19 +9,17 @@
    The engine is imported here exactly as it is imported anywhere else: it stays
    pure, offline and deterministic, and knows nothing about where it runs. */
 
-import { analyzeWithDiagnostic } from "./prep/diagnostic.js";
+import { runAnalysisSync } from "./runAnalysis.js";
 
 self.onmessage = (event) => {
   const { data, columns, target, roleOverrides } = event.data ?? {};
-  try {
-    /* Phase messages are tagged so runAnalysis() can tell an update from the
-       answer. The final message carries `result`/`error` and nothing else does. */
-    const onPhase = (phase) => self.postMessage({ type: "phase", phase });
-    self.postMessage({ result: analyzeWithDiagnostic(data, columns, target, onPhase, roleOverrides), error: null });
-  } catch (err) {
-    // Errors are RETURNED, not thrown. A throw here would surface as a bare
-    // worker error event with no message, which is how the old synchronous path
-    // used to leave the spinner turning forever.
-    self.postMessage({ result: null, error: err?.message ?? "Unknown error" });
-  }
+  /* Phase messages are tagged so runAnalysis() can tell an update from the
+     answer. The final message carries `result`/`error` and nothing else does.
+     The same function as the main-thread fallback, so the two cannot differ: it
+     takes the engine's target guess when none was chosen, and RETURNS errors
+     rather than throwing — a throw here would surface as a bare worker error
+     event with no message, which is how the old synchronous path used to leave
+     the spinner turning forever. */
+  const onPhase = (phase) => self.postMessage({ type: "phase", phase });
+  self.postMessage(runAnalysisSync(data, columns, target, onPhase, roleOverrides));
 };
