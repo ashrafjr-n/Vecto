@@ -11,7 +11,8 @@ import { getQuality } from "../src/components/utils/core/analyzers/quality.js";
 import { analyzeDataset } from "../src/components/utils/core/index.js";
 import { detectColumnRoles } from "../src/components/utils/core/detectors/roles.js";
 import { getVisualizations } from "../src/components/utils/core/analyzers/stats.js";
-import { etaCorrelation, medcouple, adjustedFences, quantileSorted, rankEta, oddsRatio } from "../src/components/utils/core/helpers.js";
+import { etaCorrelation, medcouple, adjustedFences, quantileSorted, rankEta, oddsRatio,
+         isNumeric, toNumber, normalizeValue } from "../src/components/utils/core/helpers.js";
 import { ROLE } from "../src/components/utils/core/roles.constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -666,5 +667,18 @@ const understates = Math.abs(expPair.spearman_rho) - Math.abs(expPair.pearson_r)
 if (!understates) failures++;
 console.log(`${understates ? "PASS" : "FAIL"}  Pearson materially understates a monotonic non-linear pair ` +
             `(r=${expPair.pearson_r.toFixed(3)} vs rho=${expPair.spearman_rho.toFixed(3)}) — the case Spearman exists to catch`);
+
+/* One string→number policy, and it must agree with itself: `isFinite` takes "0x1A" as
+   26 while parseFloat reads 0, so a prefixed integer was counted as a number and
+   valued as zero — merged with the level "0". pandas reads neither as a number. */
+console.log("\nNumber policy — prefixed integers are not numbers\n");
+const prefixed = ["0x1A", "0X1a", "0b101", "0o7", " 0x10"];
+const plain = [["12", 12], [" 12 ", 12], ["1e3", 1000], [".5", 0.5], ["-0", -0], ["00012", 12]];
+const numberPolicyOk =
+  prefixed.every(v => !isNumeric(v) && Number.isNaN(toNumber(v)) && normalizeValue(v) !== "0")
+  && plain.every(([v, n]) => isNumeric(v) && Object.is(toNumber(v), n))
+  && ["1,234", "12kg", "125+", "Infinity", " ", "abc"].every(v => !isNumeric(v));
+if (!numberPolicyOk) failures++;
+console.log(`${numberPolicyOk ? "PASS" : "FAIL"}  "0x1A", "0b101", "0o7" are values, not 0; ordinary numbers read as before`);
 
 process.exit(failures === 0 ? 0 : 1);
